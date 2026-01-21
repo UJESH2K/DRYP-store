@@ -70,7 +70,7 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ message: err.message || 'Server error' });
 });
 
-const PORT = process.env.PORT || 5000; // Backend runs on port 5000
+const PORT = process.env.PORT || 8080; // Backend runs on port 8080
 
 // Start server
 (async () => {

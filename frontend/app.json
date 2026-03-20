@@ -6,26 +6,33 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "dryp",
+
+    "icon": "./assets/icon.png",
+
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "backgroundColor": "#000000",
-      "package": "com.dryp.app"
+      "package": "com.dryp.app",
+      "versionCode": 1
     },
+    "plugins": ["expo-font"],
     "extra": {
       "eas": {
-        "projectId": "6e689fa4-06f0-45d8-87e3-49563c8716ef"
+        "projectId": "98b13c46-4429-4145-8db9-1ea1ee234685"
       }
     },
-    "plugins": [
-      "expo-font"
-    ]
+    "owner": "prithwisk07"
   }
 }

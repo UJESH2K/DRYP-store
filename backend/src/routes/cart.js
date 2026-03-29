@@ -136,16 +136,42 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { identifyUser } = require("../middleware/auth");
 
-// Helper function to match the frontend's cart ID logic
+// The Ultimate Hammer: Match the frontend's cart ID logic perfectly
 const generateCartId = (productId, options) => {
-  if (!options || Object.keys(options).length === 0) {
-    return productId.toString();
+  const idStr =
+    productId && productId._id
+      ? productId._id.toString()
+      : productId.toString();
+
+  if (!options) return idStr;
+
+  let plainOptions = {};
+  try {
+    if (options instanceof Map) {
+      plainOptions = Object.fromEntries(options);
+    } else {
+      // Strips away ALL database internals instantly
+      plainOptions = JSON.parse(JSON.stringify(options));
+    }
+  } catch (error) {
+    console.error("Cart ID parsing error:", error);
   }
-  const sortedOptions = Object.keys(options)
+
+  // Filter out DB internals
+  const keys = Object.keys(plainOptions || {}).filter(
+    (k) => k !== "_id" && k !== "id",
+  );
+
+  if (keys.length === 0) {
+    return idStr;
+  }
+
+  const sortedOptions = keys
     .sort()
-    .map((key) => `${key}-${options[key]}`)
+    .map((key) => `${key}-${plainOptions[key]}`)
     .join("_");
-  return `${productId.toString()}_${sortedOptions}`;
+
+  return `${idStr}_${sortedOptions}`;
 };
 
 // Helper function to find or create a cart
@@ -167,8 +193,6 @@ const getOrCreateCart = async (req) => {
 };
 
 // @route   GET /api/cart
-// @desc    Get user's or guest's cart
-// @access  Public
 router.get("/", identifyUser, async (req, res) => {
   try {
     const cart = await getOrCreateCart(req);
@@ -184,8 +208,6 @@ router.get("/", identifyUser, async (req, res) => {
 });
 
 // @route   POST /api/cart
-// @desc    Add an item to the cart
-// @access  Public
 router.post("/", identifyUser, async (req, res) => {
   try {
     const { productId, quantity, price, options } = req.body;
@@ -204,7 +226,6 @@ router.post("/", identifyUser, async (req, res) => {
 
     const incomingCartId = generateCartId(productId, options);
 
-    // Find by composite ID instead of just productId
     const cartItemIndex = cart.items.findIndex(
       (item) => generateCartId(item.product, item.options) === incomingCartId,
     );
@@ -220,7 +241,10 @@ router.post("/", identifyUser, async (req, res) => {
       });
     }
 
+    // Tell Mongoose EXPLICITLY that the array changed
+    cart.markModified("items");
     await cart.save();
+
     await cart.populate("items.product");
     res.json(cart.items);
   } catch (error) {
@@ -230,8 +254,6 @@ router.post("/", identifyUser, async (req, res) => {
 });
 
 // @route   DELETE /api/cart/:cartItemId
-// @desc    Remove an item from the cart
-// @access  Public
 router.delete("/:cartItemId", identifyUser, async (req, res) => {
   try {
     const { cartItemId } = req.params;
@@ -241,12 +263,14 @@ router.delete("/:cartItemId", identifyUser, async (req, res) => {
       return res.status(404).json({ message: "Cart not found" });
     }
 
-    // Filter out the item that matches the composite ID
     cart.items = cart.items.filter(
       (item) => generateCartId(item.product, item.options) !== cartItemId,
     );
 
+    // Tell Mongoose EXPLICITLY that the array changed
+    cart.markModified("items");
     await cart.save();
+
     await cart.populate("items.product");
     res.json(cart.items);
   } catch (error) {
@@ -256,8 +280,6 @@ router.delete("/:cartItemId", identifyUser, async (req, res) => {
 });
 
 // @route   PUT /api/cart/:cartItemId
-// @desc    Update item quantity in the cart
-// @access  Public
 router.put("/:cartItemId", identifyUser, async (req, res) => {
   try {
     const { cartItemId } = req.params;
@@ -272,7 +294,6 @@ router.put("/:cartItemId", identifyUser, async (req, res) => {
       return res.status(404).json({ message: "Cart not found" });
     }
 
-    // Find by composite ID
     const cartItemIndex = cart.items.findIndex(
       (item) => generateCartId(item.product, item.options) === cartItemId,
     );
@@ -283,7 +304,10 @@ router.put("/:cartItemId", identifyUser, async (req, res) => {
       return res.status(404).json({ message: "Item not found in cart" });
     }
 
+    // Tell Mongoose EXPLICITLY that the array changed
+    cart.markModified("items");
     await cart.save();
+
     await cart.populate("items.product");
     res.json(cart.items);
   } catch (error) {

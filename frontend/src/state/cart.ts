@@ -40,59 +40,6 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       
-      // fetchCart: async () => {
-      //   try {
-      //     const data = await apiCall('/api/cart');
-      //     if (Array.isArray(data)) {
-      //       const syncedItems = data.map((item: any) => ({
-      //         id: generateCartId(item.product._id || item.product, item.options),
-      //         productId: item.product._id || item.product,
-      //         title: item.product.title || 'Product', // Fallback if not fully populated
-      //         price: item.price,
-      //         image: item.product.images?.[0] || '',
-      //         brand: item.product.brand || '',
-      //         quantity: item.quantity,
-      //         options: item.options
-      //       }));
-      //       set({ items: syncedItems });
-      //     }
-      //   } catch (error) {
-      //     console.error("Failed to sync cart from server:", error);
-      //   }
-      // },
-
-      // fetchCart: async () => {
-      //   try {
-      //     const data = await apiCall('/api/cart');
-      //     if (Array.isArray(data)) {
-      //       // Deduplicate items just in case the backend sends corrupted duplicate data
-      //       const syncedItems = data.reduce((acc: CartItem[], item: any) => {
-      //         const id = generateCartId(item.product._id || item.product, item.options);
-      //         const existingItem = acc.find(i => i.id === id);
-              
-      //         if (existingItem) {
-      //           existingItem.quantity += item.quantity;
-      //         } else {
-      //           acc.push({
-      //             id,
-      //             productId: item.product._id || item.product,
-      //             title: item.product.title || 'Product',
-      //             price: item.price,
-      //             image: item.product.images?.[0] || '',
-      //             brand: item.product.brand || '',
-      //             quantity: item.quantity,
-      //             options: item.options
-      //           });
-      //         }
-      //         return acc;
-      //       }, []);
-      //       set({ items: syncedItems });
-      //     }
-      //   } catch (error) {
-      //     console.error("Failed to sync cart from server:", error);
-      //   }
-      // },
-
       fetchCart: async () => {
         try {
           const data = await apiCall('/api/cart');
@@ -170,51 +117,6 @@ export const useCartStore = create<CartState>()(
         }
       },
       
-      // removeFromCart: async (id) => {
-      //   const itemToRemove = get().items.find(i => i.id === id);
-
-      //   // Update local state immediately
-      //   set((state) => ({
-      //     items: state.items.filter(item => item.id !== id)
-      //   }));
-
-      //   // Delete from the backend
-      //   if (itemToRemove) {
-      //     try {
-      //       await apiCall(`/api/cart/${itemToRemove.id}`, { method: 'DELETE' });
-      //     } catch (error) {
-      //       console.error("Failed to delete cart item on server:", error);
-      //     }
-      //   }
-      // },
-      
-      // updateQuantity: async (id, quantity) => {
-      //   const itemToUpdate = get().items.find(i => i.id === id);
-
-      //   // Update local state immediately
-      //   set((state) => ({
-      //     items: state.items.map(item =>
-      //       item.id === id ? { ...item, quantity: Math.max(0, quantity) } : item
-      //     ).filter(item => item.quantity > 0), // Remove if quantity is 0
-      //   }));
-
-      //   // Update on the backend
-      //   if (itemToUpdate) {
-      //     try {
-      //       if (quantity <= 0) {
-      //         await apiCall(`/api/cart/${itemToUpdate.id}`, { method: 'DELETE' });
-      //       } else {
-      //         await apiCall(`/api/cart/${itemToUpdate.id}`, {
-      //           method: 'PUT',
-      //           body: JSON.stringify({ quantity })
-      //         });
-      //       }
-      //     } catch (error) {
-      //       console.error("Failed to update cart quantity on server:", error);
-      //     }
-      //   }
-      // },
-
       removeFromCart: async (id) => {
         const itemToRemove = get().items.find(i => i.id === id);
 

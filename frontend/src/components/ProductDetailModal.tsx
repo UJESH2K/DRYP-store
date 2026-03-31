@@ -6,7 +6,6 @@ import {
   Image,
   ScrollView,
   Pressable,
-  ActivityIndicator,
   Alert,
   Dimensions,
   Animated,
@@ -26,7 +25,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
 
-const generateCartId = (productId: string, options?: { [key: string]: string }) => {
+const generateCartId = (productId: string, options?: Record<string, string>) => {
   if (!options || Object.keys(options).length === 0) {
     return productId;
   }
@@ -52,6 +51,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [displayImages, setDisplayImages] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [recentlyAddedToCart, setRecentlyAddedToCart] = useState<Set<string>>(new Set());
   const [isProductInWishlist, setIsProductInWishlist] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{
@@ -75,12 +75,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         onClose();
         return true;
       };
-
-      const backHandler = BackHandler.addEventListener(
-        'hardwareBackPress',
-        backAction
-      );
-
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
       return () => backHandler.remove();
     }
   }, [isVisible, onClose]);
@@ -90,6 +85,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
       setLoading(true);
       fetchProductDetails(productId);
       setSelectedColor(null);
+      setSelectedSize(null);
       setSelectedVariant(null);
       Animated.spring(detailsPosition, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
     } else if (!isVisible) {
@@ -98,6 +94,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         setActiveImageIndex(0);
         setDisplayImages([]);
         setSelectedColor(null);
+        setSelectedSize(null);
         setSelectedVariant(null);
       });
     }
@@ -105,14 +102,13 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
 
   useEffect(() => {
     if (product && product.variants) {
-      if (selectedColor) {
-        const variant = product.variants.find(v => v.options.Color === selectedColor);
-        setSelectedVariant(variant || null);
-      } else {
-        setSelectedVariant(null);
-      }
+      const variant = product.variants.find(v => 
+        (!v.options.Size || v.options.Size === selectedSize) && 
+        (!v.options.Color || v.options.Color === selectedColor)
+      );
+      setSelectedVariant(variant || null);
     }
-  }, [selectedColor, product]);
+  }, [selectedSize, selectedColor, product]);
 
   useEffect(() => {
     if (product) {
@@ -149,9 +145,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
     }
   };
 
-  const handleColorSelect = (color: string) => {
-    setSelectedColor(color);
-  };
+  const handleColorSelect = (color: string) => setSelectedColor(color);
 
   const onImageScroll = useCallback((event: any) => {
     const scrollX = event.nativeEvent.contentOffset.x;
@@ -178,7 +172,6 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         await addToWishlist(product);
       }
     } catch (error) {
-      console.warn(error);
       setAlertInfo({
         visible: true,
         title: 'Error',
@@ -191,15 +184,31 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
   const handleCartAction = useCallback(() => {
     if (!product) return;
 
-    const itemOptions = selectedColor ? { Color: selectedColor } : undefined;
-    const cartId = generateCartId(product._id, itemOptions);
+    const needsSize = product.options?.some((opt: ProductOption) => opt.name === 'Size' && opt.values.length > 0);
+    const needsColor = product.options?.some((opt: ProductOption) => opt.name === 'Color' && opt.values.length > 0);
+
+    if (needsSize && !selectedSize) {
+      setAlertInfo({ visible: true, title: 'Selection Required', message: 'Please select a size.', buttons: [{ text: 'OK', onPress: () => setAlertInfo(null) }] });
+      return;
+    }
+    if (needsColor && !selectedColor) {
+      setAlertInfo({ visible: true, title: 'Selection Required', message: 'Please select a color.', buttons: [{ text: 'OK', onPress: () => setAlertInfo(null) }] });
+      return;
+    }
+
+    const finalOptions: Record<string, string> = {
+      ...(selectedSize ? { Size: selectedSize } : {}),
+      ...(selectedColor ? { Color: selectedColor } : {})
+    };
+
+    const cartId = generateCartId(product._id, finalOptions);
     const isInCart = cartItems.some(item => item.id === cartId);
 
     if (isInCart) {
       removeFromCart(cartId);
     } else {
       const itemPrice = selectedVariant?.price ?? product.basePrice;
-      const itemImage = selectedVariant?.images?.[0] || product.images[0];
+      const itemImage = selectedVariant?.images?.[0] || product.images?.[0] || '';
       
       addToCart({
         id: cartId,
@@ -208,12 +217,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         brand: product.brand,
         image: itemImage,
         price: itemPrice,
-        options: itemOptions,
+        options: finalOptions,
         quantity: 1,
       });
 
       setRecentlyAddedToCart(prev => new Set(prev).add(cartId));
-      
       setTimeout(() => {
         setRecentlyAddedToCart(prev => {
           const newSet = new Set(prev);
@@ -222,7 +230,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         });
       }, 2000);
     }
-  }, [product, selectedColor, selectedVariant, cartItems, addToCart, removeFromCart]);
+  }, [product, selectedSize, selectedColor, selectedVariant, cartItems, addToCart, removeFromCart]);
 
   const renderImageIndicators = () => {
     if (displayImages.length <= 1) return null;
@@ -246,29 +254,27 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
   };
 
   const colorOption = product.options?.find((opt: ProductOption) => opt.name === 'Color');
-  const currentOptions = selectedColor ? { Color: selectedColor } : undefined;
+  const sizeOption = product.options?.find((opt: ProductOption) => opt.name === 'Size');
+  
+  const currentOptions: Record<string, string> = {
+    ...(selectedSize ? { Size: selectedSize } : {}),
+    ...(selectedColor ? { Color: selectedColor } : {})
+  };
+  
   const cartId = generateCartId(product._id, currentOptions);
   const isInCart = cartItems.some(item => item.id === cartId);
   const justAdded = recentlyAddedToCart.has(cartId);
   
   let buttonText = 'Add to Cart';
-  if (justAdded) {
-    buttonText = 'Added to Cart';
-  } else if (isInCart) {
-    buttonText = 'Remove from Cart';
-  }
+  if (justAdded) buttonText = 'Added to Cart';
+  else if (isInCart) buttonText = 'Remove from Cart';
 
   const bottomPadding = 24 + (insets.bottom || 0) + 80;
 
   return (
     <Animated.View style={[styles.detailsView, { transform: [{ translateY: detailsPosition }] }]} accessibilityViewIsModal>
       {alertInfo && (
-        <CustomAlert
-          visible={alertInfo.visible}
-          title={alertInfo.title}
-          message={alertInfo.message}
-          buttons={alertInfo.buttons}
-        />
+        <CustomAlert visible={alertInfo.visible} title={alertInfo.title} message={alertInfo.message} buttons={alertInfo.buttons} />
       )}
       <Pressable onPress={onClose} style={styles.closeButton}>
         <Ionicons name="chevron-down" size={30} color="#333" />
@@ -288,6 +294,26 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
           <Text style={styles.detailsBrand}>{product.brand}</Text>
           <Text style={styles.detailsTitle}>{product.name}</Text>
 
+          {/* Size Options */}
+          {sizeOption && sizeOption.values.length > 0 && (
+            <View style={styles.optionContainer}>
+              <Text style={styles.optionTitle}>Size</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorOptionsContainer}>
+                {sizeOption.values.map((sizeValue: string) => (
+                  <Pressable
+                    key={sizeValue}
+                    style={[styles.colorTextOptionButton, selectedSize === sizeValue && styles.colorTextOptionButtonSelected]}
+                    onPress={() => setSelectedSize(sizeValue)}
+                  >
+                    <Text style={[styles.colorTextOptionText, selectedSize === sizeValue && styles.colorTextOptionTextSelected]}>
+                      {sizeValue}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Color Options */}
           {colorOption && colorOption.values.length > 0 && (
             <View style={styles.optionContainer}>
@@ -296,16 +322,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
                 {colorOption.values.map((colorValue: string) => (
                   <Pressable
                     key={colorValue}
-                    style={[
-                      styles.colorTextOptionButton,
-                      selectedColor === colorValue && styles.colorTextOptionButtonSelected,
-                    ]}
+                    style={[styles.colorTextOptionButton, selectedColor === colorValue && styles.colorTextOptionButtonSelected]}
                     onPress={() => handleColorSelect(colorValue)}
                   >
-                    <Text style={[
-                      styles.colorTextOptionText,
-                      selectedColor === colorValue && styles.colorTextOptionTextSelected,
-                    ]}>
+                    <Text style={[styles.colorTextOptionText, selectedColor === colorValue && styles.colorTextOptionTextSelected]}>
                       {colorValue}
                     </Text>
                   </Pressable>
@@ -323,16 +343,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
               <Ionicons name={isProductInWishlist ? "bookmark" : "bookmark-outline"} size={32} color={isProductInWishlist ? "#000" : "#888"} />
             </Pressable>
             <Pressable
-              style={[
-                styles.detailsButton,
-                { flex: 1 },
-                justAdded ? styles.addedToCartButton : (isInCart ? styles.removeFromCartButton : styles.addToCartButton),
-              ]}
+              style={[styles.detailsButton, { flex: 1 }, justAdded ? styles.addedToCartButton : (isInCart ? styles.removeFromCartButton : styles.addToCartButton)]}
               onPress={handleCartAction}
             >
-              <Text style={styles.addToCartButtonText}>
-                {buttonText}
-              </Text>
+              <Text style={styles.addToCartButtonText}>{buttonText}</Text>
             </Pressable>
           </View>
         </View>
@@ -344,23 +358,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   detailsView: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '95%', backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 20, paddingTop: 30 },
-  closeButton: {
-    position: 'absolute',
-    top: 0,
-    alignSelf: 'center',
-    zIndex: 10,
-    backgroundColor: '#ffffffff',
-    borderRadius: 20,
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#ffffffff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 5,
-  },
+  closeButton: { position: 'absolute', top: 0, alignSelf: 'center', zIndex: 10, backgroundColor: '#ffffffff', borderRadius: 20, width: 30, height: 30, alignItems: 'center', justifyContent: 'center', shadowColor: '#ffffffff', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 5 },
   detailsImageCarousel: { height: IMAGE_HEIGHT },
   imageWrapper: { width: '100%', height: IMAGE_HEIGHT, overflow: 'hidden' },
   detailsContent: { paddingBottom: 40 },
@@ -373,48 +371,22 @@ const styles = StyleSheet.create({
   optionTitle: { fontSize: 16, marginBottom: 10, fontFamily: 'Zaloga' },
   detailsDescription: { fontSize: 16, lineHeight: 24, color: '#666', fontFamily: 'Zaloga' },
   detailsActions: { flexDirection: 'row', marginTop: 20, gap: 10, paddingBottom: 40 },
-  wishlistIconWrapper: {
-    padding: 10,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
+  wishlistIconWrapper: { padding: 10, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ccc' },
   detailsButton: { padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
   wishlistButtonActive: { backgroundColor: '#f0f0f0' },
   addToCartButton: { backgroundColor: '#000' },
   addedToCartButton: { backgroundColor: '#10B981' },
-  removeFromCartButton: { backgroundColor: '#EF4444' }, // Red for remove
+  removeFromCartButton: { backgroundColor: '#EF4444' },
   addToCartButtonText: { fontSize: 16, color: '#fff', fontFamily: 'Zaloga' },
   imageIndicatorsContainer: { position: 'absolute', bottom: 16, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   imageIndicator: { height: 4, borderRadius: 2, backgroundColor: 'rgba(0, 0, 0, 0.3)' },
   imageIndicatorActive: { width: 24, backgroundColor: '#000' },
   imageIndicatorInactive: { width: 12, backgroundColor: 'rgba(0, 0, 0, 0.3)' },
   colorOptionsContainer: { flexDirection: 'row', flexWrap: 'nowrap', marginTop: 10, marginBottom: 10, height: 40 },
-  colorTextOptionButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginRight: 10,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  colorTextOptionButtonSelected: {
-    backgroundColor: '#000',
-    borderColor: '#000',
-  },
-  colorTextOptionText: {
-    color: '#000',
-    fontSize: 14,
-    fontFamily: 'Zaloga',
-  },
-  colorTextOptionTextSelected: {
-    color: '#fff',
-  },
+  colorTextOptionButton: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#ccc', marginRight: 10, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
+  colorTextOptionButtonSelected: { backgroundColor: '#000', borderColor: '#000' },
+  colorTextOptionText: { color: '#000', fontSize: 14, fontFamily: 'Zaloga' },
+  colorTextOptionTextSelected: { color: '#fff' },
 });
 
 export default ProductDetailModal;

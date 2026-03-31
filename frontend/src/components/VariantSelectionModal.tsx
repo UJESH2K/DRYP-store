@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   Pressable,
   ActivityIndicator,
@@ -20,8 +19,6 @@ import { useCartStore, CartItem } from '../../src/state/cart';
 import { Product, ProductOption, ProductVariant } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.4;
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
 
 interface VariantSelectionModalProps {
   cartItem: CartItem | null;
@@ -35,9 +32,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [displayImages, setDisplayImages] = useState<string[]>([]);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -50,16 +45,13 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
     if (isVisible && cartItem) {
       setLoading(true);
       fetchProductDetails(cartItem.productId);
-      setSelectedOptions(cartItem.options || {});
       if (cartItem.options?.Size) setSelectedSize(cartItem.options.Size);
       if (cartItem.options?.Color) setSelectedColor(cartItem.options.Color);
       Animated.spring(detailsPosition, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
     } else if (!isVisible) {
       Animated.spring(detailsPosition, { toValue: SCREEN_HEIGHT, useNativeDriver: true, bounciness: 0 }).start(() => {
         setProduct(null);
-        setSelectedOptions({});
         setSelectedVariant(null);
-        setActiveImageIndex(0);
         setDisplayImages([]);
         setSelectedSize(null);
         setSelectedColor(null);
@@ -69,12 +61,11 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
 
   useEffect(() => {
     if (product) {
-      if (selectedSize && selectedColor) {
-        const variant = product.variants?.find(v => v.options.Size === selectedSize && v.options.Color === selectedColor);
-        setSelectedVariant(variant || null);
-      } else {
-        setSelectedVariant(null);
-      }
+      const variant = product.variants?.find(v => 
+        (!v.options.Size || v.options.Size === selectedSize) && 
+        (!v.options.Color || v.options.Color === selectedColor)
+      );
+      setSelectedVariant(variant || null);
     }
   }, [product, selectedSize, selectedColor]);
 
@@ -111,17 +102,9 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
     setColorDropdownOpen(false);
   };
 
-  const onImageScroll = useCallback((event: any) => {
-    const scrollX = event.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(scrollX / SCREEN_WIDTH);
-    setActiveImageIndex(newIndex);
-  }, []);
-
   const formatPrice = useCallback((price: number | undefined | null) => {
     const numericPrice = Number(price);
-    if (isNaN(numericPrice)) {
-      return '$0.00';
-    }
+    if (isNaN(numericPrice)) return '$0.00';
     try {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(numericPrice);
     } catch (e) {
@@ -147,7 +130,10 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
       brand: product.brand,
       image: selectedVariant.images?.[0] || product.images[0],
       price: price,
-      options: { Size: selectedSize, Color: selectedColor },
+      options: { 
+        ...(selectedSize ? { Size: selectedSize } : {}),
+        ...(selectedColor ? { Color: selectedColor } : {})
+      },
     });
     onClose();
   };
@@ -155,10 +141,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
   if (!isVisible) return null;
   
   return (
-    <Animated.View
-      style={[styles.detailsView, { transform: [{ translateY: detailsPosition }] }]}
-      accessibilityViewIsModal
-    >
+    <Animated.View style={[styles.detailsView, { transform: [{ translateY: detailsPosition }] }]} accessibilityViewIsModal>
       <Pressable onPress={onClose} style={styles.closeButton}>
         <Ionicons name="close-circle" size={36} color="#333" />
       </Pressable>
@@ -167,11 +150,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
         <ActivityIndicator size="large" style={styles.centered} />
       ) : (
         <>
-          <ScrollView
-            contentContainerStyle={[styles.detailsContent, { paddingBottom: 24 + (insets.bottom || 0) + 80 }]}
-            showsVerticalScrollIndicator={true}
-          >
-            {/* Content similar to ProductDetailModal */}
+          <ScrollView contentContainerStyle={[styles.detailsContent, { paddingBottom: 24 + (insets.bottom || 0) + 80 }]} showsVerticalScrollIndicator={true}>
             <View style={styles.detailsInfoSection}>
               <Text style={styles.detailsBrand}>{product.brand}</Text>
               <Text style={styles.detailsTitle}>{product.name}</Text>
@@ -239,11 +218,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
           </Modal>
 
           <View style={[styles.detailsActions, { paddingBottom: insets.bottom || 12 }]}>
-            <Pressable
-              style={[styles.detailsButton, { flex: 1 }]}
-              onPress={handleConfirm}
-              disabled={!selectedVariant}
-            >
+            <Pressable style={[styles.detailsButton, { flex: 1 }]} onPress={handleConfirm} disabled={!selectedVariant}>
               <Text style={styles.detailsButtonText}>Confirm</Text>
             </Pressable>
           </View>
@@ -256,8 +231,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   detailsView: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '95%', backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 20, paddingTop: 20 },
-  closeButton: { position: 'absolute', top: 10, right: 10, zIndex: 10, padding: 10,
-  },
+  closeButton: { position: 'absolute', top: 10, right: 10, zIndex: 10, padding: 10 },
   detailsContent: { paddingBottom: 40 },
   detailsInfoSection: { padding: 20 },
   detailsBrand: { fontSize: 16, color: '#888', marginBottom: 5 },
@@ -265,46 +239,16 @@ const styles = StyleSheet.create({
   detailsPrice: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 15 },
   optionContainer: { marginBottom: 15 },
   optionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
-  optionButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  optionButton: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#ccc' },
-  optionButtonSelected: { backgroundColor: '#1a1a1a', borderColor: '#1a1a1a' },
-  optionText: { color: '#1a1a1a' },
-  optionTextSelected: { color: '#fff' },
   stockIn: { fontSize: 16, color: '#10B981', fontWeight: '600', marginBottom: 15 },
   stockOut: { fontSize: 16, color: '#EF4444', fontWeight: '600', marginBottom: 15 },
   detailsActions: { flexDirection: 'row', padding: 20, gap: 10, borderTopWidth: 1, borderTopColor: '#eee' },
   detailsButton: { padding: 15, borderRadius: 15, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   detailsButtonText: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-  },
-  dropdownText: {
-    fontSize: 16,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    width: '80%',
-    maxHeight: '50%',
-  },
-  modalItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
+  dropdown: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 },
+  dropdownText: { fontSize: 16 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: 'white', borderRadius: 8, padding: 16, width: '80%', maxHeight: '50%' },
+  modalItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
 });
 
 export default VariantSelectionModal;

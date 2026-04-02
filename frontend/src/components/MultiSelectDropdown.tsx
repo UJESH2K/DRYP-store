@@ -41,13 +41,19 @@ export default function MultiSelectDropdown({
     setModalVisible(false);
   };
 
-  const renderItem = ({ item }: { item: string }) => (
-    <Pressable style={styles.option} onPress={() => toggleOption(item)}>
-      <Text style={tempSelectedOptions.includes(item) ? styles.selectedOptionText : styles.optionText}>
-        {item}
-      </Text>
-    </Pressable>
-  );
+  const renderItem = ({ item }: { item: string }) => {
+    const isSelected = tempSelectedOptions.includes(item);
+    
+    return (
+      <Pressable style={styles.option} onPress={() => toggleOption(item)}>
+        <Text style={isSelected ? styles.selectedOptionText : styles.optionText}>
+          {item}
+        </Text>
+        {/* Render a checkmark if the item is in the selected array */}
+        {isSelected && <Ionicons name="checkmark" size={20} color="#000" />}
+      </Pressable>
+    );
+  };
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -66,10 +72,19 @@ export default function MultiSelectDropdown({
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <FlatList
+            {/* <FlatList
               data={options}
               renderItem={renderItem}
               keyExtractor={item => item}
+            /> */}
+            <FlatList
+                data={options}
+                renderItem={renderItem}
+                keyExtractor={item => item}
+                // Add this line so the list knows when to re-render selections:
+                extraData={tempSelectedOptions} 
+                // Add this line as a best practice for dropdowns/modals:
+                keyboardShouldPersistTaps="handled" 
             />
             <View style={styles.buttonsContainer}>
               <Pressable style={styles.cancelButton} onPress={handleCancel}>
@@ -121,15 +136,20 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   option: {
-    paddingVertical: 10, // Reverted padding
+    paddingVertical: 10, 
+    flexDirection: 'row',             // Added: align text and icon horizontally
+    justifyContent: 'space-between',  // Added: pushes checkmark to the far right
+    alignItems: 'center',             // Added: vertically centers text and icon
   },
   optionText: {
-    fontSize: 16, // Reverted font size
+    fontSize: 16, 
     fontFamily: 'Zaloga',
+    color: '#888',                    // Added: make unselected items slightly gray
   },
   selectedOptionText: {
-    fontSize: 16, // Reverted font size
+    fontSize: 16, 
     fontFamily: 'Zaloga',
+    color: '#000',                    // Added: make selected items solid black
   },
   buttonsContainer: {
     flexDirection: 'row',

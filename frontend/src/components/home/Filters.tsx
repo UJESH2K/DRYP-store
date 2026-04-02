@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import MultiSelectDropdown from '../MultiSelectDropdown';
@@ -55,6 +54,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center', // Align items vertically
     gap: 10,
+    zIndex: 100,
+    elevation: 100,
   },
   filterIcon: {
     marginRight: 5, // Space between icon and dropdown

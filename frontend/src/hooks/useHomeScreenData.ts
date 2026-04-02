@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import type { Item } from '../types';
 import { apiCall } from '../lib/api';
@@ -31,13 +30,37 @@ export function useHomeScreenData() {
     }
   }, []);
 
+  // const loadRecommendations = useCallback(async () => {
+  //   setLoading(true);
+  //   try {
+  //     const params = new URLSearchParams();
+  //     if (selectedBrands.length > 0) params.append('brand', selectedBrands.join(','));
+  //     if (selectedCategories.length > 0) params.append('category', selectedCategories.join(','));
+  //     if (selectedColors.length > 0) params.append('color', selectedColors.join(','));
+      
+  //     const products = await apiCall(`/api/products?${params.toString()}`);
+  //     setItems(Array.isArray(products) ? mapProductsToItems(products) : []);
+  //   } catch (error) {
+  //     console.warn('Failed to load products', error);
+  //     setItems([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [selectedBrands, selectedCategories, selectedColors]);
+
   const loadRecommendations = useCallback(async () => {
-    setLoading(true);
+    // FIX 1: We removed `setLoading(true)` from here! 
+    // We only want the loading screen on the very first boot. 
+    // Triggering it here unmounts your dropdowns mid-click.
+    
     try {
       const params = new URLSearchParams();
-      if (selectedBrands.length > 0) params.append('brand', selectedBrands.join(','));
-      if (selectedCategories.length > 0) params.append('category', selectedCategories.join(','));
-      if (selectedColors.length > 0) params.append('color', selectedColors.join(','));
+      
+      // FIX 2: Append each filter separately instead of joining with commas.
+      // This creates ?brand=Nike&brand=Adidas, which Express/Mongoose natively understands as an array!
+      selectedBrands.forEach(brand => params.append('brand', brand));
+      selectedCategories.forEach(category => params.append('category', category));
+      selectedColors.forEach(color => params.append('color', color));
       
       const products = await apiCall(`/api/products?${params.toString()}`);
       setItems(Array.isArray(products) ? mapProductsToItems(products) : []);
@@ -45,7 +68,8 @@ export function useHomeScreenData() {
       console.warn('Failed to load products', error);
       setItems([]);
     } finally {
-      setLoading(false);
+      // This will turn off the initial boot loader, and stay safely false afterward
+      setLoading(false); 
     }
   }, [selectedBrands, selectedCategories, selectedColors]);
 

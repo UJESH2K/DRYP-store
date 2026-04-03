@@ -16,11 +16,15 @@ import { apiCall } from '../src/lib/api';
 import type { Item } from '../src/types';
 import { mapProductsToItems } from '../src/utils/productMapping';
 import AnimatedLoadingScreen from '../src/components/common/AnimatedLoadingScreen';
+import ProductDetailModal from '../src/components/ProductDetailModal';
 
 // This screen shows items the user has 'liked' for recommendation purposes
 export default function LikedItemsScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const fetchLikedItems = useCallback(async () => {
     setLoading(true);
@@ -74,17 +78,32 @@ export default function LikedItemsScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: Item }) => (
-    <View style={styles.itemContainer}>
+const renderItem = ({ item }: { item: Item }) => (
+    <Pressable 
+      style={styles.itemContainer}
+      onPress={() => {
+        // Open the modal instead of routing!
+        const productId = item.id || item._id;
+        setSelectedProductId(productId);
+        setIsModalVisible(true);
+      }}
+    >
       <Image source={{ uri: item.image }} style={styles.itemImage} />
       <View style={styles.itemDetails}>
         <Text style={styles.itemBrand}>{item.brand}</Text>
         <Text style={styles.itemTitle}>{item.title}</Text>
-        <Pressable onPress={() => handleUnlike(item.id, item.title)} style={styles.unlikeButton}>
+        
+        <Pressable 
+          style={styles.unlikeButton}
+          onPress={(e) => {
+            e.stopPropagation?.(); 
+            handleUnlike(item.id, item.title);
+          }} 
+        >
           <Text style={styles.unlikeButtonText}>Unlike</Text>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 
   if (loading) {
@@ -92,26 +111,35 @@ export default function LikedItemsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="heart-dislike-outline" size={80} color="#ccc" />
-            <Text style={styles.emptyTitle}>No Liked Items Yet</Text>
-            <Text style={styles.emptySubtitle}>Swipe right on products you love, and they'll appear here!</Text>
-            <Pressable onPress={() => router.push('/(tabs)/home')} style={styles.discoverButton}>
-              <Text style={styles.discoverButtonText}>Discover Now</Text>
-            </Pressable>
-          </View>
-        }
+    <>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="heart-dislike-outline" size={80} color="#ccc" />
+              <Text style={styles.emptyTitle}>No Liked Items Yet</Text>
+              <Text style={styles.emptySubtitle}>Swipe right on products you love, and they'll appear here!</Text>
+              <Pressable onPress={() => router.push('/(tabs)/home')} style={styles.discoverButton}>
+                <Text style={styles.discoverButtonText}>Discover Now</Text>
+              </Pressable>
+            </View>
+          }
+        />
+      </SafeAreaView>
+
+      {/* ADD THE MODAL COMPONENT HERE */}
+      <ProductDetailModal
+        productId={selectedProductId}
+        isVisible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
       />
-    </SafeAreaView>
+    </>
   );
 }
 

@@ -13,7 +13,7 @@ const { width: screenWidth } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
     const { id } = useLocalSearchParams();
-    const { cart, addToCart, removeFromCart } = useCartStore();
+    const { items:cart, addToCart, removeFromCart } = useCartStore();
     const { addToWishlist, removeFromWishlist, isWishlisted } = useWishlistStore();
 
     const [product, setProduct] = useState(null);
@@ -79,21 +79,30 @@ export default function ProductDetailScreen() {
         }
     }, [cart, product, selectedOptions]);
     
+    const fetchProduct = async () => {
+        if (!id) return;
+        setLoading(true);
+        try {
+            const productData = await apiCall(`/api/products/${id}`);
+            setProduct(productData);
+        } catch (error) {
+            console.error("Failed to fetch product:", error);
+            Alert.alert("Error", "Failed to load product details.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 2. Call it when the screen loads
     useEffect(() => {
-        const fetchProduct = async () => {
-            if (!id) return;
-            setLoading(true);
-            try {
-                const productData = await apiCall(`/api/products/${id}`);
-                setProduct(productData);
-            } catch (error) {
-                console.error("Failed to fetch product:", error);
-                Alert.alert("Error", "Failed to load product details.");
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchProduct();
+    }, [id]);
+
+    // 3. Call it when the user pulls down to refresh
+    const handleRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        await fetchProduct(); // Fetch fresh data instead of router.back()
+        setIsRefreshing(false);
     }, [id]);
 
     useEffect(() => {
@@ -146,13 +155,6 @@ export default function ProductDetailScreen() {
             addToWishlist(product);
         }
     };
-
-    const handleRefresh = useCallback(() => {
-        setIsRefreshing(true);
-        router.back();
-        // The timeout ensures the refresh indicator is visible for a moment
-        setTimeout(() => setIsRefreshing(false), 500); 
-    }, [router]);
 
     if (loading) {
         return <ActivityIndicator size="large" style={styles.centered} />;
@@ -225,7 +227,7 @@ export default function ProductDetailScreen() {
             </View>
             <FlatList
                 data={[]}
-                renderItem={null}
+                renderItem={()=>null}
                 keyExtractor={() => 'product-page'}
                 ListHeaderComponent={renderProductContent}
                 showsVerticalScrollIndicator={false}

@@ -438,8 +438,11 @@ export default function CartScreen() {
   
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  const formatPrice = React.useCallback((price: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price)
+const formatPrice = React.useCallback((price: number) =>
+    new Intl.NumberFormat('en-IN', { 
+      style: 'currency', 
+      currency: 'INR',
+    }).format(price)
   , []);
 
   const isEveryVariantSelected = React.useMemo(() => {

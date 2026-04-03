@@ -99,7 +99,7 @@ export default function LandingPage() {
 
           {/* Abstract coordinates accent (common in high-end design) */}
           <div className="hidden text-[9px] tracking-[0.4em] text-white/20 lg:block">
-            48°52'5.67"N · 2°19'59.80"E
+            48°52&apos;5.67&quot;N · 2°19&apos;59.80&quot;E
           </div>
 
           <div className="flex space-x-8 text-[9px] tracking-[0.3em] uppercase text-white/40">

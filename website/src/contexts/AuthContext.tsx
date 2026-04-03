@@ -3,26 +3,38 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
-const AuthContext = createContext(null);
+// ✅ Define proper type
+type AuthContextType = {
+  user: any;
+  token: string | null;
+  login: (userData: any, userToken: string) => void;
+  logout: () => void;
+  isAuthenticated: boolean;
+  loading: boolean;
+};
+
+// ✅ Context can be undefined initially
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState<any>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Check for token in localStorage on initial load
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
     }
+
     setLoading(false);
   }, []);
 
-  const login = (userData, userToken) => {
+  const login = (userData: any, userToken: string) => {
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', userToken);
     setUser(userData);
@@ -38,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   };
 
-  const authContextValue = {
+  const authContextValue: AuthContextType = {
     user,
     token,
     login,
@@ -54,10 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// ✅ Safe hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };

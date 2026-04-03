@@ -5,9 +5,29 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+interface AnalyticsSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  totalProducts: number;
+  totalLikes: number;
+}
+
+interface ProductStat {
+  _id: string;
+  name: string;
+  likes: number;
+  totalQuantity: number;
+}
+
+interface AnalyticsData {
+  summary: AnalyticsSummary;
+  topLikedProducts: ProductStat[];
+  topSoldProducts: ProductStat[];
+}
+
 const AnalyticsPage = () => {
   const { token } = useAuth();
-  const [analytics, setAnalytics] = useState(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -14,8 +14,8 @@ const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const formRef = useRef(null);
+  const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
+  const formRef = useRef<{ isSubmitting: boolean; submit: () => void; clearForm: () => void } | null>(null);
 
   const fetchProducts = useCallback(async () => {
     if (!user) return;
@@ -34,7 +34,7 @@ const ProductsPage = () => {
     }
   }, [user]);
 
-  const handleDelete = async (productId) => {
+  const handleDelete = async (productId: string | undefined) => {
     if (
       window.confirm(
         "Are you certain you wish to remove this piece from your archive?",
@@ -61,7 +61,7 @@ const ProductsPage = () => {
     }
   };
 
-  const handleEdit = (product) => {
+  const handleEdit = (product: Product | undefined) => {
     setEditingProduct(product);
     setIsModalOpen(true);
   };
@@ -72,7 +72,7 @@ const ProductsPage = () => {
 
   const handleSaveSuccess = () => {
     setIsModalOpen(false);
-    setEditingProduct(null);
+    setEditingProduct(undefined);
     if (formRef.current) {
       formRef.current.clearForm();
     }
@@ -119,7 +119,7 @@ const ProductsPage = () => {
             onClick={() => setIsModalOpen(true)}
             className="group relative inline-flex overflow-hidden bg-black px-8 py-4 text-[10px] font-medium uppercase tracking-[0.3em] text-white transition-all duration-500 hover:tracking-[0.4em]"
           >
-            <div className="absolute inset-0 h-full w-full translate-x-[-100%] bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0" />
+            <div className="absolute inset-0 h-full w-full -translate-x-full bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0" />
             <span className="relative z-10 transition-colors duration-500">
               Add to Collection
             </span>
@@ -131,7 +131,7 @@ const ProductsPage = () => {
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false);
-            setEditingProduct(null);
+            setEditingProduct(undefined);
           }}
           onSave={handleSave}
           title={editingProduct ? "Edit Piece" : "Add New Piece"}
@@ -154,7 +154,7 @@ const ProductsPage = () => {
               {products.map((product) => (
                 <div key={product._id} className="group relative flex flex-col">
                   {/* High-Fashion Image Container (4:5 Aspect Ratio) */}
-                  <div className="relative w-full aspect-[4/5] overflow-hidden bg-[#F2F2F0] mb-5">
+                  <div className="relative w-full aspect-4/5 overflow-hidden bg-[#F2F2F0] mb-5">
                     {product.images && product.images.length > 0 ? (
                       <Image
                         src={product.images[0]}
@@ -212,10 +212,10 @@ const ProductsPage = () => {
                               className="flex justify-between items-center text-[10px] tracking-wider text-gray-600"
                             >
                               <span className="uppercase">
-                                {Object.values(variant.options).join(" · ")}
+                                {variant.options ? Object.entries(variant.options).map(([key, value]) => `${key}: ${value}`).join(" · ") : ''}
                               </span>
                               <div className="flex gap-3 text-gray-400">
-                                <span>QTY: {variant.stock}</span>
+                                <span>QTY: {Object.values(variant.stock).reduce((sum, qty) => sum + qty, 0)}</span>
                                 <span className="text-black">
                                   ${variant.price.toFixed(2)}
                                 </span>

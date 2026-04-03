@@ -5,9 +5,23 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+interface Vendor {
+  name?: string;
+  description?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  address?: {
+    line1: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+}
+
 const StoreProfilePage = () => {
   const { token } = useAuth();
-  const [vendor, setVendor] = useState(null);
+  const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

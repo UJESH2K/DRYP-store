@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 
 export default function LandingPage() {
@@ -27,16 +28,16 @@ export default function LandingPage() {
             className="h-full w-full object-cover opacity-40 mix-blend-luminosity transition-transform duration-[40s] ease-out hover:scale-110"
           />
           {/* Refined gradient overlay: Top and bottom vignette instead of a full dull cover */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-transparent to-[#050505]" />
+          <div className="absolute inset-0 bg-linear-to-b from-[#050505] via-transparent to-[#050505]" />
         </div>
 
         {/* --- ABSTRACT GEOMETRY LAYER --- */}
         {/* Impossibly thin vertical tracking line (Spine) */}
-        <div className="absolute left-1/2 top-0 z-0 h-full w-[1px] -translate-x-1/2 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+        <div className="absolute left-1/2 top-0 z-0 h-full w-px -translate-x-1/2 bg-linear-to-b from-transparent via-white/10 to-transparent" />
 
         {/* Giant, slow-rotating ultra-thin abstract ring */}
-        <div className="absolute left-1/2 top-1/2 z-0 h-[120vh] w-[120vh] -translate-x-1/2 -translate-y-1/2 animate-[spin_120s_linear_infinite] rounded-full border border-white/[0.04]" />
-        <div className="absolute left-1/2 top-1/2 z-0 h-[80vh] w-[80vh] -translate-x-1/2 -translate-y-1/2 animate-[spin_80s_linear_infinite_reverse] rounded-full border border-white/[0.02] border-dashed" />
+        <div className="absolute left-1/2 top-1/2 z-0 h-[120vh] w-[120vh] -translate-x-1/2 -translate-y-1/2 animate-[spin_120s_linear_infinite] rounded-full border border-white/4" />
+        <div className="absolute left-1/2 top-1/2 z-0 h-[80vh] w-[80vh] -translate-x-1/2 -translate-y-1/2 animate-[spin_80s_linear_infinite_reverse] rounded-full border border-white/2 border-dashed" />
 
         {/* Minimalist Header */}
         <header className="absolute top-0 z-20 flex w-full items-center justify-between px-8 py-10 sm:px-16 md:px-24 text-white/90">
@@ -47,7 +48,7 @@ export default function LandingPage() {
             <span className="hidden text-[9px] uppercase tracking-[0.4em] text-white/40 md:block">
               Syndicate Access
             </span>
-            <div className="h-[1px] w-8 bg-white/30 hidden md:block" />
+            <div className="h-px w-8 bg-white/30 hidden md:block" />
             <Link
               href="/login"
               className="font-sans text-[10px] font-bold uppercase tracking-[0.3em] transition-all hover:tracking-[0.4em] hover:text-white"
@@ -83,7 +84,7 @@ export default function LandingPage() {
               href="/signup"
               className="group relative inline-flex overflow-hidden border border-white/20 bg-transparent px-10 py-5 text-[11px] font-medium uppercase tracking-[0.3em] text-white backdrop-blur-sm transition-all duration-500 hover:border-white hover:tracking-[0.4em]"
             >
-              <div className="absolute inset-0 h-full w-full translate-y-[100%] bg-white transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-y-0" />
+              <div className="absolute inset-0 h-full w-full translate-y-full bg-white transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-y-0" />
               <span className="relative z-10 mix-blend-difference transition-colors duration-500">
                 Apply for Access
               </span>

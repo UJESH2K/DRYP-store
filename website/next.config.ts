@@ -1,22 +1,30 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   reactCompiler: true,
+
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "5000", // since your backend runs on 5000
+        pathname: "/**",
+      },
+    ],
   },
+
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
-        destination: 'http://localhost:5000/api/:path*',
+        source: "/api/:path*",
+        destination: "http://localhost:5000/api/:path*",
       },
       {
-        source: '/uploads/:path*',
-        destination: 'http://localhost:5000/uploads/:path*',
+        source: "/uploads/:path*",
+        destination: "http://localhost:5000/uploads/:path*",
       },
-    ]
+    ];
   },
 };
 

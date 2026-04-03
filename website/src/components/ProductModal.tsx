@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Product } from '@/types/Product';
-import React from 'react';
+import { Product } from "@/types/Product";
+import React, { useEffect } from "react";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -13,50 +13,100 @@ interface ProductModalProps {
   isSubmitting?: boolean;
 }
 
-const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, title, children, product, isSubmitting }) => {
+const ProductModal: React.FC<ProductModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  title,
+  children,
+  product,
+  isSubmitting,
+}) => {
+  // --- Prevent Background Scrolling ---
+  useEffect(() => {
+    if (isOpen) {
+      // Lock the scroll
+      document.body.style.overflow = "hidden";
+    } else {
+      // Unlock the scroll
+      document.body.style.overflow = "";
+    }
+
+    // Cleanup function to ensure scrolling unlocks if the component unmounts
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  // Hook rules dictate we put early returns AFTER the hooks
   if (!isOpen) {
     return null;
   }
 
-  const modalTitle = product ? 'Edit Product' : title;
-  const saveButtonText = product ? 'Save Changes' : 'Save Product';
+  const modalTitle = product ? "Modify Dossier" : "New Archive Entry";
+  const saveButtonText = product ? "Update Piece" : "Initialize Entry";
 
   return (
-    <div className="fixed inset-0 bg-gray-100 z-50 overflow-y-auto">
-      <div className="flex flex-col min-h-screen">
-        <div className="bg-white shadow-md sticky top-0 z-10">
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-bold text-gray-900">{modalTitle}</h2>
-              <button
-                onClick={onClose}
-                className="text-gray-600 hover:text-red-600 text-4xl font-bold"
-              >
-                &times;
-              </button>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 flex w-full h-screen flex-col bg-[#FCFCFA] animate-in fade-in duration-300">
+      {/* Strictly Anchored Full-Width Header */}
+      <div className="flex-none flex items-center justify-between border-b border-black bg-[#FCFCFA] px-8 md:px-16 lg:px-24 py-8 z-20">
+        <div>
+          <p className="font-sans text-[8px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-2">
+            {product ? "Editing Mode" : "Creation Mode"}
+          </p>
+          <h2 className="font-editorial text-4xl font-light text-black tracking-tight">
+            {modalTitle}
+          </h2>
         </div>
-        <div className="flex-grow container mx-auto px-6 py-8">
-          {React.cloneElement(children as React.ReactElement<{ product?: Product }>, { product })}
+        <button
+          onClick={onClose}
+          className="group flex items-center gap-3 p-2 transition-colors"
+        >
+          <span className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black group-hover:text-red-600 transition-colors">
+            Close
+          </span>
+          <span className="text-2xl font-light leading-none group-hover:text-red-600 transition-colors">
+            &times;
+          </span>
+        </button>
+      </div>
+
+      {/* Clean Scrolling Content Area */}
+      <div className="flex-1 overflow-y-auto px-8 md:px-16 lg:px-24 py-12 lg:py-16">
+        {/* We constrain the form width so it doesn't stretch awkwardly on ultrawide monitors */}
+        <div className="max-w-5xl mx-auto">
+          {React.cloneElement(
+            children as React.ReactElement<{ product?: Product }>,
+            { product },
+          )}
         </div>
-        <div className="bg-white shadow-md sticky bottom-0 z-10">
-          <div className="container mx-auto px-6 py-4 flex justify-end items-center">
-            <button
-              onClick={onClose}
-              className="text-lg font-semibold text-gray-700 hover:text-gray-900 mr-6"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSave}
-              className="bg-purple-600 text-white px-8 py-3 rounded-lg shadow-md hover:bg-purple-700 text-lg font-semibold disabled:bg-gray-400"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Saving...' : saveButtonText}
-            </button>
-          </div>
+      </div>
+
+      {/* Strictly Anchored Full-Width Footer */}
+      <div className="flex-none flex items-center justify-between border-t border-black bg-[#FCFCFA] px-8 md:px-16 lg:px-24 py-6 z-20">
+        <p className="font-sans text-[9px] uppercase tracking-[0.3em] text-gray-400 hidden sm:block">
+          {isSubmitting ? "Syncing to network..." : "Awaiting confirmation"}
+        </p>
+
+        <div className="flex items-center justify-end w-full sm:w-auto gap-8">
+          <button
+            onClick={onClose}
+            className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-black transition-colors disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            Discard
+          </button>
+
+          <button
+            onClick={onSave}
+            disabled={isSubmitting}
+            className="group relative inline-flex overflow-hidden border border-black bg-black px-10 py-4 text-[10px] font-medium uppercase tracking-[0.3em] text-white transition-all duration-500 hover:text-black disabled:border-gray-300 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+          >
+            <div className="absolute inset-0 h-full w-full translate-y-[100%] bg-[#FCFCFA] transition-transform duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-y-0 group-disabled:hidden" />
+            <span className="relative z-10 transition-colors duration-500">
+              {isSubmitting ? "Authenticating..." : saveButtonText}
+            </span>
+          </button>
         </div>
       </div>
     </div>

@@ -88,6 +88,11 @@ export default function LandingPage() {
           50% { transform: translateY(-10px) rotate(-3deg); }
         }
 
+        @keyframes marquee {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(-100%); }
+        }
+
         /* Animation Classes */
         .animate-blob { animation: blobBounce 25s infinite ease-in-out; }
         .animation-delay-2000 { animation-delay: 2s; }
@@ -162,7 +167,8 @@ export default function LandingPage() {
         {/* =========================================
             HERO SECTION
         ========================================= */}
-        <section className="relative flex min-h-[90vh] w-full flex-col items-center justify-center pt-28 pb-12 px-6 md:flex-row md:px-12 md:pt-24 overflow-hidden">
+        {/* Changed min-h-[90vh] to min-h-screen md:min-h-[90vh] to stretch full height on mobile */}
+        <section className="relative flex min-h-screen md:min-h-screen w-full flex-col items-center justify-center pt-28 pb-12 px-6 md:flex-row md:px-12 md:pt-24 overflow-hidden">
           
           <div className="absolute inset-0 z-0 flex pointer-events-none">
             <div className="w-full md:w-5/12 bg-gray-50" />
@@ -212,7 +218,7 @@ export default function LandingPage() {
                 <img 
                   src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop" 
                   alt="High fashion editorial back"
-                  className="h-full w-full object-cover scale-110   transition-all duration-700 ease-out mix-blend-multiply opacity-90"
+                  className="h-full w-full object-cover scale-110 transition-all duration-700 ease-out mix-blend-multiply opacity-90"
                 />
               </div>
             </div>
@@ -223,7 +229,7 @@ export default function LandingPage() {
                 <img 
                   src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1000&auto=format&fit=crop" 
                   alt="Avant garde clothing mid"
-                  className="h-full w-full object-cover   transition-all duration-700 ease-out hover:scale-105"
+                  className="h-full w-full object-cover transition-all duration-700 ease-out hover:scale-105"
                 />
               </div>
             </div>
@@ -234,7 +240,7 @@ export default function LandingPage() {
                 <img 
                   src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1000&auto=format&fit=crop" 
                   alt="Avant garde clothing front"
-                  className="h-full w-full object-cover   transition-all duration-700 ease-out hover:scale-105"
+                  className="h-full w-full object-cover transition-all duration-700 ease-out hover:scale-105"
                 />
               </div>
               
@@ -409,7 +415,7 @@ export default function LandingPage() {
                             <img 
                               src={img} 
                               alt="Style Match" 
-                              className={`w-full h-full object-cover  transition-transform duration-[6s] ease-out ${stackIndex === 0 ? 'scale-105' : 'scale-100'}`} 
+                              className={`w-full h-full object-cover transition-transform duration-[6s] ease-out ${stackIndex === 0 ? 'scale-105' : 'scale-100'}`} 
                             />
                             
                             <div className={`absolute top-6 md:top-8 w-full px-4 md:px-6 flex justify-between pointer-events-none transition-opacity duration-300 ${isTop ? 'opacity-100' : 'opacity-0'}`}>
@@ -448,12 +454,6 @@ export default function LandingPage() {
         ========================================= */}
         <section className="relative py-40 flex flex-col items-center justify-center bg-gray-50 px-6 text-center overflow-hidden z-10 border-b border-gray-300/30">
           
-          <div className="absolute inset-0 flex items-center opacity-[0.03] pointer-events-none overflow-hidden">
-            <span className="font-editorial text-[40vw] italic text-black animate-[marquee_40s_linear_infinite] whitespace-nowrap">
-              Dryp Dryp Dryp Dryp
-            </span>
-          </div>
-
           <div className="absolute top-[20%] left-[10%] animate-float-slow opacity-30 pointer-events-none">
             <span className="text-3xl text-gray-400">✦</span>
           </div>
@@ -464,38 +464,38 @@ export default function LandingPage() {
             <div className="h-32 w-32 rounded-full border border-gray-400/50"></div>
           </div>
 
-          {/* Left Side Images (4 total) - Updated for Mobile Visibility */}
+          {/* Left Side Images (4 total) */}
           <div className="absolute left-[-5%] top-[5%] h-[160px] w-[110px] md:left-[5%] md:top-[10%] md:h-[260px] md:w-[180px] block lg:block overflow-hidden opacity-30 md:opacity-90 animate-float-slow shadow-xl transform -rotate-6 border border-gray-300 z-0 md:z-10 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1618932260643-eee4a2f652a6?q=80&w=800&auto=format&fit=crop" alt="Curated style left 1" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1618932260643-eee4a2f652a6?q=80&w=800&auto=format&fit=crop" alt="Curated style left 1" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
           
           <div className="absolute left-[5%] bottom-[30%] h-[140px] w-[90px] md:left-[18%] md:bottom-[15%] md:h-[200px] md:w-[150px] block lg:block overflow-hidden opacity-20 md:opacity-80 animate-float-slower shadow-lg transform rotate-3 border border-gray-300 z-0 md:z-10 pointer-events-none">
-            <img src="https://plus.unsplash.com/premium_photo-1675186049419-d48f4b28fe7c?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8ZmFzaGlvbnxlbnwwfHwwfHx8MA%3D%3D" alt="Curated style left 2" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://plus.unsplash.com/premium_photo-1675186049419-d48f4b28fe7c?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8ZmFzaGlvbnxlbnwwfHwwfHx8MA%3D%3D" alt="Curated style left 2" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
           <div className="absolute left-[2%] bottom-[25%] h-[160px] w-[120px] hidden lg:block overflow-hidden opacity-75 animate-float-fast shadow-xl transform -rotate-12 border border-gray-300 z-0 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTR8fGNsb3RoZXN8ZW58MHx8MHx8fDA%3D" alt="Curated style left 3" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTR8fGNsb3RoZXN8ZW58MHx8MHx8fDA%3D" alt="Curated style left 3" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
           <div className="absolute left-[22%] top-[5%] h-[180px] w-[140px] hidden lg:block overflow-hidden opacity-85 animate-float-slower shadow-lg transform rotate-6 border border-gray-300 z-0 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=800&auto=format&fit=crop" alt="Curated style left 4" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=800&auto=format&fit=crop" alt="Curated style left 4" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
-          {/* Right Side Images (4 total) - Updated for Mobile Visibility */}
+          {/* Right Side Images (4 total) */}
           <div className="absolute right-[-5%] top-[12%] h-[150px] w-[100px] md:right-[8%] md:top-[15%] md:h-[220px] md:w-[160px] block lg:block overflow-hidden opacity-25 md:opacity-85 animate-float-fast shadow-xl transform rotate-6 border border-gray-300 z-0 md:z-10 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=800&auto=format&fit=crop" alt="Curated style right 1" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=800&auto=format&fit=crop" alt="Curated style right 1" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
           <div className="absolute right-[-10%] bottom-[15%] h-[200px] w-[140px] md:right-[20%] md:bottom-[10%] md:h-[280px] md:w-[200px] block lg:block overflow-hidden opacity-30 md:opacity-95 animate-float-slow shadow-2xl transform -rotate-3 border border-gray-300 z-0 md:z-10 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1612423284934-2850a4ea6b0f?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzV8fGNsb3RoZXN8ZW58MHx8MHx8fDA%3D" alt="Curated style right 2" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1612423284934-2850a4ea6b0f?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzV8fGNsb3RoZXN8ZW58MHx8MHx8fDA%3D" alt="Curated style right 2" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
           <div className="absolute right-[4%] bottom-[30%] h-[240px] w-[140px] hidden lg:block overflow-hidden opacity-75 animate-float-slower shadow-lg transform rotate-12 border border-gray-300 z-0 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1540221652346-e5dd6b50f3e7?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2xvdGhlc3xlbnwwfHwwfHx8MA%3D%3D" alt="Curated style right 3" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1540221652346-e5dd6b50f3e7?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2xvdGhlc3xlbnwwfHwwfHx8MA%3D%3D" alt="Curated style right 3" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
           <div className="absolute right-[25%] top-[8%] h-[150px] w-[110px] hidden lg:block overflow-hidden opacity-80 animate-float-fast shadow-md transform -rotate-6 border border-gray-300 z-0 pointer-events-none">
-            <img src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjR8fGNsb3RoZXN8ZW58MHx8MHx8fDA%3D" alt="Curated style right 4" className="h-full w-full object-cover   transition-all duration-700" />
+            <img src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjR8fGNsb3RoZXN8ZW58MHx8MHx8fDA%3D" alt="Curated style right 4" className="h-full w-full object-cover transition-all duration-700 hover:scale-105" />
           </div>
 
           <h2 className="relative z-10 font-editorial text-5xl md:text-7xl font-light tracking-tight mb-8 mt-12 md:mt-0">

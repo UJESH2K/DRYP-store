@@ -35,9 +35,12 @@ export default function DashboardLayout({
         <aside className="hidden md:flex w-64 flex-col justify-between bg-[#050505] border-r border-white/10 fixed h-screen z-20 shadow-2xl shadow-black/50">
           <div>
             <div className="p-10 pb-16">
-              <h2 className="font-editorial text-3xl italic tracking-[0.2em] text-[#FCFCFA]">
-                DRYP
-              </h2>
+              {/* Clickable Brand Logo added here */}
+              <Link href="/" className="inline-block w-max">
+                <h2 className="font-editorial text-3xl italic tracking-[0.2em] text-[#FCFCFA] hover:text-white hover:opacity-80 transition-opacity cursor-pointer">
+                  DRYP
+                </h2>
+              </Link>
               <p className="font-sans text-[8px] uppercase tracking-[0.4em] text-gray-500 mt-2">
                 Vendor Portal
               </p>

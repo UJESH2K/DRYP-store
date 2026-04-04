@@ -123,7 +123,6 @@ export default function SignupPage() {
         }}
       />
 
-      {/* Changed min-h-screen to h-screen and overflow-hidden to prevent body scrolling */}
       <div className="flex h-screen w-full overflow-hidden bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white">
         {/* LEFT SPLIT */}
         <div className="relative hidden w-1/2 lg:block">
@@ -135,9 +134,11 @@ export default function SignupPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
           <div className="absolute inset-0 flex flex-col justify-between p-12 text-white">
-            <h1 className="font-editorial text-3xl italic tracking-[0.2em] text-white/90">
-              DRYP
-            </h1>
+            <Link href="/" className="inline-block w-max">
+              <h1 className="font-editorial text-3xl italic tracking-[0.2em] text-white/90 hover:text-white hover:opacity-80 transition-all cursor-pointer">
+                DRYP
+              </h1>
+            </Link>
 
             <div className="max-w-lg space-y-2">
               <h2 className="font-editorial text-8xl leading-[1.1] tracking-tight">
@@ -159,12 +160,14 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {/* RIGHT SPLIT - Adjusted paddings and spacing for viewport fit */}
+        {/* RIGHT SPLIT */}
         <div className="flex h-full w-full flex-col justify-center px-8 sm:px-16 md:px-24 lg:w-1/2 relative overflow-y-auto">
           <div className="mb-8 block lg:hidden text-center">
-            <h1 className="font-editorial text-3xl italic tracking-[0.2em] text-black">
-              DRYP
-            </h1>
+            <Link href="/" className="inline-block w-max mx-auto">
+              <h1 className="font-editorial text-3xl italic tracking-[0.2em] text-black hover:opacity-70 transition-opacity cursor-pointer">
+                DRYP
+              </h1>
+            </Link>
           </div>
 
           <div className="max-w-[380px] w-full mx-auto lg:mx-0">
@@ -179,7 +182,6 @@ export default function SignupPage() {
 
             {renderServerError()}
 
-            {/* Reduced space-y here */}
             <form className="space-y-8" onSubmit={handleSubmit}>
               <div className="space-y-8">
                 {/* Name Input */}
@@ -257,7 +259,6 @@ export default function SignupPage() {
                     Security Key
                   </label>
 
-                  {/* NEW: Sleek, horizontal, typography-driven password requirements */}
                   <div className="mt-3 flex items-center justify-between text-[9px] tracking-[0.15em] uppercase text-gray-300 transition-colors">
                     <span
                       className={`transition-colors duration-500 ${passwordRules.length ? "text-black font-medium" : ""}`}

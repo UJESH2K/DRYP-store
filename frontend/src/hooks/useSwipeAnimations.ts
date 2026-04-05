@@ -1,16 +1,18 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
-import { Animated, PanResponder } from 'react-native';
+import { Animated, PanResponder,Alert } from 'react-native';
 import { SCREEN_WIDTH } from '../constants/dimensions';
 import { useInteractionStore } from '../state/interactions';
 import { useAuthStore } from '../state/auth';
 import type { Item } from '../types';
 import { sendInteraction } from '../lib/api';
 import { updateModel } from '../lib/recommender';
+import { useCustomRouter } from './useCustomRouter';
 
 export function useSwipeAnimations(
     items: Item[], 
     onShowDetails: (item: Item) => void,
 ) {
+  const router = useCustomRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
@@ -22,7 +24,7 @@ export function useSwipeAnimations(
   
   const undoTimer = useRef<NodeJS.Timeout | null>(null);
   
-  const { user } = useAuthStore();
+  const { user , isAuthenticated} = useAuthStore();
   const pushInteraction = useInteractionStore((s) => s.pushInteraction);
 
   useEffect(() => {
@@ -49,6 +51,24 @@ export function useSwipeAnimations(
     if (isAnimating) return;
     const currentItem = items && items.length > 0 ? items[currentIndex] : null;
     if (!currentItem) return;
+
+    if (decision === 'like' && !isAuthenticated) {
+      Alert.alert(
+        'Sign In Required',
+        'Please log in or create an account to save your favorite products.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Log In', 
+            onPress: () => router.push('/login') 
+          }
+        ]
+      );
+      
+      // Bounce the card back to the center of the screen
+      Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+      return; // Stop execution! Do not track interaction or animate away.
+    }
 
     setIsAnimating(true);
     setCanUndo(true);

@@ -1,15 +1,4 @@
 const mongoose = require("mongoose");
-
-// const CartItemSchema = new mongoose.Schema({
-//   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-//   quantity: { type: Number, required: true, min: 1, default: 1 },
-//   price: { type: Number, required: true }, // Price at the time of adding to cart
-//   options: {
-//     size: String,
-//     color: String,
-//   }
-// }, { _id: false });
-
 const CartItemSchema = new mongoose.Schema(
   {
     product: {
@@ -19,7 +8,6 @@ const CartItemSchema = new mongoose.Schema(
     },
     quantity: { type: Number, required: true, min: 1, default: 1 },
     price: { type: Number, required: true },
-    // Replace the old options object with this Map:
     options: {
       type: Map,
       of: String,
@@ -37,7 +25,6 @@ const CartSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Either user or guestId must be present
 CartSchema.pre("save", function (next) {
   if (!this.user && !this.guestId) {
     next(new Error("A cart must be associated with a user or a guest."));

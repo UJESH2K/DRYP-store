@@ -20,6 +20,7 @@ import { useAuthStore } from '../../src/state/auth';
 import AnimatedLoadingScreen from './common/AnimatedLoadingScreen';
 import CustomAlert from './common/CustomAlert';
 import { Product, ProductOption, ProductVariant } from '../types';
+import { useCustomRouter } from '../hooks/useCustomRouter';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
@@ -41,7 +42,9 @@ interface ProductDetailModalProps {
 
 const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVisible, onClose }) => {
   const { items: cartItems, addToCart, removeFromCart } = useCartStore();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore(); 
+  const router = useCustomRouter();
+
   const insets = useSafeAreaInsets();
   const { items: wishlistItems, addToWishlist, removeFromWishlist: removeFromWishlistState, isWishlisted } = useWishlistStore();
 
@@ -155,9 +158,9 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
 
   const formatPrice = useCallback((price: number | undefined | null) => {
     const numericPrice = Number(price);
-    if (isNaN(numericPrice)) return '$0.00';
+    if (isNaN(numericPrice)) return '₹0.00';
     try {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(numericPrice);
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(numericPrice);
     } catch (e) {
       return `$${(numericPrice || 0).toFixed(2)}`;
     }

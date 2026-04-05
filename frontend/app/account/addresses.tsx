@@ -11,11 +11,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { apiCall } from '../../src/lib/api';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect,useLocalSearchParams } from 'expo-router';
 
 export default function AddressesScreen() {
   const router = useCustomRouter();
   const [addresses, setAddresses] = useState([]);
+
+  const params = useLocalSearchParams();
+  const isSelecting = params.isSelecting === 'true';
+
+  const handleSelectForCheckout = (address) => {
+    router.replace({ 
+      pathname: '/checkout', // (Ensure this matches your checkout file path!)
+      params: { selectedAddress: JSON.stringify(address) } 
+    });
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -94,62 +104,66 @@ export default function AddressesScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {addresses.map((address) => (
-          <View key={address._id} style={styles.addressCard}>
-            <View style={styles.addressHeader}>
-              <View style={styles.addressTypeContainer}>
-                <Text style={styles.addressType}>{address.type}</Text>
-                {address.isDefault && (
-                  <View style={styles.defaultBadge}>
-                    <Text style={styles.defaultText}>Default</Text>
-                  </View>
-                )}
-              </View>
-              
-              <View style={styles.addressActions}>
-                {!address.isDefault && (
-                  <Pressable
-                    onPress={() => handleSetDefaultAddress(address._id)}
-                    style={styles.actionButton}
-                  >
-                    <Text style={styles.actionText}>Set as Default</Text>
-                  </Pressable>
-                )}
-                <Pressable 
-                  onPress={() => handleEditAddress(address)}
-                  style={styles.actionButton}
-                >
-                  <Text style={styles.actionText}>Edit</Text>
-                </Pressable>
-                <Pressable 
-                  onPress={() => handleDeleteAddress(address._id)}
-                  style={[styles.actionButton, styles.deleteButton]}
-                >
-                  <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
-                </Pressable>
-              </View>
+  {addresses.map((address) => (
+    <View key={address._id} style={styles.addressCard}>
+      
+      {/* HEADER: Contains Badges & Action Buttons (Edit/Delete/Default) */}
+      <View style={styles.addressHeader}>
+        <View style={styles.addressTypeContainer}>
+          <Text style={styles.addressType}>{address.type}</Text>
+          {address.isDefault && (
+            <View style={styles.defaultBadge}>
+              <Text style={styles.defaultText}>Default</Text>
             </View>
-            
-            <View style={styles.addressDetails}>
-              <Text style={styles.addressName}>{address.name}</Text>
-              {address.company && <Text style={styles.addressLine}>{address.company}</Text>}
-              <Text style={styles.addressLine}>{address.line1}</Text>
-              {address.line2 && <Text style={styles.addressLine}>{address.line2}</Text>}
-              <Text style={styles.addressLine}>
-                {`${address.city}, ${address.state} ${address.pincode}`}
-              </Text>
-              <Text style={styles.addressLine}>{address.country}</Text>
-              {address.phone && <Text style={styles.addressPhone}>T: {address.phone}</Text>}
-            </View>
-          </View>
-        ))}
-        
-        <Pressable onPress={handleAddAddress} style={styles.addButton}>
-          <Text style={styles.addButtonText}>Add New Address</Text>
-        </Pressable>
+          )}
+        </View>
+        <View>
+          {/* Spacer View from your original code */}
+        </View>
+        <View style={styles.addressActions}>
+          {!address.isDefault && (
+            <Pressable onPress={() => handleSetDefaultAddress(address._id)} style={styles.actionButton}>
+              <Text style={styles.actionText}>Set as Default</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={() => handleEditAddress(address)} style={styles.actionButton}>
+            <Text style={styles.actionText}>Edit</Text>
+          </Pressable>
+          <Pressable onPress={() => handleDeleteAddress(address._id)} style={[styles.actionButton, styles.deleteButton]}>
+            <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+          </Pressable>
+        </View>
+      </View>
+      
+      {/* BODY: Clickable area for selecting the address in Checkout mode */}
+      <Pressable 
+        onPress={() => isSelecting ? handleSelectForCheckout(address) : null}
+        style={({ pressed }) => [
+          isSelecting && pressed && { opacity: 0.6 } // Adds a nice click effect only when selecting
+        ]}
+      >
+        <View style={styles.addressDetails}>
+          <Text style={styles.addressName}>{address.name}</Text>
+          {address.company && <Text style={styles.addressLine}>{address.company}</Text>}
+          <Text style={styles.addressLine}>{address.line1}</Text>
+          {address.line2 && <Text style={styles.addressLine}>{address.line2}</Text>}
+          <Text style={styles.addressLine}>
+            {`${address.city}, ${address.state} ${address.pincode}`}
+          </Text>
+          <Text style={styles.addressLine}>{address.country}</Text>
+          {address.phone && <Text style={styles.addressPhone}>T: {address.phone}</Text>}
+        </View>
+      </Pressable>
 
-        <View style={styles.bottomSpacing} />
-      </ScrollView>
+    </View>
+  ))}
+  
+  <Pressable onPress={handleAddAddress} style={styles.addButton}>
+    <Text style={styles.addButtonText}>Add New Address</Text>
+  </Pressable>
+
+  <View style={styles.bottomSpacing} />
+</ScrollView>
     </SafeAreaView>
   )
 }

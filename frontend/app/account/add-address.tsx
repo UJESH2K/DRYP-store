@@ -24,9 +24,31 @@ export default function AddAddressScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const showToast = useToastStore((state) => state.showToast);
 
-  const handleAddAddress = async () => {
-    if (!address.name || !address.line1 || !address.city || !address.state || !address.pincode || !address.phone || !address.country) {
-      showToast('Please fill in all required fields.', 'error');
+const handleAddAddress = async () => {
+    // 1. Prevent "blank space" submissions
+    const trimmedName = address.name.trim();
+    const trimmedLine1 = address.line1.trim();
+    const trimmedCity = address.city.trim();
+    const trimmedState = address.state.trim();
+    const trimmedCountry = address.country.trim();
+
+    // 2. Check required text fields
+    if (!trimmedName || !trimmedLine1 || !trimmedCity || !trimmedState || !trimmedCountry) {
+      showToast('Please fill in all required text fields.', 'error');
+      return;
+    }
+
+    // 3. Strict exactly 10-digit phone number check
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(address.phone)) {
+      showToast('Phone number must be exactly 10 digits.', 'error');
+      return;
+    }
+
+    // 4. Strict exactly 6-digit pincode check
+    const pincodeRegex = /^\d{6}$/;
+    if (!pincodeRegex.test(address.pincode)) {
+      showToast('Pincode must be exactly 6 digits.', 'error');
       return;
     }
 
@@ -38,6 +60,11 @@ export default function AddAddressScreen() {
       // If this is the first address, make it the default
       const addressToSave = {
         ...address,
+        name: trimmedName,
+        line1: trimmedLine1,
+        city: trimmedCity,
+        state: trimmedState,
+        country: trimmedCountry,
         isDefault: existingAddresses.length === 0,
       };
 

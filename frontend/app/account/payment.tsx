@@ -92,7 +92,17 @@ export default function PaymentScreen() {
         {paymentMethods.length > 0 ? (
           paymentMethods.map(method => (
             <SwipeableRow key={method._id} onDelete={() => handleDeletePayment(method._id)}>
-              <View style={styles.paymentCard}>
+              
+              {/* Wrap the card in a Pressable to navigate to the Edit screen */}
+              <Pressable 
+                style={styles.paymentCard}
+                onPress={() => 
+                  router.push({
+                    pathname: '/account/edit-payment-method',
+                    params: { paymentMethod: JSON.stringify(method) }
+                  })
+                }
+              >
                 <View style={styles.paymentHeader}>
                   <View style={styles.paymentInfo}>
                     <Text style={styles.paymentIcon}>{getCardIcon(method.brand)}</Text>
@@ -117,7 +127,8 @@ export default function PaymentScreen() {
                     </Pressable>
                   )}
                 </View>
-              </View>
+              </Pressable>
+
             </SwipeableRow>
           ))
         ) : (

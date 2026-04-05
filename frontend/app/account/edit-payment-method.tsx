@@ -22,11 +22,17 @@ export default function EditPaymentMethodScreen() {
 
     setIsProcessing(true);
     try {
-      const profile = await apiCall('/api/users/profile');
-      const existingPaymentMethods = profile.paymentMethods || [];
-      const updatedPaymentMethods = existingPaymentMethods.map(p => p._id === paymentMethod._id ? paymentMethod : p);
+      // 1. Fetch current payment methods using the correct endpoint
+      const existingPaymentMethods = await apiCall('/api/payments/methods');
+      if (!existingPaymentMethods) throw new Error('Could not fetch payment methods.');
 
-      const result = await apiCall('/api/users/profile', {
+      // 2. Map through and swap out the edited method
+      const updatedPaymentMethods = existingPaymentMethods.map((p: any) => 
+        p._id === paymentMethod._id ? paymentMethod : p
+      );
+
+      // 3. Send the updated array back
+      const result = await apiCall('/api/payments/methods', {
         method: 'PUT',
         body: JSON.stringify({
           paymentMethods: updatedPaymentMethods,
@@ -41,8 +47,7 @@ export default function EditPaymentMethodScreen() {
       }
     } catch (error: any) {
       console.error('Update payment method error:', error);
-      const errorMessage = error?.data?.message || 'An unexpected error occurred.';
-      showToast(errorMessage, 'error');
+      showToast(error?.data?.message || 'An unexpected error occurred.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -57,15 +62,9 @@ export default function EditPaymentMethodScreen() {
         onPress: async () => {
           setIsProcessing(true);
           try {
-            const profile = await apiCall('/api/users/profile');
-            const existingPaymentMethods = profile.paymentMethods || [];
-            const updatedPaymentMethods = existingPaymentMethods.filter(p => p._id !== paymentMethod._id);
-
-            const result = await apiCall('/api/users/profile', {
-              method: 'PUT',
-              body: JSON.stringify({
-                paymentMethods: updatedPaymentMethods,
-              }),
+            // Your backend has a dedicated DELETE route, so we just call it directly!
+            const result = await apiCall(`/api/payments/methods/${paymentMethod._id}`, { 
+              method: 'DELETE' 
             });
 
             if (result) {
@@ -76,8 +75,7 @@ export default function EditPaymentMethodScreen() {
             }
           } catch (error: any) {
             console.error('Delete payment method error:', error);
-            const errorMessage = error?.data?.message || 'An unexpected error occurred.';
-            showToast(errorMessage, 'error');
+            showToast(error?.data?.message || 'An unexpected error occurred.', 'error');
           } finally {
             setIsProcessing(false);
           }

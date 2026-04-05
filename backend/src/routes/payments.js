@@ -75,6 +75,29 @@ router.put('/methods', protect, async (req, res) => {
   }
 });
 
+// @route   PUT /api/payments/methods/:id/default
+// @desc    Set a payment method as default
+// @access  Private
+router.put('/methods/:id/default', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Loop through all methods and set only the matching ID to true
+    user.paymentMethods.forEach(pm => {
+      pm.isDefault = pm._id.toString() === req.params.id;
+    });
+
+    await user.save();
+    res.json(user.paymentMethods);
+  } catch (error) {
+    console.error('Error setting default payment method:', error.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   DELETE /api/payments/methods/:id
 // @desc    Delete a payment method
 // @access  Private

@@ -62,7 +62,7 @@ export default function OrdersScreen() {
   };
 
   const formatPrice = (price: number = 0) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price);
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
 
   const renderOrderItem = ({ item }: { item: any }) => {
     const statusStyle = getStatusStyle(item.status);

@@ -106,7 +106,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({ cartItem,
     const numericPrice = Number(price);
     if (isNaN(numericPrice)) return '$0.00';
     try {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(numericPrice);
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(numericPrice);
     } catch (e) {
       return `$${(numericPrice || 0).toFixed(2)}`;
     }

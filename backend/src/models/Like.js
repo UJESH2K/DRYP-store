@@ -10,5 +10,3 @@ LikeSchema.index({ user: 1, product: 1 }, { unique: true, partialFilterExpressio
 LikeSchema.index({ guestId: 1, product: 1 }, { unique: true, partialFilterExpression: { guestId: { $exists: true } } });
 
 module.exports = mongoose.model('Like', LikeSchema);
-
-

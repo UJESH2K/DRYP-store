@@ -88,7 +88,7 @@ export default function CheckoutScreen() {
   const tax = useMemo(() => subtotal * 0.08, [subtotal]);
   const total = useMemo(() => subtotal + shipping + tax, [subtotal, shipping, tax]);
 
-  const formatPrice = (price: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price);
+  const formatPrice = (price: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
   
   const handlePlaceOrder = async () => {
     if (!shippingAddress) {

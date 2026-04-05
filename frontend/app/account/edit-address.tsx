@@ -31,23 +31,90 @@ export default function EditAddressScreen() {
   const showToast = useToastStore((state) => state.showToast);
 
   const handleEditAddress = async () => {
-    if (!address.name || !address.line1 || !address.city || !address.state || !address.pincode || !address.phone || !address.country) {
-      showToast('Please fill in all required fields.', 'error');
+    const trimmedName = address.name.trim();
+    if (!trimmedName || !address.line1.trim() || !address.city.trim() || !address.state.trim() || !address.country.trim()) {
+      showToast('Please fill in all required text fields.', 'error');
+      return;
+    }
+    if (!/^\d{10}$/.test(address.phone)) {
+      showToast('Phone number must be exactly 10 digits.', 'error');
+      return;
+    }
+    if (!/^\d{6}$/.test(address.pincode)) {
+      showToast('Pincode must be exactly 6 digits.', 'error');
       return;
     }
 
     setIsProcessing(true);
-    // ... (rest of the function is unchanged)
+    
+    try {
+      // 1. Fetch current profile to get the full array of addresses
+      const profile = await apiCall('/api/users/profile');
+      if (!profile || !profile.addresses) {
+        throw new Error('Could not fetch current profile data.');
+      }
+
+      // 2. Map through and swap out only the edited address
+      const updatedAddresses = profile.addresses.map((a: any) =>
+        a._id === address._id ? address : a
+      );
+
+      // 3. Send the complete updated array back to the database
+      const result = await apiCall('/api/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ addresses: updatedAddresses }),
+      });
+
+      if (result) {
+        showToast('Address updated successfully!', 'success');
+        router.back(); // 4. Success! Navigate back to the list
+      } else {
+        throw new Error('Failed to update address.');
+      }
+    } catch (error: any) {
+      console.error('Edit address error:', error);
+      showToast(error?.data?.message || 'An unexpected error occurred.', 'error');
+    } finally {
+      setIsProcessing(false); // 5. ALWAYS stop the spinner, even on error!
+    }
   };
 
-  const handleDeleteAddress = async () => {
+  const handleDeleteAddress = () => {
     Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          // ... (rest of the function is unchanged)
+          setIsProcessing(true); // Start spinner
+          try {
+            // 1. Fetch current profile
+            const profile = await apiCall('/api/users/profile');
+            if (!profile || !profile.addresses) {
+              throw new Error('Could not fetch current profile data.');
+            }
+
+            // 2. Filter out the deleted address
+            const updatedAddresses = profile.addresses.filter((a: any) => a._id !== address._id);
+
+            // 3. Send the updated array to the database
+            const result = await apiCall('/api/users/profile', {
+              method: 'PUT',
+              body: JSON.stringify({ addresses: updatedAddresses }),
+            });
+
+            if (result) {
+              showToast('Address deleted successfully!', 'success');
+              router.back(); // 4. Go back to the list
+            } else {
+              throw new Error('Failed to delete address.');
+            }
+          } catch (error: any) {
+            console.error('Delete address error:', error);
+            showToast(error?.data?.message || 'An unexpected error occurred.', 'error');
+          } finally {
+            setIsProcessing(false); // 5. Stop the spinner!
+          }
         },
       },
     ]);

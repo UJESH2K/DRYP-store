@@ -27,9 +27,22 @@ export default function AddAddressScreen() {
     }
   }, [params.newAddress]);
 
-  const handleAddAddress = async () => {
-    if (!address.name || !address.street || !address.city || !address.state || !address.zipCode) {
-      showToast('Please fill in all fields.', 'error');
+const handleAddAddress = async () => {
+    // 1. Prevent "blank space" submissions
+    const trimmedName = address.name.trim();
+    const trimmedStreet = address.street.trim();
+    const trimmedCity = address.city.trim();
+    const trimmedState = address.state.trim();
+
+    if (!trimmedName || !trimmedStreet || !trimmedCity || !trimmedState) {
+      showToast('Please fill in all text fields.', 'error');
+      return;
+    }
+
+    // 2. Strict exactly 6-digit zipCode/pincode check
+    const zipRegex = /^\d{6}$/;
+    if (!zipRegex.test(address.zipCode)) {
+      showToast('ZIP/Pincode must be exactly 6 digits.', 'error');
       return;
     }
 
@@ -38,17 +51,28 @@ export default function AddAddressScreen() {
       // First, get the current user's addresses
       const profile = await apiCall('/api/users/profile');
       const existingAddresses = profile.addresses || [];
+      
+      const addressToSave = {
+        ...address,
+        name: trimmedName,
+        street: trimmedStreet,
+        city: trimmedCity,
+        state: trimmedState,
+      };
 
       const result = await apiCall('/api/users/profile', {
         method: 'PUT',
         body: JSON.stringify({
-          addresses: [...existingAddresses, address],
+          addresses: [...existingAddresses, addressToSave],
         }),
       });
 
       if (result) {
         showToast('Address added successfully!', 'success');
-        router.goBack({ newAddress: JSON.stringify(address) });
+        router.replace({ 
+            pathname: '/(checkout)/select-address', 
+            params: { newAddress: JSON.stringify(addressToSave) } 
+        });
       } else {
         throw new Error('Failed to add address.');
       }

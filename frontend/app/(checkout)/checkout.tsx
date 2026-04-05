@@ -166,12 +166,12 @@ export default function CheckoutScreen() {
         )}
 
         <InfoCard 
-          title="Shipping to"
-          action={
-            <Pressable onPress={() => router.push('/account/addresses')}>
-              <Text style={styles.changeButtonText}>Change</Text>
-            </Pressable>
-          }>
+  title="Shipping to"
+  action={
+    <Pressable onPress={() => router.push({ pathname: '/account/addresses', params: { isSelecting: 'true' } })}>
+      <Text style={styles.changeButtonText}>Change</Text>
+    </Pressable>
+  }>
           {shippingAddress ? (
             <>
               <Text style={styles.cardBodyText}>{shippingAddress.name}</Text>
@@ -184,12 +184,12 @@ export default function CheckoutScreen() {
         </InfoCard>
 
         <InfoCard 
-          title="Payment"
-          action={
-            <Pressable onPress={() => router.push('/account/payment')}>
-              <Text style={styles.changeButtonText}>Change</Text>
-            </Pressable>
-          }>
+  title="Payment"
+  action={
+    <Pressable onPress={() => router.push('/account/payment')}>
+      <Text style={styles.changeButtonText}>Change</Text>
+    </Pressable>
+  }>
           {paymentMethod ? (
             <View style={styles.paymentMethodContainer}>
               <Ionicons name="card-outline" size={24} color="#1c1c1e" />

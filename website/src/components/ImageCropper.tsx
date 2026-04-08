@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import React, { useState, useRef, useImperativeHandle } from "react";
 import ReactCrop, { Crop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -75,8 +74,10 @@ const ImageCropper = React.forwardRef<ImageCropperRef, ImageCropperProps>(
     }));
 
     return (
-      <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-[#050505]/95 backdrop-blur-md selection:bg-white selection:text-black">
-        <div className="mb-6 text-center">
+      <div className="fixed inset-0 z-[60] flex flex-col bg-[#050505]/95 backdrop-blur-md selection:bg-white selection:text-black p-6 md:p-12">
+        
+        {/* --- Header (Fixed) --- */}
+        <div className="flex-none text-center mb-6">
           <h3 className="font-editorial text-2xl italic tracking-[0.1em] text-white mb-2">
             Adjust Frame
           </h3>
@@ -85,19 +86,24 @@ const ImageCropper = React.forwardRef<ImageCropperRef, ImageCropperProps>(
           </p>
         </div>
 
-        <div className="w-full max-w-4xl p-2 border border-white/10 bg-black/50 shadow-2xl">
-          <ReactCrop crop={crop} onChange={(c) => setCrop(c)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              ref={imgRef}
-              src={image}
-              alt="Crop preview"
-              className="max-h-[60vh] object-contain mx-auto"
-            />
-          </ReactCrop>
+        {/* --- Image Area (Flexible & Constrained) --- */}
+        {/* min-h-0 is a crucial flexbox property that prevents the child from blowing past the parent's boundaries */}
+        <div className="flex-1 min-h-0 flex items-center justify-center w-full max-w-4xl mx-auto overflow-hidden">
+          <div className="p-2 border border-white/10 bg-black/50 shadow-2xl max-h-full max-w-full flex items-center justify-center overflow-auto">
+            <ReactCrop crop={crop} onChange={(c) => setCrop(c)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                ref={imgRef}
+                src={image}
+                alt="Crop preview"
+                className="max-h-[60vh] md:max-h-[65vh] object-contain mx-auto block"
+              />
+            </ReactCrop>
+          </div>
         </div>
 
-        <div className="mt-10 flex items-center gap-8">
+        {/* --- Footer / Buttons (Fixed) --- */}
+        <div className="flex-none mt-8 flex items-center justify-center gap-8">
           <button
             onClick={onCancel}
             className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 hover:text-white transition-colors"
@@ -115,6 +121,7 @@ const ImageCropper = React.forwardRef<ImageCropperRef, ImageCropperProps>(
             Confirm Crop
           </button>
         </div>
+        
       </div>
     );
   },

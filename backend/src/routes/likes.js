@@ -49,7 +49,7 @@ router.post('/:productId', identifyUser, async (req, res, next) => {
       return res.status(200).json({ success: true, message: 'Product already liked.' });
     }
 
-    await Like.create({ ...query, user: userId }); // user can be null
+    await Like.create(query);
     await Product.findByIdAndUpdate(productId, { $inc: { likes: 1 } });
     
     res.status(201).json({ success: true, message: `Successfully liked ${productId}` });

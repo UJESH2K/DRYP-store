@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +19,7 @@ export default function LoginPage() {
   });
 
   const { login } = useAuth();
+  const router = useRouter();
 
   const validateForm = () => {
     let isValid = true;
@@ -50,20 +52,30 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/vendors/login`, {
+      // CRITICAL: Notice this hits the GENERIC auth route, bypassing the Vendor bouncer!
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to authenticate");
-      }
 
-      login(data.user, data.token);
+      if (res.ok) {
+        // Double-check they actually have admin privileges before letting them into the dashboard
+        if (data.user.role !== "admin") {
+          setServerError("Unauthorized. Administrative credentials required.");
+          setIsLoading(false);
+          return;
+        }
+
+        login(data.user, data.token);
+        router.push("/admin/applications");
+      } else {
+        throw new Error(data.message || "Invalid credentials");
+      }
     } catch (error) {
-      setServerError(error.message);
+      setServerError(error.message || "Network error. The server may be unreachable.");
     } finally {
       setIsLoading(false);
     }
@@ -96,42 +108,6 @@ export default function LoginPage() {
 
       <div className="flex h-screen w-full overflow-hidden bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white">
         {/* LEFT SPLIT */}
-        <div className="relative hidden w-1/2 lg:block">
-          <img
-            src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"
-            alt="Avant-garde fashion editorial"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-[20s] ease-out hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-
-          <div className="absolute inset-0 flex flex-col justify-between p-12 text-white">
-            <Link href="/" className="inline-block w-max">
-              <h1 className="font-editorial text-3xl italic tracking-[0.2em] text-white/90 hover:text-white hover:opacity-80 transition-all cursor-pointer">
-                DRYP
-              </h1>
-            </Link>
-
-            <div className="max-w-lg space-y-2">
-              <h2 className="font-editorial text-8xl leading-[1.1] tracking-tight">
-                Curate the <br />
-                <span className="font-cursive text-[6.5rem] font-normal leading-[0.6] text-[#E8E6DF]">
-                  collection.
-                </span>
-              </h2>
-              <p className="pt-4 font-light leading-relaxed tracking-widest text-white/70 max-w-sm">
-                AN EXCLUSIVE SYNDICATE FOR DESIGNERS & VISIONARIES.
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-6 text-[0.8rem] tracking-[0.3em] uppercase text-white/50">
-              <span>Vendor Portal</span>
-              <span className="h-[1px] w-12 bg-white/30" />
-              <span>S/S Collection</span>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT SPLIT */}
         <div className="flex h-full w-full flex-col justify-center px-8 sm:px-16 md:px-24 lg:w-1/2 relative overflow-y-auto">
           <div className="mb-8 block lg:hidden text-center">
             <Link href="/" className="inline-block w-max mx-auto">
@@ -143,12 +119,12 @@ export default function LoginPage() {
 
           <div className="max-w-[380px] w-full mx-auto lg:mx-0">
             <div className="mb-10 space-y-2">
-              <h3 className="font-editorial text-5xl font-normal tracking-tight text-black">
-                Access the Studio
-              </h3>
-              <p className="font-cursive text-4xl text-gray-500">
-                Authenticate your dossier
+              <p className="font-sans text-[9px] uppercase tracking-[0.4em] text-gray-400 mb-4">
+                Restricted Access
               </p>
+              <h3 className="font-editorial text-5xl font-normal tracking-tight text-black">
+                System Override
+              </h3>
             </div>
 
             {renderServerError()}
@@ -168,13 +144,13 @@ export default function LoginPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.email ? "border-red-300" : ""
                     }`}
-                    placeholder="Studio Email"
+                    placeholder="Admin Identification"
                   />
                   <label
                     htmlFor="email-address"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Studio Email
+                    Admin Identification
                   </label>
                   {fieldErrors.email && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
@@ -196,28 +172,19 @@ export default function LoginPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base tracking-widest text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.password ? "border-red-300" : ""
                     }`}
-                    placeholder="Security Key"
+                    placeholder="Passcode"
                   />
                   <label
                     htmlFor="password"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Security Key
+                    Passcode
                   </label>
                   {fieldErrors.password && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
                       {fieldErrors.password}
                     </span>
                   )}
-                </div>
-
-                <div className="text-right mt-2">
-                  <Link 
-                    href="/forgot-password" 
-                    className="font-sans text-[9px] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
-                  >
-                    Forgot your password?
-                  </Link>
                 </div>
               </div>
 
@@ -229,7 +196,7 @@ export default function LoginPage() {
                 >
                   <div className="absolute inset-0 h-full w-full translate-x-[-100%] bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
                   <span className="relative z-10 transition-colors duration-500">
-                    {isLoading ? "Authenticating..." : "Enter the Studio"}
+                    {isLoading ? "Authenticating..." : "Establish Link"}
                   </span>
                 </button>
               </div>
@@ -237,14 +204,50 @@ export default function LoginPage() {
 
             <div className="mt-10 text-center">
               <p className="font-editorial text-sm italic text-gray-500">
-                Not curated yet?{" "}
+                Not an admin?{" "}
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors ml-2"
                 >
-                  Apply Here
+                  Return to Portal
                 </Link>
               </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* RIGHT SPLIT */}
+        <div className="relative hidden w-1/2 lg:block">
+          <img
+            src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"
+            alt="Avant-garde fashion editorial"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-[20s] ease-out hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+          <div className="absolute inset-0 flex flex-col justify-between p-12 text-white">
+            <Link href="/" className="inline-block w-max">
+              <h1 className="font-editorial text-3xl italic tracking-[0.2em] text-white/90 hover:text-white hover:opacity-80 transition-all cursor-pointer">
+                DRYP
+              </h1>
+            </Link>
+
+            <div className="max-w-lg space-y-2">
+              <h2 className="font-editorial text-8xl leading-[1.1] tracking-tight">
+                Command the <br />
+                <span className="font-cursive text-[6.5rem] font-normal leading-[0.6] text-[#E8E6DF]">
+                  network.
+                </span>
+              </h2>
+              <p className="pt-4 font-light leading-relaxed tracking-widest text-white/70 max-w-sm">
+                ADMINISTRATIVE OVERRIDE AND CONTROL.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-6 text-[0.8rem] tracking-[0.3em] uppercase text-white/50">
+              <span>Admin Portal</span>
+              <span className="h-[1px] w-12 bg-white/30" />
+              <span>System Override</span>
             </div>
           </div>
         </div>

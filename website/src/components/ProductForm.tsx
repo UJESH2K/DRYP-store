@@ -346,7 +346,7 @@ const ProductForm = React.forwardRef(
               sizes: v.options && v.options.Size ? v.options.Size : "",
               color: v.options && v.options.Color ? v.options.Color : "",
               price: v.price || "",
-              stock: v.stock || {},
+              stock: v.options && v.options.Size ? { [v.options.Size]: v.stock } : {},
               images: v.images || [],
             })),
           );

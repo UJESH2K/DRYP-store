@@ -2,9 +2,9 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const Product = require('../models/Product');
-const Like = require('../models/Like');
-const Cart = require('../models/Cart');
-const WishlistItem = require('../models/WishlistItem');
+const Cart = require('../models/Cart'); 
+const WishlistItem = require('../models/WishlistItem'); 
+const Like = require('../models/Like'); 
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 
@@ -160,10 +160,16 @@ router.put('/:id', protect, async (req, res, next) => {
       return res.status(401).json({ message: 'Not authorized to edit this product' });
     }
 
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const { name, description, brand, category, tags, basePrice, options, variants, images } = req.body;
+    const safeUpdateData = {
+        name, description, brand, category, tags, basePrice, options, variants, images
+    };
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id, 
+      { $set: safeUpdateData }, 
+      { new: true, runValidators: true }
+    );
 
     res.json(updatedProduct);
   } catch (error) {
@@ -186,40 +192,20 @@ router.delete('/:id', protect, async (req, res, next) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Ensure the user deleting the product is the one who created it
     if (product.vendor.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: 'Not authorized to delete this product' });
     }
 
+    product.isActive = false;
+    await product.save();
+
     const productId = product._id;
 
-    // 1. Delete images from the filesystem
-    if (product.images && product.images.length > 0) {
-      product.images.forEach(imageUrl => {
-        // url is like '/uploads/image-123.jpg', we need the relative path from the project root
-        const imagePath = path.join(__dirname, '..', 'public', imageUrl);
-        fs.unlink(imagePath, (err) => {
-          if (err) {
-            // Log the error but don't block the process. The file might already be gone.
-            console.error(`Failed to delete image: ${imagePath}`, err);
-          }
-        });
-      });
-    }
-
-    // 2. Delete from all carts
     await Cart.updateMany({}, { $pull: { items: { product: productId } } });
-
-    // 3. Delete from all wishlists
     await WishlistItem.deleteMany({ product: productId });
-    
-    // 4. Delete all likes for this product
     await Like.deleteMany({ product: productId });
 
-    // 5. Finally, delete the product itself
-    await Product.findByIdAndDelete(req.params.id);
-
-    res.json({ message: 'Product and all associated data have been removed' });
+    res.json({ message: 'Product archived successfully' });
   } catch (error) {
     next(error);
   }

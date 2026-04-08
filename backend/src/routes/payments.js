@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
+const Order = require('../models/Order');
 
 // @route   GET /api/payments/methods
 // @desc    Get user's saved payment methods
@@ -124,26 +125,83 @@ router.delete('/methods/:id', protect, async (req, res) => {
 });
 
 // POST /api/payments/create-intent (mock)
-router.post('/create-intent', async (req, res, next) => {
+// router.post('/create-intent', async (req, res, next) => {
+//   try {
+//     const { amount } = req.body;
+//     const order = {
+//       id: `order_${Date.now()}`,
+//       amount,
+//       currency: 'INR',
+//       status: 'created',
+//     };
+//     res.json(order);
+//   } catch (error) { next(error); }
+// });
+
+router.post('/create-intent', protect, async (req, res, next) => {
   try {
-    const { amount } = req.body;
-    const order = {
-      id: `order_${Date.now()}`,
-      amount,
-      currency: 'INR',
+    const { orderId, amount } = req.body; 
+
+    const order = await Order.findOne({ _id: orderId, user: req.user._id });
+    if (!order) {
+        return res.status(404).json({ message: 'Order not found or unauthorized' });
+    }
+
+    const razorpayOrderId = `rzp_order_${Date.now()}`;
+
+    order.razorpayOrderId = razorpayOrderId;
+    await order.save();
+
+    res.json({
+      id: razorpayOrderId,
+      amount: order.totalAmount, 
+      currency: 'USD',
       status: 'created',
-    };
-    res.json(order);
+    });
   } catch (error) { next(error); }
 });
 
 // POST /api/payments/verify (signature verify mock)
-router.post('/verify', async (req, res, next) => {
+// router.post('/verify', async (req, res, next) => {
+//   try {
+//     const { orderId, paymentId, signature } = req.body;
+//     const secret = process.env.RAZORPAY_KEY_SECRET || 'secret';
+//     const generated = crypto.createHmac('sha256', secret).update(`${orderId}|${paymentId}`).digest('hex');
+//     res.json({ verified: generated === signature });
+//   } catch (error) { next(error); }
+// });
+
+router.post('/verify', protect, async (req, res, next) => {
   try {
-    const { orderId, paymentId, signature } = req.body;
-    const secret = process.env.RAZORPAY_KEY_SECRET || 'secret';
-    const generated = crypto.createHmac('sha256', secret).update(`${orderId}|${paymentId}`).digest('hex');
-    res.json({ verified: generated === signature });
+    const { razorpayOrderId, paymentId, signature } = req.body; 
+    
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) throw new Error('FATAL: RAZORPAY_KEY_SECRET missing in environment variables');
+
+    const generated = crypto.createHmac('sha256', secret).update(`${razorpayOrderId}|${paymentId}`).digest('hex');
+    const isVerified = generated === signature;
+
+    if (!isVerified) {
+        await Order.findOneAndUpdate({ razorpayOrderId }, { paymentStatus: 'failed' });
+        return res.status(400).json({ verified: false, message: 'Invalid payment signature. Potential fraud attempt.' });
+    }
+
+    const order = await Order.findOneAndUpdate(
+        { razorpayOrderId: razorpayOrderId }, 
+        { 
+            paymentStatus: 'completed',
+            status: 'confirmed', 
+            razorpayPaymentId: paymentId,
+            razorpaySignature: signature
+        },
+        { new: true }
+    );
+
+    if (!order) {
+        return res.status(404).json({ verified: true, message: 'Payment verified, but Order record missing from database.' });
+    }
+
+    res.json({ verified: true, message: 'Payment successful and order confirmed.' });
   } catch (error) { next(error); }
 });
 

@@ -18,6 +18,21 @@ const uploadRoutes = require("./src/routes/upload"); // Import the new upload ro
 const analyticsRoutes = require("./src/routes/analytics"); // Import analytics routes
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
+const rateLimit = require('express-rate-limit');
+
+const authLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 10, 
+  message: { message: "Too many login attempts from this IP, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const vendorSignupLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, 
+  max: 3, 
+  message: { message: "Too many studio applications from this IP, please try again later" },
+});
 
 const app = express();
 
@@ -53,6 +68,10 @@ app.get("/health", (_req, res) => {
 });
 
 // API routes
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/vendors/register", vendorSignupLimiter);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/vendors", vendorRoutes);
@@ -81,14 +100,16 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
 (async () => {
   try {
     await connectDatabase(process.env.MONGO_URI);
+    
+    app.listen(PORT, "0.0.0.0", () =>
+    console.log(
+        `Server running on port ${PORT} and accessible from all interfaces`,
+      ),
+    );
   } catch (error) {
     console.warn("Starting server without database connection:", error.message);
+    process.exit(1);
   }
-  app.listen(PORT, "0.0.0.0", () =>
-    console.log(
-      `Server running on port ${PORT} and accessible from all interfaces`,
-    ),
-  );
 })();
 
 module.exports = app;

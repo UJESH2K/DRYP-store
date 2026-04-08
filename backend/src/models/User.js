@@ -38,7 +38,8 @@ const UserSchema = new mongoose.Schema({
     colors: { type: [String], default: [] },
     brands: { type: [String], default: [] },
   },
-
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

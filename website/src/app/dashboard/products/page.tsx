@@ -28,6 +28,7 @@ const ProductsPage = () => {
       const response = await fetch(
         `${API_BASE_URL}/api/products?vendor=${user._id}`,
       );
+      
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -257,7 +258,7 @@ const ProductsPage = () => {
                                 {variant.options ? Object.entries(variant.options).map(([key, value]) => `${key}: ${value}`).join(" · ") : ''}
                               </span>
                               <div className="flex gap-3 text-gray-400">
-                                <span>QTY: {Object.values(variant.stock).reduce((sum, qty) => sum + qty, 0)}</span>
+                                <span>QTY: {variant.stock}</span>
                                 <span className="text-black">
                                   ${variant.price.toFixed(2)}
                                 </span>

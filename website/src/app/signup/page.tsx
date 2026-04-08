@@ -54,7 +54,7 @@ export default function SignupPage() {
     return isValid;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError("");
 
@@ -63,7 +63,8 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      // Point to the Vendor registration route
+      const res = await fetch(`${API_BASE_URL}/api/vendors/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
@@ -75,7 +76,7 @@ export default function SignupPage() {
       }
 
       login(data.user, data.token);
-    } catch (error) {
+    } catch (error: any) {
       setServerError(error.message);
     } finally {
       setIsLoading(false);
@@ -126,12 +127,13 @@ export default function SignupPage() {
       <div className="flex h-screen w-full overflow-hidden bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white">
         {/* LEFT SPLIT */}
         <div className="relative hidden w-1/2 lg:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"
             alt="Avant-garde fashion editorial"
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-[20s] ease-out hover:scale-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-transparent" />
 
           <div className="absolute inset-0 flex flex-col justify-between p-12 text-white">
             <Link href="/" className="inline-block w-max">
@@ -154,7 +156,7 @@ export default function SignupPage() {
 
             <div className="flex items-center space-x-6 text-[0.8rem] tracking-[0.3em] uppercase text-white/50">
               <span>Vendor Portal</span>
-              <span className="h-[1px] w-12 bg-white/30" />
+              <span className="h-px w-12 bg-white/30" />
               <span>S/S Collection</span>
             </div>
           </div>
@@ -176,7 +178,7 @@ export default function SignupPage() {
                 Join the Studio
               </h3>
               <p className="font-cursive text-4xl text-gray-500">
-                Submit your dossier
+                Establish your presence
               </p>
             </div>
 
@@ -225,13 +227,13 @@ export default function SignupPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.email ? "border-red-300" : ""
                     }`}
-                    placeholder="Studio Email"
+                    placeholder="Approved Email"
                   />
                   <label
                     htmlFor="email-address"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Studio Email
+                    Approved Email
                   </label>
                   {fieldErrors.email && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
@@ -295,7 +297,7 @@ export default function SignupPage() {
                   }
                   className="group relative w-full overflow-hidden bg-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-white transition-all duration-500 hover:tracking-[0.4em] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:tracking-[0.3em]"
                 >
-                  <div className="absolute inset-0 h-full w-full translate-x-[-100%] bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
+                  <div className="absolute inset-0 h-full w-full -translate-x-full bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
                   <span className="relative z-10 transition-colors duration-500">
                     {isLoading ? "Authenticating..." : "Enter the Studio"}
                   </span>
@@ -303,17 +305,23 @@ export default function SignupPage() {
               </div>
             </form>
 
-            <div className="mt-10 text-center">
-              <p className="font-editorial text-sm italic text-gray-500">
-                Already curated?{" "}
-                <Link
-                  href="/login"
-                  className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors ml-2"
-                >
-                  Sign In
-                </Link>
-              </p>
+            {/* NEW GATEKEEPER LINKS */}
+            <div className="mt-10 pt-6 border-t border-gray-200 text-center space-y-5">
+              <Link
+                href="/apply"
+                className="block font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors"
+              >
+                New Studio? Submit an application first
+              </Link>
+              
+              <Link
+                href="/login"
+                className="block font-sans text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
+              >
+                Already Curated? Log In
+              </Link>
             </div>
+            
           </div>
         </div>
       </div>

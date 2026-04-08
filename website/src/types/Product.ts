@@ -1,13 +1,14 @@
 export interface Variant {
-  color: string;
-  sizes: string;
   price: number;
-  stock: { [key: string]: number };
+  stock: number; // It's a flat number coming from the API!
   images: string[];
   options?: {
     Color?: string;
     Size?: string;
+    [key: string]: any;
   };
+  color?: string; 
+  sizes?: string; 
 }
 
 export interface Product {

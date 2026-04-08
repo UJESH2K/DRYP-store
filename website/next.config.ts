@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactCompiler: true,
 
-  // 🔥 Disable TypeScript build errors
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -13,9 +12,19 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "localhost",
-        port: "5000",
+        port: "8080", // ⬅️ Changed from 5000
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "plus.unsplash.com",
+        pathname: "/**",
+      }
     ],
   },
 
@@ -23,11 +32,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:5000/api/:path*",
+        destination: "http://localhost:8080/api/:path*", // ⬅️ Changed from 5000
       },
       {
         source: "/uploads/:path*",
-        destination: "http://localhost:5000/uploads/:path*",
+        destination: "http://localhost:8080/uploads/:path*", // ⬅️ Changed from 5000
       },
     ];
   },

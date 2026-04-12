@@ -97,7 +97,8 @@ export function useSwipeAnimations(
       nextCardAnimation.setValue(0.9);
       setCurrentIndex(prev => {
         if (!items || items.length === 0) return 0;
-        return (prev + 1) % items.length;
+        // FIX: Remove the modulo so the index actually advances past the end of the array
+        return (prev + 1);
       });
       setIsAnimating(false);
     });

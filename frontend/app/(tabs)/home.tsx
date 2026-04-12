@@ -73,7 +73,8 @@ export default function HomeScreen() {
   }
 
   const currentItem = items[swipeAnimations.currentIndex];
-  const nextItem = items[(swipeAnimations.currentIndex + 1) % items.length];
+  // FIX: Remove the modulo so the stack actually ends when it runs out of items
+  const nextItem = items[swipeAnimations.currentIndex + 1];
 
   return (
     <>
@@ -86,6 +87,13 @@ export default function HomeScreen() {
           onSelectionChange={setSelectedFilters}
         />
         <View style={styles.cardStack}>
+          {/* Add this fallback message behind the cards */}
+          {swipeAnimations.currentIndex >= items.length && (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 22, fontFamily: 'Zaloga', marginBottom: 8 }}>You're all caught up!</Text>
+              <Text style={{ fontSize: 16, color: '#666', fontFamily: 'Zaloga' }}>Check back later for new styles.</Text>
+            </View>
+          )}
           {nextItem && (
             <Card 
               item={nextItem}

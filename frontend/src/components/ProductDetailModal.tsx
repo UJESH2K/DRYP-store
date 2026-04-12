@@ -298,13 +298,54 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
           <Text style={styles.detailsTitle}>{product.name}</Text>
 
           {/* Size Options */}
-          {sizeOption && sizeOption.values.length > 0 && (
+          {/* {sizeOption && sizeOption.values.length > 0 && (
             <View style={styles.optionContainer}>
               <Text style={styles.optionTitle}>Size</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorOptionsContainer}>
                 {sizeOption.values.map((sizeValue: string) => (
                   <Pressable
                     key={sizeValue}
+                    style={[styles.colorTextOptionButton, selectedSize === sizeValue && styles.colorTextOptionButtonSelected]}
+                    onPress={() => setSelectedSize(sizeValue)}
+                  >
+                    <Text style={[styles.colorTextOptionText, selectedSize === sizeValue && styles.colorTextOptionTextSelected]}>
+                      {sizeValue}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )} */}
+
+          {/* Color Options */}
+          {/* {colorOption && colorOption.values.length > 0 && (
+            <View style={styles.optionContainer}>
+              <Text style={styles.optionTitle}>Color</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorOptionsContainer}>
+                {colorOption.values.map((colorValue: string) => (
+                  <Pressable
+                    key={colorValue}
+                    style={[styles.colorTextOptionButton, selectedColor === colorValue && styles.colorTextOptionButtonSelected]}
+                    onPress={() => handleColorSelect(colorValue)}
+                  >
+                    <Text style={[styles.colorTextOptionText, selectedColor === colorValue && styles.colorTextOptionTextSelected]}>
+                      {colorValue}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )} */}
+
+          {/* Size Options */}
+          {sizeOption && sizeOption.values.length > 0 && (
+            <View style={styles.optionContainer}>
+              <Text style={styles.optionTitle}>Size</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorOptionsContainer}>
+                {/* FIX: Deduplicate array and add index to key */}
+                {Array.from(new Set(sizeOption.values)).map((sizeValue: string, index: number) => (
+                  <Pressable
+                    key={`${sizeValue}-${index}`}
                     style={[styles.colorTextOptionButton, selectedSize === sizeValue && styles.colorTextOptionButtonSelected]}
                     onPress={() => setSelectedSize(sizeValue)}
                   >
@@ -322,9 +363,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
             <View style={styles.optionContainer}>
               <Text style={styles.optionTitle}>Color</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorOptionsContainer}>
-                {colorOption.values.map((colorValue: string) => (
+                {/* FIX: Deduplicate array and add index to key */}
+                {Array.from(new Set(colorOption.values)).map((colorValue: string, index: number) => (
                   <Pressable
-                    key={colorValue}
+                    key={`${colorValue}-${index}`}
                     style={[styles.colorTextOptionButton, selectedColor === colorValue && styles.colorTextOptionButtonSelected]}
                     onPress={() => handleColorSelect(colorValue)}
                   >

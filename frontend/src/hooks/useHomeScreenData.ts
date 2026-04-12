@@ -55,15 +55,22 @@ export function useHomeScreenData() {
     
     try {
       const params = new URLSearchParams();
-      
-      // FIX 2: Append each filter separately instead of joining with commas.
-      // This creates ?brand=Nike&brand=Adidas, which Express/Mongoose natively understands as an array!
       selectedBrands.forEach(brand => params.append('brand', brand));
       selectedCategories.forEach(category => params.append('category', category));
       selectedColors.forEach(color => params.append('color', color));
       
       const products = await apiCall(`/api/products?${params.toString()}`);
-      setItems(Array.isArray(products) ? mapProductsToItems(products) : []);
+      
+      // FIX: Deduplicate products coming from the API based on their ID
+      if (Array.isArray(products)) {
+        const mappedItems = mapProductsToItems(products);
+        const uniqueItems = mappedItems.filter((item, index, self) =>
+          index === self.findIndex((t) => t.id === item.id)
+        );
+        setItems(uniqueItems);
+      } else {
+        setItems([]);
+      }
     } catch (error) {
       console.warn('Failed to load products', error);
       setItems([]);

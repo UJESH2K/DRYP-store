@@ -76,52 +76,6 @@ router.get("/", identifyUser, async (req, res) => {
 });
 
 // @route   POST /api/cart
-// router.post("/", identifyUser, async (req, res) => {
-//   try {
-//     const { productId, quantity, price, options } = req.body;
-
-//     const cart = await getOrCreateCart(req);
-//     if (!cart) {
-//       return res
-//         .status(400)
-//         .json({ message: "Could not establish a cart session." });
-//     }
-
-//     const product = await Product.findById(productId);
-//     if (!product) {
-//       return res.status(404).json({ message: "Product not found" });
-//     }
-
-//     const incomingCartId = generateCartId(productId, options);
-
-//     const cartItemIndex = cart.items.findIndex(
-//       (item) => generateCartId(item.product, item.options) === incomingCartId,
-//     );
-
-//     if (cartItemIndex > -1) {
-//       cart.items[cartItemIndex].quantity += quantity || 1;
-//     } else {
-//       cart.items.push({
-//         product: productId,
-//         quantity: quantity || 1,
-//         price,
-//         options,
-//       });
-//     }
-
-//     // Tell Mongoose EXPLICITLY that the array changed
-//     cart.markModified("items");
-//     await cart.save();
-
-//     await cart.populate("items.product");
-//     res.json(cart.items);
-//   } catch (error) {
-//     console.error("Error adding to cart:", error.message);
-//     res.status(500).send("Server Error");
-//   }
-// });
-
-// @route   POST /api/cart
 router.post("/", identifyUser, async (req, res) => {
   try {
     const { productId, quantity, price, options } = req.body;

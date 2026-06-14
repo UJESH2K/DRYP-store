@@ -75,7 +75,7 @@ export default function LoginPage() {
     return (
       <div className="mb-6 border-l border-black bg-white p-4 text-sm tracking-wide shadow-sm">
         <p className="font-editorial italic text-black text-base mb-1">
-          Access Denied
+          Login Failed
         </p>
         <p className="text-gray-500 font-light text-xs mt-1">{serverError}</p>
       </div>
@@ -144,10 +144,10 @@ export default function LoginPage() {
           <div className="max-w-[380px] w-full mx-auto lg:mx-0">
             <div className="mb-10 space-y-2">
               <h3 className="font-editorial text-5xl font-normal tracking-tight text-black">
-                Access the Studio
+                Welcome Back
               </h3>
               <p className="font-cursive text-4xl text-gray-500">
-                Authenticate your dossier
+                Log in to your studio
               </p>
             </div>
 
@@ -168,13 +168,13 @@ export default function LoginPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.email ? "border-red-300" : ""
                     }`}
-                    placeholder="Studio Email"
+                    placeholder="Email"
                   />
                   <label
                     htmlFor="email-address"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Studio Email
+                    Email
                   </label>
                   {fieldErrors.email && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
@@ -196,13 +196,13 @@ export default function LoginPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base tracking-widest text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.password ? "border-red-300" : ""
                     }`}
-                    placeholder="Security Key"
+                    placeholder="Password"
                   />
                   <label
                     htmlFor="password"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Security Key
+                    Password
                   </label>
                   {fieldErrors.password && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
@@ -229,7 +229,7 @@ export default function LoginPage() {
                 >
                   <div className="absolute inset-0 h-full w-full translate-x-[-100%] bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
                   <span className="relative z-10 transition-colors duration-500">
-                    {isLoading ? "Authenticating..." : "Enter the Studio"}
+                    {isLoading ? "Authenticating..." : "Log In"}
                   </span>
                 </button>
               </div>
@@ -237,12 +237,12 @@ export default function LoginPage() {
 
             <div className="mt-10 text-center">
               <p className="font-editorial text-sm italic text-gray-500">
-                Not curated yet?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
-                  href="/signup"
+                  href="/apply"
                   className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors ml-2"
                 >
-                  Apply Here
+                  Apply first
                 </Link>
               </p>
             </div>

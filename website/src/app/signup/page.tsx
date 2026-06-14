@@ -92,7 +92,7 @@ export default function SignupPage() {
     return (
       <div className="mb-6 border-l border-black bg-white p-4 text-sm tracking-wide shadow-sm">
         <p className="font-editorial italic text-black text-base mb-1">
-          Access Denied
+          Account Creation Failed
         </p>
         {isUserExistsError ? (
           <p className="text-gray-500 font-light text-xs mt-1">
@@ -175,11 +175,28 @@ export default function SignupPage() {
           <div className="max-w-[380px] w-full mx-auto lg:mx-0">
             <div className="mb-10 space-y-2">
               <h3 className="font-editorial text-5xl font-normal tracking-tight text-black">
-                Join the Studio
+                Create Your Account
               </h3>
-              <p className="font-cursive text-4xl text-gray-500">
-                Establish your presence
-              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.2em] text-black">Step 1</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] bg-black text-white">✓</div>
+                <span className="text-[9px] tracking-[0.15em] mt-1 text-black">Apply</span>
+              </div>
+              <span className="text-gray-300 text-lg">→</span>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.2em] text-black">Step 2</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] bg-black text-white">✓</div>
+                <span className="text-[9px] tracking-[0.15em] mt-1 text-black">Approval</span>
+              </div>
+              <span className="text-gray-300 text-lg">→</span>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.2em] text-black">Step 3</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] bg-black text-white">3</div>
+                <span className="text-[9px] tracking-[0.15em] mt-1 text-black">Account</span>
+              </div>
             </div>
 
             {renderServerError()}
@@ -227,19 +244,22 @@ export default function SignupPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.email ? "border-red-300" : ""
                     }`}
-                    placeholder="Approved Email"
+                    placeholder="Email"
                   />
                   <label
                     htmlFor="email-address"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Approved Email
+                    Email
                   </label>
                   {fieldErrors.email && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
                       {fieldErrors.email}
                     </span>
                   )}
+                  <p className="font-sans text-[8px] uppercase tracking-[0.1em] text-gray-400 mt-2">
+                    Use the same email you applied with
+                  </p>
                 </div>
 
                 {/* Password Input */}
@@ -252,13 +272,13 @@ export default function SignupPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base tracking-widest text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       password && !isPasswordValid ? "border-black" : ""
                     }`}
-                    placeholder="Security Key"
+                    placeholder="Password"
                   />
                   <label
                     htmlFor="password"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Security Key
+                    Password
                   </label>
 
                   <div className="mt-3 flex items-center justify-between text-[9px] tracking-[0.15em] uppercase text-gray-300 transition-colors">
@@ -299,7 +319,7 @@ export default function SignupPage() {
                 >
                   <div className="absolute inset-0 h-full w-full -translate-x-full bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
                   <span className="relative z-10 transition-colors duration-500">
-                    {isLoading ? "Authenticating..." : "Enter the Studio"}
+                    {isLoading ? "Authenticating..." : "Create Account"}
                   </span>
                 </button>
               </div>
@@ -311,14 +331,14 @@ export default function SignupPage() {
                 href="/apply"
                 className="block font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors"
               >
-                New Studio? Submit an application first
+                Haven&apos;t applied yet? Start here
               </Link>
-              
+
               <Link
                 href="/login"
                 className="block font-sans text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
               >
-                Already Curated? Log In
+                Already have an account? Log in
               </Link>
             </div>
             

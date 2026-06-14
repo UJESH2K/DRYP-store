@@ -108,6 +108,13 @@ router.post('/login', async (req, res, next) => {
 // @desc    Generate token and send email
 router.post('/forgot-password', async (req, res, next) => {
   try {
+    if (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
+      console.error('SMTP not configured. Set SMTP_HOST, SMTP_EMAIL, SMTP_PASSWORD in backend/.env');
+      return res.status(500).json({
+        message: 'Email service is not configured. Please contact support.'
+      });
+    }
+
     const user = await User.findOne({ email: req.body.email });
     
     if (!user) {

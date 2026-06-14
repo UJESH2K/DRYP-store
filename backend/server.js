@@ -100,14 +100,22 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
 (async () => {
   try {
     await connectDatabase(process.env.MONGO_URI);
-    
+
     app.listen(PORT, "0.0.0.0", () =>
     console.log(
         `Server running on port ${PORT} and accessible from all interfaces`,
       ),
     );
   } catch (error) {
-    console.warn("Starting server without database connection:", error.message);
+    // We intentionally do NOT start the server when MongoDB is unreachable.
+    // A "listening but every query 500s" process hides outages and wastes
+    // the deploy slot on AWS — fail fast so the orchestrator can restart us
+    // (or a human can investigate) and we never serve a broken API.
+    console.error(
+      `❌ Failed to connect to MongoDB. Refusing to start the API. ` +
+      `Original error: ${error.message}`,
+    );
+    process.exit(1);
   }
 })();
 

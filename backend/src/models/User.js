@@ -52,6 +52,11 @@ const UserSchema = new mongoose.Schema(
     paymentMethods: { type: [PaymentMethodSchema], default: [] },
     role: { type: String, enum: ["user", "vendor", "admin"], default: "user" },
     isActive: { type: Boolean, default: true },
+    // Soft-delete fields — used by DELETE /api/users/me. We
+    // anonymize rather than hard-delete so historical orders
+    // and reviews keep a stable reference.
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date },
     likedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
     preferences: {
       currency: { type: String, default: "USD" },

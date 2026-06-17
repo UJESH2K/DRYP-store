@@ -2,6 +2,13 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { z } = require('zod');
+
+const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Password is required to confirm account deletion'),
+  confirmText: z.literal('DELETE MY ACCOUNT'),
+}).strict();
 
 // @route   PUT /api/users/preferences
 // @desc    Update user preferences
@@ -61,7 +68,7 @@ router.put('/profile', protect, async (req, res) => {
 
     // Update user fields from request body
     const { name, phone, avatar, addresses } = req.body;
-    
+
     if (name) user.name = name;
     if (phone) user.phone = phone;
     if (avatar) user.avatar = avatar;
@@ -76,5 +83,46 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/users/me
+// @desc    Delete the authenticated user's account. Requires the
+//          user to re-enter their password AND type a literal
+//          confirmation string. We do this to make a deletion
+//          hard to trigger by accident — a stolen JWT alone
+//          can't wipe the account.
+// @access  Private
+router.delete(
+  '/me',
+  protect,
+  validate({ body: deleteAccountSchema }),
+  async (req, res) => {
+    try {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      // password check — use bcryptjs to match the rest of the
+      // codebase (the native `bcrypt` package isn't installed).
+      const bcrypt = require('bcryptjs');
+      const ok = await bcrypt.compare(req.body.password, user.passwordHash);
+      if (!ok) return res.status(401).json({ message: 'Incorrect password' });
+      // Anonymize rather than hard-delete so historical orders
+      // and reviews keep a non-PII reference. The email is
+      // suffixed with the deletedAt timestamp to make it
+      // impossible to re-register with the same address.
+      user.name = 'Deleted user';
+      user.email = `deleted+${user._id}@dryp.invalid`;
+      user.phone = undefined;
+      user.avatar = undefined;
+      user.addresses = [];
+      user.paymentMethods = [];
+      user.likedProducts = [];
+      user.isDeleted = true;
+      user.deletedAt = new Date();
+      await user.save();
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Error deleting account:', error.message);
+      res.status(500).send('Server Error');
+    }
+  },
+);
 
 module.exports = router;

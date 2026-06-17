@@ -5,11 +5,17 @@ require("dotenv").config();
 // required env var is missing — never silently falls back to a default secret.
 const env = require("./src/config/validateEnv")({ exitOnError: true });
 
+// Sentry must be initialized FIRST so it captures errors from every other
+// require() below. Safe no-op if SENTRY_DSN is empty or @sentry/node isn't
+// installed.
+const Sentry = require("./src/config/sentry")();
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path"); // Import path module
 const connectDatabase = require("./src/config/database");
 const logger = require("./src/utils/logger");
+const healthRoutes = require("./src/routes/health");
 
 // Route imports
 const authRoutes = require("./src/routes/auth");
@@ -54,6 +60,12 @@ app.use(
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Sentry request handler — must come before any other middleware.
+// Captures one transaction per HTTP request so we can see which route is slow.
+if (Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.requestHandler());
+}
+
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -71,9 +83,7 @@ app.use((req, res, next) => {
 });
 
 // Health check
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
+app.use("/api/health", healthRoutes);
 
 // API routes
 app.use("/api/auth/login", authLimiter);
@@ -96,11 +106,17 @@ app.use("/api/cart", cartRoutes);
 // Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  logger.error({ err, stack: err.stack }, "unhandled_error");
   res
     .status(err.status || 500)
     .json({ message: err.message || "Server error" });
 });
+
+// Sentry error handler — must come AFTER the global error handler above so
+// it can also see and report those errors. Skipped when Sentry is a no-op.
+if (Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 const PORT = process.env.PORT || 8080; // Backend runs on port 8080
 
@@ -110,8 +126,9 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
     await connectDatabase(process.env.MONGO_URI);
 
     app.listen(PORT, "0.0.0.0", () =>
-    console.log(
-        `Server running on port ${PORT} and accessible from all interfaces`,
+      logger.info(
+        { port: PORT, env: process.env.NODE_ENV || "development" },
+        "server_listening",
       ),
     );
   } catch (error) {
@@ -119,9 +136,9 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
     // A "listening but every query 500s" process hides outages and wastes
     // the deploy slot on AWS — fail fast so the orchestrator can restart us
     // (or a human can investigate) and we never serve a broken API.
-    console.error(
-      `❌ Failed to connect to MongoDB. Refusing to start the API. ` +
-      `Original error: ${error.message}`,
+    logger.error(
+      { err: error.message, stack: error.stack },
+      "mongo_connection_failed_refusing_to_start",
     );
     process.exit(1);
   }

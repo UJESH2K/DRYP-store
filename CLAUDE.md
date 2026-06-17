@@ -80,3 +80,38 @@ Next.js App Router. Auth is **client-side only** (`contexts/AuthContext.tsx` sto
 - **Image uploads** go to backend local disk (`backend/public/uploads/` via `routes/upload.js`, multer, vendor-only, 10MB, jpg/png/gif). On ephemeral AWS hosts this is **not durable** across deploys/restarts — flag if persistence matters.
 - **iOS work**: `app.json` defines an Android `package` (`com.dryp.app`) but **no `ios.bundleIdentifier`** — that must be added before an iOS build/submit. EAS project id and `owner` are already set. The app code is largely platform-agnostic; `app/index.tsx` has Android-specific timing branches to audit when bringing up iOS.
 - This is a student/early-stage project: expect inconsistent style, commented-out code kept "just in case", emoji-heavy logs, and duplicated logic. Match the surrounding file's conventions rather than imposing a global style.
+
+## What this repo now has (current state)
+
+Phases 0-11 of the roadmap are complete. Run `git log --oneline` for the full list.
+
+### Tests (run from `backend/`)
+- `tests/phase*.test.js` — 28 integration suites (one per phase). Run with `node tests/phaseN-name.test.js`. They're isolated: each spins up an in-memory MongoDB, mounts the route, hits it over HTTP. No external services required.
+- The legacy `tests/api.test.js` hits a live server and is hard-coded to port 5000 — **don't trust it without updating `API_BASE_URL` first**. Prefer the phase tests.
+- `tests/smoke-integration.test.js` — end-to-end smoke test for the happy path.
+
+### Mobile app conventions
+- `src/lib/api.ts` exports `apiCall(endpoint, options)`. It is the ONLY way to call the backend; never use `fetch` directly. It injects auth, never throws (returns the error body), and (since phase 7) bounces to /login on 401.
+- `src/state/` — Zustand stores. Persist via AsyncStorage. New stores follow the `useFooStore()` pattern.
+- `src/hooks/usePushNotifications.ts` — opt-in Expo push registration. Mount once near the root.
+- `src/lib/haptics.ts` — shim over `expo-haptics` with a Vibration fallback. Use it on every primary action (like, cart, checkout) — iOS users notice when it's missing.
+- `src/components/common/RefreshableScrollView.tsx` — wrap any scrollable list that has a "reload" action.
+- The product detail screen reads `useLocalSearchParams().id` and expects an ObjectId. The legacy `productMapping.js` mapping is **dead code** (phase 5.6 removed its callers).
+- `app.json` is now canonical. iOS bundle id is `com.dryp.app`, build number 1. Run `npm run check:ios:launch` before submitting to App Store Connect.
+- The Recommender (`src/lib/recommender.ts`) had a latent ReferenceError in `getInitialItems` (referenced a global `ITEMS` that was never imported). The dead path is removed; the live feed comes from the API via `useHomeScreenData`.
+
+### Backend conventions
+- All requests go through `middleware/auth.js` (`identifyUser` for guest-aware, `protect` for protected). Role checks use the `requireVendor` / `requireAdmin` middleware in `middleware/requireRole.js` — do not copy-paste role checks into handlers.
+- Inputs are validated with zod schemas in `validation/schemas.js` via the `validate({ body, params, query })` wrapper. Use it on every new route.
+- Sensitive values (Shopify tokens, future API keys) are AES-256-GCM-encrypted at rest with `utils/shopifyCrypto.js`. The encryption key is `SHOPIFY_TOKEN_ENCRYPTION_KEY`; without it the helper logs a warning and stores plaintext (dev-only).
+- Email goes out via Resend (`utils/sendEmail.js`) gated by `requireEmailConfig` (no key → 503, never silent failure).
+- Rate limiters live in `server.js`: `authLimiter` on login/register, `vendorSignupLimiter` on vendor register, `productsLimiter` on `/api/products/*`, `cartLimiter` on `/api/cart/*`, `likesLimiter` on `/api/likes/*`, `wishlistLimiter` on `/api/wishlist/*`. Adjust here.
+- The trending endpoint is `GET /api/products/trending` — declared **before** `/:id` so Express doesn't parse the literal as a product id. Same ordering rule applies to any new literal route.
+- Admin metrics live at `GET /api/analytics/admin/metrics` (admin only, 30-day revenue series + counts + top vendors).
+
+### Common gotchas
+- `Product.vendor` is the **User** `_id` (a `vendor` user), not the `Vendor` doc's `_id`. `Vendor.owner` is the same User id. Joining `Order.items.vendor` (User id) → `Vendor` uses `Vendor.owner`. Don't confuse the two.
+- The `Order.items.vendor` field is a User id. `Order.totalAmount` is the field; there's no `total` or `lineTotal` field.
+- `User.passwordHash` is the field, not `password`. The auth routes handle bcrypt transparently.
+- `User.pushTokens` is a `{ token, platform, appVersion, registeredAt }` array. `sendPush` (utils/pushNotifications.js) cleans up `DeviceNotRegistered` tokens automatically.
+- Image uploads still go to `public/uploads/` (ephemeral on AWS) — S3 storage is wired (`utils/storage.js`) but uploads are not migrated.

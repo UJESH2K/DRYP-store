@@ -10,6 +10,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const VendorApplication = require("../models/VendorApplication");
 const sendEmail = require("../utils/sendEmail");
+const logger = require("../utils/logger");
 
 // @route   POST /api/vendors/apply
 // @desc    Submit a studio application to the waitlist
@@ -46,8 +47,9 @@ router.post("/apply", async (req, res, next) => {
 // @desc    Admin: Approve or Reject a vendor application
 // @access  Private (Admin Only)
 router.put("/applications/:id", requireAdmin, requireEmailConfig, async (req, res, next) => {
-  try {
-    const { status } = req.body; // 'approved' or 'rejected'
+  let status;
+try {
+    ({ status } = req.body); // 'approved' or 'rejected'
     if (!["approved", "rejected"].includes(status)) {
       return res.status(400).json({ message: "Invalid status update." });
     }
@@ -56,14 +58,22 @@ router.put("/applications/:id", requireAdmin, requireEmailConfig, async (req, re
     if (!application)
       return res.status(404).json({ message: "Application not found" });
 
-    application.status = status;
-    application.reviewedBy = req.user._id;
-    application.reviewedAt = Date.now();
-    await application.save();
+    // Idempotency: if the application is already in the requested state,
+    // don't re-send the email or re-update timestamps. Just return success.
+    if (application.status === status) {
+      return res.json({
+        message: `Application already ${status}. No action taken.`,
+      });
+    }
 
     const frontendUrl =
       process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
 
+    // Send the email FIRST. If the email throws, we return 502 and the DB
+    // state is unchanged. This avoids the previous bug where the
+    // application was marked "approved" in Mongo but the email never went
+    // out — the vendor would then try to register and find their application
+    // in an inconsistent state.
     if (status === "approved") {
       await sendEmail({
         email: application.email,
@@ -78,10 +88,37 @@ router.put("/applications/:id", requireAdmin, requireEmailConfig, async (req, re
       });
     }
 
+    // Email confirmed sent. Now commit the state change.
+    application.status = status;
+    application.reviewedBy = req.user._id;
+    application.reviewedAt = Date.now();
+    await application.save();
+
     res.json({
       message: `Application ${status} successfully. Email dispatched.`,
     });
   } catch (error) {
+    // If sendEmail threw, surface a 502 (Bad Gateway) so the admin knows
+    // it's a third-party issue (SMTP) and not a server bug. The DB write
+    // never happened, so the application is still in its prior state.
+    if (
+      error &&
+      (error.code === "EAUTH" ||
+        error.code === "ECONNECTION" ||
+        error.code === "ETIMEDOUT" ||
+        /SMTP|email/i.test(error.message || ""))
+    ) {
+      logger.error(
+        { err: error.message, applicationId: req.params.id, status },
+        "vendor_application_email_failed",
+      );
+      return res.status(502).json({
+        message:
+          "Could not send the application status email. The application " +
+          "state has not been changed. Please check SMTP configuration and " +
+          "try again.",
+      });
+    }
     next(error);
   }
 });

@@ -127,4 +127,33 @@ export async function fetchProducts() {
 // Health check
 export async function checkBackendHealth() {
   return apiCall('/health');
+
+// -----------------------------------------------------------------------------
+// Password reset
+//
+// Backend exposes:
+//   POST /api/auth/forgot-password   { email }                 -> 200 always
+//   PUT  /api/auth/reset-password/:token { password }          -> 200 / 4xx
+//
+// The mobile flow: user taps "Forgot password" on /login → enters email →
+// backend emails them a link with a token. The email link goes to the
+// website by default; the "Open in DRYP App" link opens
+// `dryp://reset-password/<token>` which Linking intercepts and routes
+// into `app/reset-password/[token].tsx`. That screen calls
+// `resetPassword` below.
+// -----------------------------------------------------------------------------
+
+export async function forgotPassword(email: string) {
+  return apiCall('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(token: string, password: string) {
+  return apiCall(`/api/auth/reset-password/${encodeURIComponent(token)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  });
+}
 }

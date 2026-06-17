@@ -125,6 +125,13 @@ router.post('/forgot-password', requireEmailConfig, validate({ body: schemas.for
     // Ensure NEXT_PUBLIC_FRONTEND_URL is in your .env (e.g., http://localhost:3000)
     const resetUrl = `${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
 
+    // Mobile deep link. The Expo app's `scheme: "dryp"` lets us register
+    // dryp://reset-password/<token> as a deep link, and the app's Linking
+    // listener will route it to /reset-password/[token] inside the app.
+    // This is the iOS-friendly path: tapping the email on a phone opens
+    // the app directly instead of bouncing through Safari to the website.
+    const mobileResetUrl = `${process.env.MOBILE_RESET_SCHEME || 'dryp://reset-password'}/${resetToken}`;
+
     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. \n\nPlease make a PUT request to: \n\n ${resetUrl}`;
 
     try {
@@ -177,6 +184,13 @@ router.post('/forgot-password', requireEmailConfig, validate({ body: schemas.for
                 <tr>
                   <td align="center" style="padding-bottom: 50px;">
                     <a href="${resetUrl}" class="button" style="display: inline-block; background-color: #000000; color: #ffffff; text-decoration: none; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 4px; padding: 20px 45px; border: 1px solid #000000;">Initialize Reset</a>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td align="center" style="padding-bottom: 50px;">
+                    <p style="margin: 0 0 16px 0; font-size: 9px; color: #999999; text-transform: uppercase; letter-spacing: 3px;">On Mobile?</p>
+                    <a href="${mobileResetUrl}" class="button" style="display: inline-block; background-color: #ffffff; color: #000000; text-decoration: none; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 4px; padding: 20px 45px; border: 1px solid #000000;">Open in DRYP App</a>
                   </td>
                 </tr>
 

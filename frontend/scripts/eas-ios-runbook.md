@@ -390,3 +390,28 @@ When the build fails, `eas build:view <build-id>` shows the full
 build log. The most useful section is the **Build** phase, which
 shows the iOS compile output. `npx expo prebuild` can often catch
 issues locally before paying for a remote build.
+
+## Deep links & password reset
+
+The app declares `scheme: "dryp"` in `app.config.ts`. That registers
+two URL schemes the system can route to the app:
+
+- `dryp://reset-password/<token>` — opens the in-app reset-password
+  screen. The handler lives in `app/_layout.tsx` (look for the
+  `Linking.addEventListener` block).
+- `dryp://vendor-register?token=<token>` — opens vendor register with
+  the admin-approval token preloaded.
+
+The backend (`backend/src/routes/auth.js#forgot-password`) builds
+both links into the reset email — a web link to the Next.js
+`/reset-password/<token>` page **and** a mobile deep link to
+`dryp://reset-password/<token>`. The email includes a separate
+"Open in DRYP App" button so phone users can stay in-app.
+
+To override the deep-link scheme (e.g. for a white-label deployment),
+set `MOBILE_RESET_SCHEME` in the backend's `.env`. The default
+`dryp://reset-password` is what `app.config.ts` declares.
+
+After `eas build`, the OS will ask permission the first time a user
+taps one of these links. This is the standard iOS prompt — there is
+no way to suppress it from the app side.

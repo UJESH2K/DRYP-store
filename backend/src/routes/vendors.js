@@ -4,7 +4,8 @@ const jwt = require("jsonwebtoken");
 const Vendor = require("../models/Vendor");
 const User = require("../models/User");
 const Product = require("../models/Product");
-const { protect } = require("../middleware/auth");
+const { requireAdmin, requireVendor } = require("../middleware/requireRole");
+const requireEmailConfig = require("../middleware/requireEmailConfig");
 const router = express.Router();
 const mongoose = require("mongoose");
 const VendorApplication = require("../models/VendorApplication");
@@ -44,12 +45,8 @@ router.post("/apply", async (req, res, next) => {
 // @route   PUT /api/vendors/applications/:id
 // @desc    Admin: Approve or Reject a vendor application
 // @access  Private (Admin Only)
-router.put("/applications/:id", protect, async (req, res, next) => {
+router.put("/applications/:id", requireAdmin, requireEmailConfig, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Admins only." });
-    }
-
     const { status } = req.body; // 'approved' or 'rejected'
     if (!["approved", "rejected"].includes(status)) {
       return res.status(400).json({ message: "Invalid status update." });
@@ -92,12 +89,8 @@ router.put("/applications/:id", protect, async (req, res, next) => {
 // @route   GET /api/vendors/applications
 // @desc    Admin: View all applications
 // @access  Private (Admin Only)
-router.get("/applications", protect, async (req, res, next) => {
-  console.log(req.user);
+router.get("/applications", requireAdmin, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
-      return res.status(403).json({ message: "Admins only." });
-
     const applications = await VendorApplication.find().sort({ createdAt: -1 });
     res.json(applications);
   } catch (error) {
@@ -233,14 +226,8 @@ router.post("/login", async (req, res, next) => {
 // @route   GET /api/vendors/me/products
 // @desc    Get all products for the logged-in vendor
 // @access  Private (Vendor only)
-router.get("/me/products", protect, async (req, res, next) => {
+router.get("/me/products", requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== "vendor") {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Only vendors can access this route" });
-    }
-
     const vendor = await Vendor.findOne({ owner: req.user._id });
     if (!vendor) {
       return res
@@ -261,16 +248,9 @@ router.get("/me/products", protect, async (req, res, next) => {
 // @route   GET /api/vendors/me
 // @desc    Get the logged-in vendor's profile
 // @access  Private (Vendor only)
-router.get("/me", protect, async (req, res, next) => {
+router.get("/me", requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== "vendor") {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Only vendors can access this route" });
-    }
-    console.log("Searching for vendor with owner ID:", req.user._id);
     const vendor = await Vendor.findOne({ owner: req.user._id });
-    console.log("Found vendor:", vendor);
     if (!vendor) {
       return res
         .status(404)
@@ -285,13 +265,8 @@ router.get("/me", protect, async (req, res, next) => {
 // @route   PUT /api/vendors/me
 // @desc    Update the logged-in vendor's profile
 // @access  Private (Vendor only)
-router.put("/me", protect, async (req, res, next) => {
+router.put("/me", requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== "vendor") {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Only vendors can access this route" });
-    }
     const vendor = await Vendor.findOneAndUpdate(
       { owner: req.user._id },
       { $set: req.body },
@@ -335,11 +310,8 @@ router.get("/:id/products", async (req, res, next) => {
 // @route   GET /api/vendors/admin/directory
 // @desc    Admin: Get all officially registered studios
 // @access  Private (Admin Only)
-router.get("/admin/directory", protect, async (req, res, next) => {
+router.get("/admin/directory", requireAdmin, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
-      return res.status(403).json({ message: "Admins only." });
-
     // We populate the owner to get their email and isActive suspension status
     const vendors = await Vendor.find().populate(
       "owner",
@@ -354,11 +326,8 @@ router.get("/admin/directory", protect, async (req, res, next) => {
 // @route   PUT /api/vendors/admin/suspend/:vendorId
 // @desc    Admin: Toggle a studio's suspension status and email them
 // @access  Private (Admin Only)
-router.put("/admin/suspend/:vendorId", protect, async (req, res, next) => {
+router.put("/admin/suspend/:vendorId", requireAdmin, requireEmailConfig, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
-      return res.status(403).json({ message: "Admins only." });
-
     // 1. Find the Vendor and their associated User account
     const vendor = await Vendor.findById(req.params.vendorId).populate("owner");
     if (!vendor || !vendor.owner) {

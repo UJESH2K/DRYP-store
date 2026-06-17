@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/auth');
+const requireEmailConfig = require('../middleware/requireEmailConfig');
 const logger = require('../utils/logger');
 
 const mergeGuestData = async (userId, guestId) => {
@@ -96,7 +97,7 @@ router.post('/login', validate({ body: schemas.login }), async (req, res, next) 
 
 // @route   POST /api/auth/forgot-password
 // @desc    Generate token and send email
-router.post('/forgot-password', validate({ body: schemas.forgotPassword }), async (req, res, next) => {
+router.post('/forgot-password', requireEmailConfig, validate({ body: schemas.forgotPassword }), async (req, res, next) => {
   try {
     if (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
       logger.error({}, 'forgot_password called but SMTP is not configured');

@@ -21,7 +21,8 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "nodemailer": "^8.0.5",
-    "pino": "^9.5.0"
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "eslint": "^8.44.0",

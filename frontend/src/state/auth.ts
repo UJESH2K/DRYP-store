@@ -30,6 +30,11 @@ interface AuthState {
   initGuestUser: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<User | null>;
   login: (email: string, password: string) => Promise<User | null>;
+  // Phase 4B: Google sign-in. The idToken comes from
+  // expo-auth-session / expo-google-sign-in on the client; the
+  // backend verifies it with Google and returns the same
+  // { token, user } as the email/password flow.
+  signInWithGoogle: (idToken: string) => Promise<User | null>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (user: User) => Promise<void>;
@@ -125,6 +130,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Error logging in:', error);
       useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
+      return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  signInWithGoogle: async (idToken) => {
+    const { apiCall } = require('../lib/api');
+    set({ isLoading: true });
+    try {
+      const guestId = get().guestId;
+      const response = await apiCall('/api/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ idToken, guestId }),
+      });
+      if (response && response.token) {
+        const { token, user } = response;
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        await AsyncStorage.setItem('user_token', token);
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await AsyncStorage.removeItem('guest_id');
+        // Refresh the wishlist for the new account.
+        try {
+          const wl = await apiCall('/api/wishlist');
+          if (Array.isArray(wl)) {
+            const items = wl.filter((it: any) => it && it.product).map((it: any) => it.product);
+            useWishlistStore.getState().setWishlist(items);
+          }
+        } catch (_) { /* non-fatal */ }
+        useToastStore.getState().showToast('Signed in with Google.');
+        return user;
+      }
+      useToastStore.getState().showToast(response?.message || 'Google sign-in failed.', 'error');
+      return null;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      useToastStore.getState().showToast('Google sign-in failed. Please try again.', 'error');
       return null;
     } finally {
       set({ isLoading: false });

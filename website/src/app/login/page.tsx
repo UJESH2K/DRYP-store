@@ -69,6 +69,61 @@ export default function LoginPage() {
     }
   };
 
+  /**
+   * Phase 4B: Google sign-in.
+   *
+   * The website uses Google's "render-button" + `google.accounts.id`
+   * library loaded as a one-time script tag. When the user picks an
+   * account, the library returns an `id_token` (a JWT). We POST it
+   * to `/api/auth/google` and the backend verifies + signs the user
+   * in.
+   *
+   * If the Google script isn't loaded yet (e.g. the user is offline),
+   * we surface a friendly error. We do not silently fall back to
+   * email/password — that would mask a real config issue.
+   */
+  const handleGoogleSignIn = async () => {
+    setServerError("");
+    const google = (window as any).google;
+    if (!google?.accounts?.id) {
+      setServerError(
+        "Google sign-in is not available. Please use email and password.",
+      );
+      return;
+    }
+    setIsLoading(true);
+    try {
+      // Use the popup callback flow. We wrap the deprecated
+      // `prompt()` notification with a one-shot callback.
+      const idToken: string = await new Promise((resolve, reject) => {
+        google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          callback: (resp: any) => {
+            if (resp?.credential) resolve(resp.credential);
+            else reject(new Error("No credential returned"));
+          },
+        });
+        google.accounts.id.prompt((notif: any) => {
+          if (notif?.isNotDisplayed() || notif?.isSkippedMoment()) {
+            reject(new Error("Google sign-in was closed"));
+          }
+        });
+      });
+      const data = await apiCall<{ user: any; token: string }>(
+        "/api/auth/google",
+        {
+          method: "POST",
+          body: JSON.stringify({ idToken }),
+        },
+      );
+      login(data.user, data.token);
+    } catch (error: any) {
+      setServerError(error.message || "Google sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderServerError = () => {
     if (!serverError) return null;
 
@@ -234,6 +289,30 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
+
+            <div className="mt-8 flex items-center gap-4">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400">
+                or
+              </span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="mt-6 w-full flex items-center justify-center gap-3 border border-gray-300 bg-white px-6 py-3 font-sans text-sm font-medium uppercase tracking-[0.18em] text-[#1a1a1a] transition hover:bg-gray-50 disabled:opacity-50"
+              aria-label="Continue with Google"
+            >
+              <span
+                aria-hidden
+                className="font-serif font-bold text-lg leading-none text-[#4285F4]"
+              >
+                G
+              </span>
+              <span>Continue with Google</span>
+            </button>
 
             <div className="mt-10 text-center">
               <p className="font-editorial text-sm italic text-gray-500">

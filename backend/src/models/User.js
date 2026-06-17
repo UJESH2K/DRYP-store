@@ -66,6 +66,15 @@ const UserSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    // Expo push tokens, one per (token, platform) pair. We keep
+    // them as a list so a user can have an iPhone, an Android,
+    // and a tablet all registered at once.
+    pushTokens: [{
+      token: { type: String, required: true },
+      platform: { type: String, enum: ['ios', 'android', 'web'], required: true },
+      appVersion: { type: String },
+      registeredAt: { type: Date, default: Date.now },
+    }],
   },
   { timestamps: true },
 );

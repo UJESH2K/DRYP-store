@@ -244,6 +244,7 @@ router.post('/:id/track', validate({ params: schemas.idParam }), requireVendor, 
     }
     const { status, note } = req.body || {};
     if (!status) return res.status(400).json({ message: 'status is required' });
+    const previous = order.status;
     order.status = status;
     // The pre('save') hook will append to trackingHistory and set
     // deliveredAt/cancelledAt automatically. We pass the note and
@@ -251,6 +252,31 @@ router.post('/:id/track', validate({ params: schemas.idParam }), requireVendor, 
     order._pendingTrackingNote = note || '';
     order._pendingTrackingBy = req.user._id;
     await order.save();
+
+    // Notify the buyer when status changes to something the
+    // customer cares about. We deliberately do NOT notify on
+    // every status change — only on the meaningful milestones.
+    const notifyOn = ['shipped', 'out_for_delivery', 'delivered'];
+    if (notifyOn.includes(status) && previous !== status && order.user) {
+      try {
+        const { sendPush } = require('../utils/pushNotifications');
+        const titles = {
+          shipped: 'Your order shipped',
+          out_for_delivery: 'Out for delivery',
+          delivered: 'Delivered',
+        };
+        await sendPush([order.user], {
+          title: titles[status] || 'Order update',
+          body: note || `Order #${order.orderNumber || order._id} is now ${status}`,
+          data: { url: `/orders/${order._id}`, orderId: String(order._id) },
+          sound: 'default',
+        });
+      } catch (e) {
+        // Push delivery is best-effort; the route should not fail
+        // just because the notification couldn't be sent.
+        console.warn('[orders/track] push failed:', e?.message);
+      }
+    }
     res.json({ ok: true, order });
   } catch (error) { next(error); }
 });

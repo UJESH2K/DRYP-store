@@ -10,6 +10,12 @@ const deleteAccountSchema = z.object({
   confirmText: z.literal('DELETE MY ACCOUNT'),
 }).strict();
 
+const pushTokenSchema = z.object({
+  token: z.string().min(10).max(200),
+  platform: z.enum(['ios', 'android', 'web']),
+  appVersion: z.string().nullable().optional(),
+}).strict();
+
 // @route   PUT /api/users/preferences
 // @desc    Update user preferences
 // @access  Private
@@ -120,6 +126,63 @@ router.delete(
       res.json({ ok: true });
     } catch (error) {
       console.error('Error deleting account:', error.message);
+      res.status(500).send('Server Error');
+    }
+  },
+);
+
+// @route   POST /api/users/push-token
+// @desc    Register (or refresh) the calling user's Expo push
+//          token. Idempotent: re-registering the same token
+//          updates the platform/appVersion but doesn't
+//          duplicate the entry.
+// @access  Private
+router.post(
+  '/push-token',
+  protect,
+  validate({ body: pushTokenSchema }),
+  async (req, res) => {
+    try {
+      const { token, platform, appVersion } = req.body;
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      const existing = user.pushTokens.find((t) => t.token === token);
+      if (existing) {
+        existing.platform = platform;
+        existing.appVersion = appVersion || null;
+        existing.registeredAt = new Date();
+      } else {
+        user.pushTokens.push({ token, platform, appVersion: appVersion || null });
+      }
+      await user.save();
+      res.json({ ok: true, count: user.pushTokens.length });
+    } catch (error) {
+      console.error('Error registering push token:', error.message);
+      res.status(500).send('Server Error');
+    }
+  },
+);
+
+// @route   DELETE /api/users/push-token
+// @desc    Unregister a push token (logout / sign out / app
+//          uninstall). We match by token string so a stale
+//          token can be removed even if the user lost the
+//          device.
+// @access  Private
+router.delete(
+  '/push-token',
+  protect,
+  async (req, res) => {
+    try {
+      const { token } = req.body || {};
+      if (!token) return res.status(400).json({ message: 'token is required' });
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      user.pushTokens = user.pushTokens.filter((t) => t.token !== token);
+      await user.save();
+      res.json({ ok: true, count: user.pushTokens.length });
+    } catch (error) {
+      console.error('Error unregistering push token:', error.message);
       res.status(500).send('Server Error');
     }
   },

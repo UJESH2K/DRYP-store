@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../state/auth';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+// EXPO_PUBLIC_API_BASE_URL is inlined at bundle time. In production builds
+// it must be set — fall back to a clear sentinel so misconfigured builds
+// fail loudly in the first network call instead of silently hitting a
+// developer's LAN IP (port 8080 to match the deployed backend).
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || '';
 
 // Debug logging is gated behind __DEV__ so request/response bodies (which may
 // contain credentials) never reach device logs in production builds.
@@ -20,6 +24,15 @@ debugLog('🌐 API Base URL:', API_BASE_URL);
 
 // Simple fetch wrapper with error handling and auth token injection
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
+  // Fail fast if the API URL is not configured. Without this, every
+  // request silently hits a non-existent host in production builds
+  // where EXPO_PUBLIC_API_BASE_URL was never set.
+  if (!API_BASE_URL) {
+    return {
+      message:
+        'API not configured. Set EXPO_PUBLIC_API_BASE_URL in frontend/.env before building.',
+    };
+  }
   try {
     const fullUrl = `${API_BASE_URL}${endpoint}`;
     debugLog(`🚀 FRONTEND API CALL: ${options.method || 'GET'} ${fullUrl}`);

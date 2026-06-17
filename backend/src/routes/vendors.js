@@ -248,7 +248,10 @@ router.get("/me/products", protect, async (req, res, next) => {
         .json({ message: "Vendor profile not found for this user" });
     }
 
-    const products = await Product.find({ vendor: vendor._id });
+    // `Product.vendor` references the owning *User* (_id), not the Vendor
+    // document. Filter by the User id (req.user._id) so vendors actually
+    // see their own products.
+    const products = await Product.find({ vendor: req.user._id });
     res.json(products);
   } catch (error) {
     next(error);

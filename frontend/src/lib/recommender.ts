@@ -47,30 +47,15 @@ export async function initRecommender() {
   await loadProfile()
 }
 
-// Cold start + category filter + diverse seed ordering
+// Cold start + category filter + diverse seed ordering.
+//
+// NOTE: this is a stub. The real feed comes from the API via
+// `useHomeScreenData`. The previous implementation referenced an
+// `ITEMS` constant that was never imported, so any caller would
+// crash with a ReferenceError. Return [] for now and remove this
+// function once the API path is confirmed stable.
 export async function getInitialItems(): Promise<Item[]> {
-  const selectedCategoriesJson = await AsyncStorage.getItem('categories:selected')
-  const selectedCategories: string[] = selectedCategoriesJson ? JSON.parse(selectedCategoriesJson) : []
-
-  const source = selectedCategories.length
-    ? ITEMS.filter(i => selectedCategories.includes(i.category))
-    : ITEMS
-
-  // Cold start: mix categories for diversity
-  const byCategory: Record<string, Item[]> = {}
-  for (const it of source) {
-    byCategory[it.category] = byCategory[it.category] || []
-    byCategory[it.category].push(it)
-  }
-  const maxLen = Math.max(...Object.values(byCategory).map(a => a.length)) || 0
-  const mixed: Item[] = []
-  for (let i = 0; i < maxLen; i++) {
-    for (const cat of Object.keys(byCategory)) {
-      const arr = byCategory[cat]
-      if (arr[i]) mixed.push(arr[i])
-    }
-  }
-  return mixed.length ? mixed : source
+  return [];
 }
 
 function scoreItem(item: Item): number {

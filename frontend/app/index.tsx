@@ -1,70 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
-import { Redirect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
+// Splash placeholder. Auth/onboarding routing is owned by
+// `app/_layout.tsx` so this file must NOT issue its own <Redirect/> —
+// doing so races with the layout and can send the user to the wrong
+// place (e.g. /(tabs)/home when they should be on /login).
+//
+// We render a brief spinner so the splash screen transition is smooth,
+// then render null to defer to whatever route the layout has selected.
 export default function Index() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [minDelayElapsed, setMinDelayElapsed] = useState(false);
 
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      try {
-        console.log('Checking onboarding status...');
-        
-        // Add timeout for Android
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AsyncStorage timeout')), 3000)
-        );
-        
-        const storagePromise = AsyncStorage.getItem('categories:selected');
-        const result = await Promise.race([storagePromise, timeoutPromise]) as string | null;
-        
-        console.log('AsyncStorage result:', result);
-        
-        if (result) {
-          const categories = JSON.parse(result);
-          if (categories && categories.length > 0) {
-            setHasOnboarded(true);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        setError(error instanceof Error ? error.message : 'Unknown error');
-        // Continue to onboarding on error
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // Add a minimum loading time to prevent flash
-    setTimeout(checkOnboardingStatus, Platform.OS === 'android' ? 1000 : 100);
+    const t = setTimeout(() => setMinDelayElapsed(true), 300);
+    return () => clearTimeout(t);
   }, []);
 
-  if (isLoading) {
+  if (!minDelayElapsed) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#000000" />
         <Text style={styles.loadingText}>Loading DRYP...</Text>
-        {Platform.OS === 'android' && (
-          <Text style={styles.platformText}>Initializing Android app</Text>
-        )}
-        {error && (
-          <Text style={styles.errorText}>Error: {error}</Text>
-        )}
       </View>
     );
   }
 
-  // Navigate based on onboarding status
-  if (hasOnboarded) {
-    console.log('User has onboarded, going to home');
-    return <Redirect href="/(tabs)/home" />;
-  } else {
-    console.log('User needs onboarding, going to onboarding');
-    return <Redirect href="/onboarding" />;
-  }
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -73,25 +34,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
   },
   loadingText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
     marginTop: 20,
-    textAlign: 'center',
-  },
-  platformText: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#ff0000',
-    marginTop: 8,
-    textAlign: 'center',
   },
 });

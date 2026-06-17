@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+// Used to absolutize relative image paths from the backend (e.g. `/uploads/foo.png`).
+// In production, EXPO_PUBLIC_API_BASE_URL must point at the deployed backend.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || '';
 
 /**
  * Derives a price tier ('low', 'mid', 'high') from a product's price.

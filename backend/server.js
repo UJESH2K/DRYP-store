@@ -1,9 +1,15 @@
 require("dotenv").config();
+
+// CRITICAL: validateEnv must run before any module that depends on JWT_SECRET
+// (which is most of the app). It exits the process with a clear error if a
+// required env var is missing — never silently falls back to a default secret.
+const env = require("./src/config/validateEnv")({ exitOnError: true });
+
 const express = require("express");
 const cors = require("cors");
-const morgan = require("morgan");
 const path = require("path"); // Import path module
 const connectDatabase = require("./src/config/database");
+const logger = require("./src/utils/logger");
 
 // Route imports
 const authRoutes = require("./src/routes/auth");
@@ -51,14 +57,16 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, "public")));
 
-// Custom logging middleware to track API calls
+// Custom logging middleware to track API calls.
+// IMPORTANT: do NOT log req.body directly. It can contain passwords, reset
+// tokens, payment info, etc. We log method, path, and origin only. If you need
+// more visibility, attach the data to req.log in the handler with the redacting
+// logger in src/utils/logger.js.
 app.use((req, res, next) => {
-  console.log(`
-🔥 API CALL: ${req.method} ${req.path}`);
-  console.log(`📱 From: ${req.get("origin") || "localhost"}`);
-  if (req.body && Object.keys(req.body).length > 0) {
-    console.log(`📦 Body:`, JSON.stringify(req.body, null, 2));
-  }
+  logger.info(
+    { method: req.method, path: req.path, origin: req.get("origin") || "localhost" },
+    "api_call",
+  );
   next();
 });
 

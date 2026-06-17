@@ -78,7 +78,7 @@ router.post('/register', async (req, res, next) => {
     
     await mergeGuestData(user._id, guestId);
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     const userObj = user.toObject();
     delete userObj.passwordHash;
@@ -98,7 +98,7 @@ router.post('/login', async (req, res, next) => {
     
     await mergeGuestData(user._id, guestId);
     
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ token, user });
   } catch (error) { next(error); }

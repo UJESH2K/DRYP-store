@@ -240,6 +240,49 @@ router.delete('/:id', requireVendor, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/trending
+// @desc    Trending products — most-liked in the last 7 days.
+//          Falls back to highest-rated if there aren't enough
+//          recent likes. Returns up to 20.
+// @access  Public
+//
+// IMPORTANT: this route MUST be declared before `/:id` so
+// Express's first-match-wins routing doesn't interpret
+// "trending" as a product id.
+router.get('/trending', async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+    const windowMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const since = new Date(Date.now() - windowMs);
+
+    const Like = require('../models/Like');
+    const recent = await Like.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: '$product', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit },
+    ]);
+
+    let products;
+    if (recent.length >= 2) {
+      const ids = recent.map((r) => r._id);
+      products = await Product.find({ _id: { $in: ids }, isActive: true })
+        .select('name brand basePrice images rating category');
+      // Preserve the trending order from the aggregation.
+      const order = new Map(ids.map((id, i) => [String(id), i]));
+      products.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+    } else {
+      // Not enough recent signal — fall back to highest-rated
+      // products, weighted by review count.
+      products = await Product.find({ isActive: true })
+        .select('name brand basePrice images rating reviews category')
+        .sort({ rating: -1, reviews: -1 })
+        .limit(limit);
+    }
+    res.json(products);
+  } catch (error) { next(error); }
+});
+
 // @route   GET /api/products/:id
 // @desc    Get a single product by ID
 // @access  Public

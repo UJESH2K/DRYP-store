@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router'; // Added useFocusEffect for fetching on screen focus
 import { apiCall } from '../../src/lib/api';
 import { useCartStore, CartItem } from '../../src/state/cart';
+import { useWishlistStore } from '../../src/state/wishlist';
 import { Ionicons } from '@expo/vector-icons';
 import { useToastStore } from '../../src/state/toast';
 import { useAuthStore } from '../../src/state/auth';
@@ -17,6 +18,7 @@ export default function CartScreen() {
   const router = useCustomRouter();
   // Extracted fetchCart from useCartStore
   const { items, removeFromCart, updateQuantity, updateCartItem, fetchCart } = useCartStore();
+  const { addToWishlist } = useWishlistStore();
   const { user } = useAuthStore();
   const [productDetails, setProductDetails] = React.useState<any>({});
   const showToast = useToastStore((state) => state.showToast);
@@ -164,6 +166,30 @@ const formatPrice = React.useCallback((price: number) =>
                         <Ionicons name="close-outline" size={20} color="#fff" />
                       </Pressable>
                     </View>
+
+                    <Pressable
+                      onPress={async () => {
+                        // Save for later: move the item from cart to wishlist
+                        // without changing the quantity.
+                        const wishlistItem = {
+                          _id: item.productId,
+                          id: item.productId,
+                          name: item.title,
+                          title: item.title,
+                          brand: item.brand,
+                          images: item.image ? [item.image] : [],
+                          price: item.price,
+                          basePrice: item.price,
+                        };
+                        await addToWishlist(wishlistItem as any);
+                        await removeFromCart(item.id);
+                        showToast('Moved to wishlist');
+                      }}
+                      style={styles.saveForLaterButton}
+                    >
+                      <Ionicons name="bookmark-outline" size={14} color="#666" />
+                      <Text style={styles.saveForLaterText}>Save for later</Text>
+                    </Pressable>
                     
                     {productDetails[item.productId] && productDetails[item.productId].variants?.length > 0 && (
                       <View style={styles.variantSelector}>
@@ -357,6 +383,20 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: '#ff4d4f',
     borderRadius: 20
+  },
+  saveForLaterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  saveForLaterText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
   quantityControls: {
     flexDirection: 'row',

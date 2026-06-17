@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+import { apiCall } from "@/lib/api";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -64,20 +63,17 @@ export default function SignupPage() {
 
     try {
       // Point to the Vendor registration route
-      const res = await fetch(`${API_BASE_URL}/api/vendors/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to sign up");
-      }
+      const data = await apiCall<{ user: any; token: string }>(
+        "/api/vendors/register",
+        {
+          method: "POST",
+          body: JSON.stringify({ name, email, password }),
+        },
+      );
 
       login(data.user, data.token);
     } catch (error: any) {
-      setServerError(error.message);
+      setServerError(error.message || "Failed to sign up");
     } finally {
       setIsLoading(false);
     }

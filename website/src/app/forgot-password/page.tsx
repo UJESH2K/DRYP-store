@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+import { apiCall } from "@/lib/api";
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
@@ -16,24 +15,18 @@ const ForgotPasswordPage = () => {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus("success");
-        setMessage(data.message || "If an account exists, a reset link has been sent.");
-      } else {
-        setStatus("error");
-        setMessage(data.message || "Failed to process request.");
-      }
-    } catch (error) {
+      const data = await apiCall<{ message: string }>(
+        "/api/auth/forgot-password",
+        {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        },
+      );
+      setStatus("success");
+      setMessage(data.message || "If an account exists, a reset link has been sent.");
+    } catch (error: any) {
       setStatus("error");
-      setMessage("A network error occurred. Please try again.");
+      setMessage(error.message || "A network error occurred. Please try again.");
     }
   };
 

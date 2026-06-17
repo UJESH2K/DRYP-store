@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+import { apiCall } from "@/lib/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -50,20 +49,21 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/vendors/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to authenticate");
-      }
+      // apiCall throws ApiError on non-2xx and on missing-config, with
+      // the server's `{ message }` in `error.message`. It also handles
+      // malformed/HTML responses internally so we never get a JSON
+      // parse error here.
+      const data = await apiCall<{ user: any; token: string }>(
+        "/api/vendors/login",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        },
+      );
 
       login(data.user, data.token);
-    } catch (error) {
-      setServerError(error.message);
+    } catch (error: any) {
+      setServerError(error.message || "Failed to authenticate");
     } finally {
       setIsLoading(false);
     }

@@ -94,6 +94,27 @@ async function run() {
     Object.defineProperty(mongoose.connection, "readyState", origReadyState);
   }
 
+  // ---- Test 3: /api/health/ready returns 503 when not connected ----
+  Object.defineProperty(mongoose.connection, "readyState", {
+    get: () => 0,
+    configurable: true,
+  });
+  // (wait past cache)
+  await new Promise((r) => setTimeout(r, 5100));
+  const r3 = await fetch(`${s1.baseUrl}/api/health/ready`);
+  const b3 = await r3.json();
+  check("ready: disconnected → 503", r3.status === 503);
+  check("ready: ready=false", b3.ready === false);
+
+  // ---- Test 4: /api/health/deep includes memory and version ----
+  const r4 = await fetch(`${s1.baseUrl}/api/health/deep`);
+  const b4 = await r4.json();
+  check("deep: status field present", typeof b4.status === "string");
+  check("deep: includes node version", typeof b4.node === "string" && b4.node.startsWith("v"));
+  check("deep: includes pid", typeof b4.pid === "number");
+  check("deep: includes memory.rss", typeof b4.memory.rss === "number");
+  check("deep: includes memory.heapUsed", typeof b4.memory.heapUsed === "number");
+
   await s1.close();
 
   console.log(`\n  ${passed} passed, ${failed} failed.`);

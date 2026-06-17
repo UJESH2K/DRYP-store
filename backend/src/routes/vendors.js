@@ -74,18 +74,57 @@ try {
     // application was marked "approved" in Mongo but the email never went
     // out — the vendor would then try to register and find their application
     // in an inconsistent state.
-    if (status === "approved") {
-      await sendEmail({
-        email: application.email,
-        subject: "DRYP: Studio Approved",
-        message: `Your application has been accepted. You may now create your account at: ${frontendUrl}/signup`,
-      });
-    } else {
-      await sendEmail({
+    //
+    // Phase 0E: on a transient SMTP failure (e.g. SMTP server
+    // bouncing), we fall back to the background queue with retries.
+    // The synchronous `await` blocks long enough to catch "wrong
+    // email address" (4xx) — those should NOT be silently retried,
+    // they should fail loud. But a timeout / 5xx / DNS error
+    // shouldn't kill the whole approval; it should retry.
+    const queue = require("../utils/jobQueue");
+    const sendOnce = async () => {
+      if (status === "approved") {
+        return sendEmail({
+          email: application.email,
+          subject: "DRYP: Studio Approved",
+          message: `Your application has been accepted. You may now create your account at: ${frontendUrl}/signup`,
+        });
+      }
+      return sendEmail({
         email: application.email,
         subject: "DRYP: Application Status",
         message: `Thank you for your interest in DRYP. Unfortunately, your studio does not align with our current curation. We wish you the best.`,
       });
+    };
+
+    let emailSent = false;
+    let lastErr = null;
+    try {
+      await sendOnce();
+      emailSent = true;
+    } catch (err) {
+      lastErr = err;
+      // 4xx errors: don't retry, re-throw so the admin sees the error.
+      // For everything else, hand it to the queue and accept the
+      // approval anyway — the queue will retry up to 3 times.
+      const msg = String(err && err.message).toLowerCase();
+      const isPermanent = msg.includes("invalid") || msg.includes("not found") || /\b4\d\d\b/.test(msg);
+      if (isPermanent) throw err;
+      // Phase 0E: enqueue for background retry. We do NOT block
+      // the admin request on this.
+      await queue.enqueue(
+        "sendVendorApprovalEmail",
+        {
+          email: application.email,
+          status,
+          frontendUrl,
+        },
+        { attempts: 3, backoff: { type: "exponential", delay: 30_000 } },
+      );
+      // The approval succeeds; the email is in flight. The admin
+      // gets a slightly different response so they know to expect
+      // a delay.
+      emailSent = "queued";
     }
 
     // Email confirmed sent. Now commit the state change.
@@ -95,7 +134,9 @@ try {
     await application.save();
 
     res.json({
-      message: `Application ${status} successfully. Email dispatched.`,
+      message: `Application ${status} successfully.${
+        emailSent === "queued" ? " Email queued for retry." : " Email dispatched."
+      }`,
     });
   } catch (error) {
     // If sendEmail threw, surface a 502 (Bad Gateway) so the admin knows

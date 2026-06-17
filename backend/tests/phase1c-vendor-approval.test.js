@@ -1,14 +1,16 @@
 /**
- * Phase 1C — vendor approval atomicity
+ * Phase 1C — vendor approval atomicity (with Phase 0E retry behavior)
  *
- * Verifies the fix for the bug where the application was marked "approved"
- * in Mongo but the email send failed, leaving the DB in an inconsistent
- * state.
- *
- * Strategy: stub `sendEmail` to throw, then call the route and assert:
- *   - response is 502 (Bad Gateway)
- *   - the application in the DB is still in its prior state
- *   - on the next call with a working email, the state is committed
+ * Verifies:
+ *  - PERMANENT email failure (e.g. "550 invalid recipient") →
+ *    502, DB unchanged. The admin needs to see this and fix the
+ *    address manually.
+ *  - TRANSIENT email failure (ECONNREFUSED, timeout, 5xx) →
+ *    200, response says "queued", DB committed, background queue
+ *    retries the send. The vendor is approved; the email arrives
+ *    later.
+ *  - Success → 200, "dispatched", DB committed.
+ *  - Idempotency → second approval is a no-op.
  */
 
 // Set env vars BEFORE requiring the app, so the auth middleware picks them up.
@@ -121,17 +123,18 @@ async function run() {
   await connectMongo();
   await seedAdmin();
 
-  // ---- Test 1: email failure → 502, DB unchanged ----
+  // ---- Test 1: PERMANENT email failure (bad address) → 502, DB unchanged ----
+  // Phase 0E distinguishes permanent (4xx, "invalid recipient") from
+  // transient (ECONNREFUSED, timeout, 5xx). Permanent errors must still
+  // hard-fail so the admin sees the problem.
   const app1 = await VendorApplication.create({
-    studioName: "Failing Email Studio",
+    studioName: "Permanent Fail Studio",
     email: "fail@example.com",
     websiteOrPortfolio: "https://example.com",
     status: "pending",
   });
   await startServer(async () => {
-    const err = new Error("SMTP ECONNECTION refused");
-    err.code = "ECONNECTION";
-    throw err;
+    throw new Error("SMTP 550 invalid recipient");
   });
 
   const r1 = await fetch(
@@ -146,29 +149,35 @@ async function run() {
     },
   );
   const b1 = await r1.json();
-  check("email failure → 502 (Bad Gateway)", r1.status === 502);
+  check("permanent failure → 502", r1.status === 502);
   check(
-    "502 message mentions SMTP / no state change",
-    /SMTP|state|not been changed/i.test(b1.message || ""),
+    "502 message mentions SMTP",
+    /SMTP|invalid/i.test(b1.message || ""),
   );
 
   const reread1 = await VendorApplication.findById(app1._id);
-  check("DB state unchanged after email failure (still pending)", reread1.status === "pending");
-  check("reviewedBy NOT set after email failure", reread1.reviewedBy == null);
+  check("permanent: DB unchanged (still pending)", reread1.status === "pending");
+  check("permanent: reviewedBy NOT set", reread1.reviewedBy == null);
 
   await teardown();
 
-  // ---- Test 2: success path → 200, DB committed ----
+  // ---- Test 2: TRANSIENT email failure → 200, queued, DB committed ----
+  // Phase 0E: ECONNREFUSED / timeout are treated as transient. The
+  // approval succeeds; the email is retried in the background.
   await connectMongo();
   await seedAdmin();
 
   const app2 = await VendorApplication.create({
-    studioName: "Working Email Studio",
-    email: "ok@example.com",
+    studioName: "Transient Fail Studio",
+    email: "transient@example.com",
     websiteOrPortfolio: "https://example.com",
     status: "pending",
   });
-  await startServer(async () => ({ messageId: "stub" }));
+  await startServer(async () => {
+    const err = new Error("SMTP ECONNECTION refused");
+    err.code = "ECONNECTION";
+    throw err;
+  });
 
   const r2 = await fetch(
     `${baseUrl}/api/vendors/applications/${app2._id}`,
@@ -182,18 +191,29 @@ async function run() {
     },
   );
   const b2 = await r2.json();
-  check("success path → 200", r2.status === 200);
-  check("response message confirms approval", /approved successfully/.test(b2.message || ""));
+  check("transient failure → 200 (queued, not 502)", r2.status === 200);
+  check("transient: response says 'queued'", /queued/i.test(b2.message || ""));
 
   const reread2 = await VendorApplication.findById(app2._id);
-  check("DB state committed to 'approved'", reread2.status === "approved");
-  check("reviewedBy is set", reread2.reviewedBy != null);
-  check("reviewedAt is set", reread2.reviewedAt != null);
+  check("transient: DB committed to 'approved'", reread2.status === "approved");
+  check("transient: reviewedBy is set", reread2.reviewedBy != null);
 
-  // ---- Test 3: idempotency — second approval is a no-op ----
-  const reviewedAtBefore = reread2.reviewedAt;
+  await teardown();
+
+  // ---- Test 3: success path → 200, DB committed, email dispatched ----
+  await connectMongo();
+  await seedAdmin();
+
+  const app3 = await VendorApplication.create({
+    studioName: "Working Email Studio",
+    email: "ok@example.com",
+    websiteOrPortfolio: "https://example.com",
+    status: "pending",
+  });
+  await startServer(async () => ({ messageId: "stub" }));
+
   const r3 = await fetch(
-    `${baseUrl}/api/vendors/applications/${app2._id}`,
+    `${baseUrl}/api/vendors/applications/${app3._id}`,
     {
       method: "PUT",
       headers: {
@@ -204,16 +224,32 @@ async function run() {
     },
   );
   const b3 = await r3.json();
-  check("second approval is idempotent (200)", r3.status === 200);
-  check(
-    "second approval message says 'already'",
-    /already/i.test(b3.message || ""),
+  check("success path → 200", r3.status === 200);
+  check("success: response says 'dispatched'", /dispatched/i.test(b3.message || ""));
+
+  const reread3 = await VendorApplication.findById(app3._id);
+  check("success: DB committed to 'approved'", reread3.status === "approved");
+  check("success: reviewedBy is set", reread3.reviewedBy != null);
+  check("success: reviewedAt is set", reread3.reviewedAt != null);
+
+  // ---- Test 4: idempotency — second approval is a no-op ----
+  const reviewedAtBefore = reread3.reviewedAt;
+  const r4 = await fetch(
+    `${baseUrl}/api/vendors/applications/${app3._id}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ status: "approved" }),
+    },
   );
-  const reread3 = await VendorApplication.findById(app2._id);
-  check(
-    "reviewedAt unchanged on idempotent call",
-    reread3.reviewedAt.getTime() === reviewedAtBefore.getTime(),
-  );
+  const b4 = await r4.json();
+  check("second approval is idempotent (200)", r4.status === 200);
+  check("second approval message says 'already'", /already/i.test(b4.message || ""));
+  const reread4 = await VendorApplication.findById(app3._id);
+  check("reviewedAt unchanged on idempotent call", reread4.reviewedAt.getTime() === reviewedAtBefore.getTime());
 
   await teardown();
 

@@ -8,6 +8,7 @@ const Order = require('../models/Order');
 const router = express.Router();
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
+const { verifyGoogleIdToken } = require('../utils/googleAuth');
 const { validate } = require('../middleware/validate');
 const schemas = require('../schemas/auth');
 const requireEmailConfig = require('../middleware/requireEmailConfig');
@@ -91,6 +92,59 @@ router.post('/login', validate({ body: schemas.login }), async (req, res, next) 
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
+    res.json({ token, user });
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/auth/google
+// @desc    Sign in or register via a Google ID token (mobile + web).
+//          The client (Expo or Next.js) gets the ID token from the
+//          GoogleSignin SDK / google.accounts.id, then POSTs it here.
+//          We verify with Google, find or create the user, and
+//          return the same { token, user } shape as /login.
+// @access  Public
+router.post('/google', async (req, res, next) => {
+  try {
+    const { idToken, guestId } = req.body || {};
+    if (!idToken) return res.status(400).json({ message: 'idToken is required' });
+
+    const expectedAud = process.env.GOOGLE_CLIENT_ID;
+    const info = await verifyGoogleIdToken(idToken, expectedAud);
+    if (!info.ok) {
+      return res.status(401).json({ message: 'Google sign-in failed: ' + info.error });
+    }
+
+    // Find by googleId first, then by email (covers the case where
+    // the user signed up with email/password first and is now adding
+    // Google as a linked provider).
+    let user = await User.findOne({ googleId: info.sub });
+    if (!user) {
+      user = await User.findOne({ email: info.email });
+      if (user) {
+        // Link: existing email/password user starts using Google too.
+        user.googleId = info.sub;
+        user.authProvider = 'google';
+        if (!user.avatar && info.picture) user.avatar = info.picture;
+        await user.save();
+      } else {
+        // Brand new SSO user. No passwordHash.
+        user = await User.create({
+          name: info.name,
+          email: info.email,
+          googleId: info.sub,
+          authProvider: 'google',
+          avatar: info.picture || undefined,
+        });
+      }
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Account is suspended' });
+    }
+
+    if (guestId) await mergeGuestData(user._id, guestId);
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user });
   } catch (error) { next(error); }
 });

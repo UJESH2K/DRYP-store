@@ -37,7 +37,15 @@ const UserSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
-    passwordHash: { type: String, required: true },
+    // passwordHash is required for email/password accounts; SSO
+    // users (Phase 4B: Google sign-in) have no password.
+    passwordHash: { type: String, required: false },
+    googleId: { type: String, index: true, sparse: true, unique: true },
+    authProvider: {
+      type: String,
+      enum: ["password", "google"],
+      default: "password",
+    },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },

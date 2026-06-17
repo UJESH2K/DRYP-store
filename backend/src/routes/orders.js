@@ -202,4 +202,57 @@ router.get('/:id', validate({ params: schemas.idParam }), protect, async (req, r
   } catch (error) { next(error); }
 });
 
+// @route   POST /api/orders/:id/cancel
+// @desc    Cancel an order (only the buyer, only before shipping).
+//          Restores stock. Writes a tracking-history entry.
+// @access  Private
+router.post('/:id/cancel', validate({ params: schemas.idParam }), protect, async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const cancellable = ['pending', 'confirmed', 'processing'];
+    if (!cancellable.includes(order.status)) {
+      return res.status(409).json({
+        message: `Order in status "${order.status}" can no longer be cancelled`,
+      });
+    }
+    const Product = require('../models/Product');
+    for (const item of order.items) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+    }
+    order.cancelledReason = (req.body && req.body.reason) || 'Cancelled by customer';
+    order.status = 'cancelled';
+    // pre('save') hook sets cancelledAt and pushes a tracking entry.
+    await order.save();
+    res.json({ ok: true, order });
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/orders/:id/track
+// @desc    Add a tracking event to an order (vendor or admin).
+// @access  Private (vendor)
+router.post('/:id/track', validate({ params: schemas.idParam }), requireVendor, async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    // Vendor can only update their own orders. Admins can update any.
+    if (req.user.role !== 'admin' && order.items[0]?.vendor?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const { status, note } = req.body || {};
+    if (!status) return res.status(400).json({ message: 'status is required' });
+    order.status = status;
+    // The pre('save') hook will append to trackingHistory and set
+    // deliveredAt/cancelledAt automatically. We pass the note and
+    // by-user through transient fields so the hook can pick them up.
+    order._pendingTrackingNote = note || '';
+    order._pendingTrackingBy = req.user._id;
+    await order.save();
+    res.json({ ok: true, order });
+  } catch (error) { next(error); }
+});
+
 module.exports = router;

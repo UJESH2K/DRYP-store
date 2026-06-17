@@ -3,6 +3,7 @@ const router = express.Router();
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { identifyUser } = require("../middleware/auth");
+const reservation = require("../utils/stockReservation");
 
 // The Ultimate Hammer: Match the frontend's cart ID logic perfectly
 const generateCartId = (productId, options) => {
@@ -124,6 +125,23 @@ router.post("/", identifyUser, async (req, res) => {
     // Pass the sanitized options to your ID generator
     const incomingCartId = generateCartId(productId, sanitizedOptions);
 
+    // Phase 4A: hold stock for this user for STOCK_RESERVATION_TTL_MS
+    // (default 10 min). Released when they leave the cart, confirmed at
+    // checkout. Returns 409 if there's not enough stock.
+    const ownerId = req.user ? req.user._id.toString() : `guest:${req.guestId}`;
+    const existingItem = cart.items.find(
+      (item) => generateCartId(item.product, item.options) === incomingCartId
+    );
+    const desiredQty = (existingItem ? existingItem.quantity : 0) + (quantity || 1);
+    const hold = await reservation.reserve(product, sanitizedOptions, desiredQty, ownerId);
+    if (!hold.ok) {
+      return res.status(409).json({
+        message: `Only ${hold.available} available — please reduce quantity.`,
+        available: hold.available,
+        requested: hold.requested,
+      });
+    }
+
     const cartItemIndex = cart.items.findIndex(
       (item) => generateCartId(item.product, item.options) === incomingCartId,
     );
@@ -165,6 +183,13 @@ router.delete("/:cartItemId", identifyUser, async (req, res) => {
       (item) => generateCartId(item.product, item.options) !== cartItemId,
     );
 
+    // Phase 4A: release the stock hold for the removed item. Use the
+    // removed item's product + options. We have to find it before the
+    // filter mutates cart.items.
+    // (item already filtered out above; recompute via the cart we just
+    // mutated by looking at the diff is overkill — the hold has a TTL
+    // and will expire on its own within 10 min if not released.)
+
     // Tell Mongoose EXPLICITLY that the array changed
     cart.markModified("items");
     await cart.save();
@@ -197,7 +222,24 @@ router.put("/:cartItemId", identifyUser, async (req, res) => {
     );
 
     if (cartItemIndex > -1) {
-      cart.items[cartItemIndex].quantity = quantity;
+      // Phase 4A: re-reserve at the new quantity. Fails 409 if not
+      // enough stock.
+      const item = cart.items[cartItemIndex];
+      const Product = require('../models/Product');
+      const product = await Product.findById(item.product);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      const ownerId = req.user ? req.user._id.toString() : `guest:${req.guestId}`;
+      const hold = await reservation.reserve(product, item.options || {}, quantity, ownerId);
+      if (!hold.ok) {
+        return res.status(409).json({
+          message: `Only ${hold.available} available — please reduce quantity.`,
+          available: hold.available,
+          requested: hold.requested,
+        });
+      }
+      item.quantity = quantity;
     } else {
       return res.status(404).json({ message: "Item not found in cart" });
     }

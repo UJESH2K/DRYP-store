@@ -1,12 +1,24 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
 const Product = require('../models/Product');
-const Cart = require('../models/Cart'); 
-const WishlistItem = require('../models/WishlistItem'); 
-const Like = require('../models/Like'); 
+const Cart = require('../models/Cart');
+const WishlistItem = require('../models/WishlistItem');
+const Like = require('../models/Like');
 const { requireVendor } = require('../middleware/requireRole');
+const { parseAndValidate } = require('../utils/excelImport');
 const router = express.Router();
+
+// Phase 3A: in-memory upload for Excel import. 5MB cap, xlsx/xls/csv only.
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(xlsx|xls|csv)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Only .xlsx, .xls, .csv allowed'), ok);
+  },
+});
 
 // @route   POST /api/products
 // @desc    Create a new product
@@ -50,6 +62,32 @@ router.get('/', async (req, res, next) => {
     res.json(products);
   } catch (error) {
     next(error);
+  }
+});
+
+// @route   POST /api/products/import
+// @desc    Bulk-import products from an Excel/CSV file (Phase 3A).
+//          Vendor-only. Always returns 200 with per-row results so the
+//          client can render "imported N, failed M" without a 4xx.
+// @access  Private (Vendor only)
+//   form-data: file=<binary>, dryRun=true|false
+router.post('/import', requireVendor, importUpload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded. Use form-data "file".' });
+    }
+    const dryRun = String(req.body.dryRun || 'false').toLowerCase() === 'true';
+    const result = await parseAndValidate(req.file.buffer, req.user._id, { dryRun });
+    const okCount = result.rows.filter((r) => r.ok).length;
+    res.json({
+      total: result.rows.length,
+      imported: okCount,
+      failed: result.errors.length,
+      dryRun,
+      rows: result.rows,
+    });
+  } catch (e) {
+    next(e);
   }
 });
 

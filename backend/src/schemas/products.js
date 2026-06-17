@@ -37,6 +37,11 @@ const description = z.string().trim().max(5000).optional();
  *
  * `basePrice` is the price when there are no variants. When variants
  * are present, the variant price wins.
+ *
+ * `vendor` is optional here: the route handler forces
+ * `vendor = req.user._id` from auth, so we don't want to require
+ * the client to send it. For the Excel import (Phase 3A) the route
+ * also injects vendor before validation runs.
  */
 const create = z
   .object({
@@ -51,8 +56,8 @@ const create = z
     options: z.array(variantOption).default([]),
     variants: z.array(productVariant).default([]),
     images: z.array(z.string().min(1)).default([]),
-  })
-  .strict();
+    vendor: z.string().trim().optional(),
+  });
 
 /**
  * PUT /api/products/:id — update. All fields optional except that

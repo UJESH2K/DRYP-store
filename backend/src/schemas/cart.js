@@ -35,9 +35,11 @@ const updateItem = z
   .strict();
 
 const productIdParam = z.object({ productId: objectId });
+const cartItemIdParam = z.object({ cartItemId: objectId });
 
 module.exports = {
   addItem,
   updateItem,
   productIdParam,
+  cartItemIdParam,
 };

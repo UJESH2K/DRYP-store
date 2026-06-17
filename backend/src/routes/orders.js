@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { identifyUser, protect } = require('../middleware/auth');
 const { requireVendor } = require('../middleware/requireRole');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/orders');
 const router = express.Router();
 const Cart = require('../models/Cart');
 const stockCheck = require('../utils/stockCheck');
@@ -189,7 +191,7 @@ router.get('/by-number/:orderNumber', protect, async (req, res, next) => {
 // @route   GET /api/orders/:id
 // @desc    Get a single order by ID
 // @access  Private
-router.get('/:id', protect, async (req, res, next) => {
+router.get('/:id', validate({ params: schemas.idParam }), protect, async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id).populate('items.product', 'name images brand');
     if (!order) return res.status(404).json({ message: 'Order not found' });

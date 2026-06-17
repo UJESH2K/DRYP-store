@@ -8,6 +8,8 @@ const WishlistItem = require('../models/WishlistItem');
 const Like = require('../models/Like');
 const { requireVendor } = require('../middleware/requireRole');
 const { parseAndValidate } = require('../utils/excelImport');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/products');
 const router = express.Router();
 
 // Phase 3A: in-memory upload for Excel import. 5MB cap, xlsx/xls/csv only.
@@ -241,7 +243,7 @@ router.delete('/:id', requireVendor, async (req, res, next) => {
 // @route   GET /api/products/:id
 // @desc    Get a single product by ID
 // @access  Public
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', validate({ params: schemas.idParam }), async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id).populate('vendor', 'name');
     if (!product) {

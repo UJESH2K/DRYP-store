@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const { identifyUser } = require('../middleware/auth');
 const WishlistItem = require('../models/WishlistItem');
 const Product = require('../models/Product');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/cart');
 
 // @route   GET /api/wishlist
 // @desc    Get all products in the current user's or guest's wishlist
@@ -60,7 +62,7 @@ router.post('/:productId', identifyUser, async (req, res, next) => {
 // @route   DELETE /api/wishlist/:productId
 // @desc    Remove a product from the user's or guest's wishlist
 // @access  Public / Private
-router.delete('/:productId', identifyUser, async (req, res, next) => {
+router.delete('/:productId', validate({ params: schemas.productIdParam }), identifyUser, async (req, res, next) => {
   try {
     const { productId } = req.params;
     const userId = req.user ? req.user._id : null;

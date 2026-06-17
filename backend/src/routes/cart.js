@@ -4,6 +4,8 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { identifyUser } = require("../middleware/auth");
 const reservation = require("../utils/stockReservation");
+const { validate } = require("../middleware/validate");
+const schemas = require("../schemas/cart");
 
 // The Ultimate Hammer: Match the frontend's cart ID logic perfectly
 const generateCartId = (productId, options) => {
@@ -170,7 +172,7 @@ router.post("/", identifyUser, async (req, res) => {
 });
 
 // @route   DELETE /api/cart/:cartItemId
-router.delete("/:cartItemId", identifyUser, async (req, res) => {
+router.delete("/:cartItemId", validate({ params: schemas.cartItemIdParam }), identifyUser, async (req, res) => {
   try {
     const { cartItemId } = req.params;
 
@@ -203,7 +205,7 @@ router.delete("/:cartItemId", identifyUser, async (req, res) => {
 });
 
 // @route   PUT /api/cart/:cartItemId
-router.put("/:cartItemId", identifyUser, async (req, res) => {
+router.put("/:cartItemId", validate({ params: schemas.cartItemIdParam }), identifyUser, async (req, res) => {
   try {
     const { cartItemId } = req.params;
     const { quantity } = req.body;

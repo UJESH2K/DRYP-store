@@ -81,6 +81,22 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
 
     if (!response.ok) {
       debugWarn(`❌ API call failed: ${endpoint}`, response.status, data);
+      // On 401, the session is dead — wipe the auth state and
+      // bounce the user back to the login screen so they don't
+      // sit on a screen that endlessly retries. We use a lazy
+      // require to avoid a circular import with the auth store.
+      if (response.status === 401) {
+        try {
+          const auth = useAuthStore.getState();
+          if (auth.token && !auth.isGuest) {
+            auth.logout?.();
+            const { router } = require('expo-router');
+            router.replace('/login');
+          }
+        } catch (_) {
+          // ignore: this is best-effort
+        }
+      }
       return data; // Return error data from server
     }
 
@@ -127,6 +143,7 @@ export async function fetchProducts() {
 // Health check
 export async function checkBackendHealth() {
   return apiCall('/health');
+}
 
 // -----------------------------------------------------------------------------
 // Password reset
@@ -155,5 +172,4 @@ export async function resetPassword(token: string, password: string) {
     method: 'PUT',
     body: JSON.stringify({ password }),
   });
-}
 }

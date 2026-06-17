@@ -161,6 +161,23 @@ export default function RootLayout() {
                 headerShadowVisible: false,
               }}
             />
+            <Stack.Screen
+              name="product/[id]"
+              options={{
+                title: '',
+                headerShown: true,
+                headerTransparent: true,
+                headerStyle: {
+                  backgroundColor: 'transparent',
+                },
+                headerTintColor: '#1a1a1a',
+                headerTitleStyle: {
+                  fontFamily: 'Zaloga',
+                  fontSize: 18,
+                },
+                headerShadowVisible: false,
+              }}
+            />
           </Stack>
         </ErrorBoundary>
         <Toast />

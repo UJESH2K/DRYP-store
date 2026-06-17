@@ -6,6 +6,8 @@ const { identifyUser, protect } = require('../middleware/auth');
 const { requireVendor } = require('../middleware/requireRole');
 const router = express.Router();
 const Cart = require('../models/Cart');
+const stockCheck = require('../utils/stockCheck');
+const reservation = require('../utils/stockReservation');
 
 
 // @route   POST /api/orders
@@ -30,6 +32,17 @@ router.post('/', protect, async (req, res, next) => {
     
     if (productsInCart.length !== new Set(productIds).size) {
         return res.status(400).json({ message: 'One or more items in your cart are no longer available.' });
+    }
+
+    // Phase 3B: pre-check stock (DB + active holds + optional live
+    // Shopify check). Fail 409 with per-line details so the client
+    // can adjust quantities or remove the item.
+    const stockResult = await stockCheck.validate(items, productsInCart);
+    if (!stockResult.ok) {
+      return res.status(409).json({
+        message: 'Some items are out of stock',
+        issues: stockResult.issues,
+      });
     }
 
     const productMap = productsInCart.reduce((acc, product) => {
@@ -102,7 +115,7 @@ router.post('/', protect, async (req, res, next) => {
 
     for (const item of items) {
       const quantityToDeduct = Math.abs(parseInt(item.quantity) || 1); // Ensure it's a positive number
-      
+
       if (item.options && item.options.size) {
         await Product.updateOne(
           { _id: item.productId, "variants.options.Size": item.options.size },
@@ -114,6 +127,11 @@ router.post('/', protect, async (req, res, next) => {
           { $inc: { stock: -quantityToDeduct } }
         );
       }
+
+      // Phase 4A: release the reservation. The deduction above is
+      // permanent; the hold is what the cart was using. After this
+      // point the order owns the stock, not the hold.
+      reservation.release(item.productId, item.options || {});
     }
     
     res.status(201).json(savedOrders);

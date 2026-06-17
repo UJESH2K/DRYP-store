@@ -361,6 +361,109 @@ router.put("/me", requireVendor, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/vendors/shopify
+// @desc    Get the vendor's Shopify connection (token is
+//          never returned; the frontend just gets status
+//          fields).
+// @access  Private (Vendor only)
+router.get("/shopify", requireVendor, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    if (!vendor.shopify?.shop) return res.json({ enabled: false });
+    res.json({
+      enabled: !!vendor.shopify.enabled,
+      shop: vendor.shopify.shop,
+      status: vendor.shopify.enabled ? 'connected' : 'disconnected',
+      lastSyncedAt: vendor.shopify.lastSyncedAt,
+      productsSynced: vendor.shopify.productsSynced,
+    });
+  } catch (error) { next(error); }
+});
+
+// @route   PUT /api/vendors/shopify
+// @desc    Connect a Shopify store. The access token is
+//          encrypted at rest with AES-256-GCM (see
+//          utils/shopifyCrypto).
+// @access  Private (Vendor only)
+router.put("/shopify", requireVendor, async (req, res, next) => {
+  try {
+    const { shop, accessToken } = req.body || {};
+    if (!shop || !accessToken) {
+      return res.status(400).json({ message: "shop and accessToken are required" });
+    }
+    // Loose shop-domain check. Don't accept a URL with a path.
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i.test(shop)) {
+      return res.status(400).json({ message: "Shop must look like 'my-store.myshopify.com'" });
+    }
+    const { encrypt } = require('../utils/shopifyCrypto');
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    vendor.shopify = vendor.shopify || {};
+    vendor.shopify.shop = shop;
+    vendor.shopify.accessToken = encrypt(accessToken);
+    vendor.shopify.enabled = true;
+    vendor.shopify.lastSyncError = undefined;
+    await vendor.save();
+    res.json({
+      ok: true,
+      enabled: true,
+      shop: vendor.shopify.shop,
+      status: 'connected',
+      lastSyncedAt: vendor.shopify.lastSyncedAt,
+      productsSynced: vendor.shopify.productsSynced,
+    });
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/vendors/shopify/test
+// @desc    Run a one-off health check against Shopify: list
+//          products and report the count. We do this on a
+//          separate endpoint so a misconfigured connection
+//          doesn't poison the connection-write path.
+// @access  Private (Vendor only)
+router.post("/shopify/test", requireVendor, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor?.shopify?.accessToken) {
+      return res.json({ ok: false, message: "Not connected" });
+    }
+    const { decrypt } = require('../utils/shopifyCrypto');
+    const token = decrypt(vendor.shopify.accessToken);
+    const url = `https://${vendor.shopify.shop}/admin/api/2024-04/products/count.json`;
+    const res2 = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+    });
+    if (!res2.ok) {
+      const body = await res2.text();
+      vendor.shopify.enabled = false;
+      vendor.shopify.lastSyncError = `HTTP ${res2.status}: ${body.slice(0, 200)}`;
+      await vendor.save();
+      return res.json({ ok: false, message: vendor.shopify.lastSyncError });
+    }
+    const data = await res2.json();
+    vendor.shopify.enabled = true;
+    vendor.shopify.lastSyncError = undefined;
+    vendor.shopify.lastSyncedAt = new Date();
+    vendor.shopify.productsSynced = data.count || 0;
+    await vendor.save();
+    res.json({ ok: true, productsCount: data.count || 0 });
+  } catch (error) { next(error); }
+});
+
+// @route   DELETE /api/vendors/shopify
+// @desc    Disconnect Shopify and wipe the stored token.
+// @access  Private (Vendor only)
+router.delete("/shopify", requireVendor, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    vendor.shopify = undefined;
+    await vendor.save();
+    res.json({ ok: true });
+  } catch (error) { next(error); }
+});
+
 // GET /api/vendors/:id
 router.get("/:id", async (req, res, next) => {
   try {

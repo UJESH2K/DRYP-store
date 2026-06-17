@@ -18,6 +18,18 @@ const VendorSchema = new mongoose.Schema({
   website: { type: String, trim: true },
   logo: { type: String },
   isActive: { type: Boolean, default: true },
+  // Shopify integration. The accessToken is stored encrypted
+  // (see utils/shopifyCrypto). The shop domain is stored in
+  // plaintext because it's not a secret — it's the public
+  // *.myshopify.com address.
+  shopify: {
+    enabled: { type: Boolean, default: false },
+    shop: { type: String, trim: true },
+    accessToken: { type: String }, // encrypted at rest
+    lastSyncedAt: { type: Date },
+    lastSyncError: { type: String },
+    productsSynced: { type: Number, default: 0 },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Vendor', VendorSchema);

@@ -30,6 +30,7 @@ const uploadRoutes = require("./src/routes/upload"); // Import the new upload ro
 const analyticsRoutes = require("./src/routes/analytics"); // Import analytics routes
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
+const reviewRoutes = require("./src/routes/reviews");
 const rateLimit = require('express-rate-limit');
 const requestId = require("./src/middleware/requestId");
 const { registerAll: registerJobs } = require("./src/jobs");
@@ -185,6 +186,11 @@ app.use("/api/upload", uploadRoutes); // Use the upload route
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartLimiter, cartRoutes);
+app.use("/api", reviewRoutes); // /products/:id/reviews and /reviews/:id
+// IMPORTANT: reviewRoutes is mounted BEFORE the not-found handler
+// but AFTER the more-specific route trees so that /api/products
+// keeps serving its own routes and reviewRoutes is consulted only
+// for /api/products/:id/reviews and /api/reviews/:reviewId.
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/josefin-sans';
 import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
 import { useAuthStore } from '../src/state/auth';
+import { useInteractionStore } from '../src/state/interactions';
 import Toast from '../src/components/Toast';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
 import { ErrorBoundary } from '../src/components/common/ErrorBoundary';
@@ -34,7 +35,7 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
-        await loadUser();
+        await Promise.all([loadUser(), useInteractionStore.getState().hydrate()]);
       } catch (e) {
         console.warn(e);
       } finally {

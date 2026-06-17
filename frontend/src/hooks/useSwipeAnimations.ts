@@ -5,7 +5,7 @@ import { useInteractionStore } from '../state/interactions';
 import { useAuthStore } from '../state/auth';
 import type { Item } from '../types';
 import { sendInteraction } from '../lib/api';
-import { updateModel } from '../lib/recommender';
+import { updateModel, recordInteraction } from '../lib/recommender';
 import { useCustomRouter } from './useCustomRouter';
 
 export function useSwipeAnimations(
@@ -76,6 +76,9 @@ export function useSwipeAnimations(
     pushInteraction({ itemId: currentItem.id, action: decision, at: Date.now(), tags: currentItem.tags, priceTier: currentItem.priceTier });
     sendInteraction(decision, currentItem.id, user?._id);
     updateModel(decision, currentItem);
+    // Phase 1: also log to the durable AsyncStorage-backed store so
+    // the recommender survives a refresh.
+    recordInteraction(decision, currentItem);
 
     if (undoTimer.current) {
       clearTimeout(undoTimer.current);

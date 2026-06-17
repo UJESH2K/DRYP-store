@@ -148,3 +148,38 @@ export function updateModel(action: 'like' | 'dislike' | 'cart', item: Item) {
 export function onItemViewed(item: Item) {
   recordEvent('view', item)
 }
+
+/**
+ * recordInteraction — single entry point for the swipe stack.
+ *
+ * Updates the on-device recommender profile (which feeds the
+ * ranker) AND the persistent interaction store (which survives
+ * a refresh and is used by the home feed). Use this from the
+ * card UI instead of calling the two functions separately.
+ */
+export function recordInteraction(
+  action: 'view' | 'like' | 'dislike' | 'cart' | 'purchase',
+  item: Item,
+) {
+  if (action === 'view') {
+    onItemViewed(item)
+  } else if (action === 'dislike') {
+    updateModel('dislike', item)
+  } else {
+    recordEvent(action === 'cart' ? 'cart' : action, item)
+  }
+  // Fire-and-forget the persistent log. The recommender's in-memory
+  // profile is the fast path; the store is the durable one.
+  import('../state/interactions').then(({ useInteractionStore }) => {
+    useInteractionStore.getState().pushInteraction({
+      itemId: String(item.id),
+      action,
+      at: Date.now(),
+      tags: item.tags || [],
+      priceTier: item.priceTier,
+      brand: item.brand,
+      category: item.category,
+      color: item.colors?.[0],
+    })
+  })
+}

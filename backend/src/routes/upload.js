@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { protect } = require('../middleware/auth');
+const { requireVendor } = require('../middleware/requireRole');
 
 const router = express.Router();
 
@@ -47,11 +47,7 @@ const upload = multer({
 // @route   POST /api/upload
 // @desc    Upload an image
 // @access  Private (Vendor only)
-router.post('/', protect, (req, res) => {
-  if (req.user.role !== 'vendor') {
-    return res.status(403).json({ message: 'Forbidden: Only vendors can upload images.' });
-  }
-
+router.post('/', requireVendor, (req, res) => {
   upload(req, res, (err) => {
     if (err) {
       res.status(400).json({ message: err });

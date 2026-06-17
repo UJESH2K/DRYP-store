@@ -5,17 +5,14 @@ const Product = require('../models/Product');
 const Cart = require('../models/Cart'); 
 const WishlistItem = require('../models/WishlistItem'); 
 const Like = require('../models/Like'); 
-const { protect } = require('../middleware/auth');
+const { requireVendor } = require('../middleware/requireRole');
 const router = express.Router();
 
 // @route   POST /api/products
 // @desc    Create a new product
 // @access  Private (Vendor only)
-router.post('/', protect, async (req, res, next) => {
+router.post('/', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can create products' });
-    }
     const productData = { ...req.body, vendor: req.user._id };
     const product = await Product.create(productData);
     res.status(201).json(product);
@@ -144,12 +141,8 @@ router.get('/suggestions', async (req, res, next) => {
 // @route   PUT /api/products/:id
 // @desc    Update a product
 // @access  Private (Vendor only)
-router.put('/:id', protect, async (req, res, next) => {
+router.put('/:id', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can edit products' });
-    }
-
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -181,12 +174,8 @@ router.put('/:id', protect, async (req, res, next) => {
 // @route   DELETE /api/products/:id
 // @desc    Delete a product and all its associated data
 // @access  Private (Vendor only)
-router.delete('/:id', protect, async (req, res, next) => {
+router.delete('/:id', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can delete products' });
-    }
-
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });

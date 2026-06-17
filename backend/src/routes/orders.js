@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { identifyUser, protect } = require('../middleware/auth');
+const { requireVendor } = require('../middleware/requireRole');
 const router = express.Router();
 const Cart = require('../models/Cart');
 
@@ -141,11 +142,8 @@ router.get('/mine', identifyUser, async (req, res, next) => {
 // @route   GET /api/orders/vendor
 // @desc    Get all orders for the logged-in vendor
 // @access  Private (Vendor only)
-router.get('/vendor', protect, async (req, res, next) => {
+router.get('/vendor', requireVendor, async (req, res, next) => {
     try {
-        if (req.user.role !== 'vendor') {
-            return res.status(403).json({ message: 'Forbidden: Only vendors can access this route' });
-        }
         const orders = await Order.find({ 'items.vendor': req.user._id })
             .populate('user', 'name email')
             .populate('items.product', 'name sku')

@@ -47,17 +47,6 @@ export async function initRecommender() {
   await loadProfile()
 }
 
-// Cold start + category filter + diverse seed ordering.
-//
-// NOTE: this is a stub. The real feed comes from the API via
-// `useHomeScreenData`. The previous implementation referenced an
-// `ITEMS` constant that was never imported, so any caller would
-// crash with a ReferenceError. Return [] for now and remove this
-// function once the API path is confirmed stable.
-export async function getInitialItems(): Promise<Item[]> {
-  return [];
-}
-
 function scoreItem(item: Item): number {
   let s = 0
   // tags

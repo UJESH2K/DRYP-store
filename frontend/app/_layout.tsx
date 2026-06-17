@@ -15,6 +15,7 @@ import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond
 import { useAuthStore } from '../src/state/auth';
 import Toast from '../src/components/Toast';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
+import { ErrorBoundary } from '../src/components/common/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -125,40 +126,42 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'black' }}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen 
-            name="liked-items" 
-            options={{ 
-              title: 'Liked Items',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#ffffff',
-              },
-              headerTintColor: '#1a1a1a',
-              headerTitleStyle: {
-                fontFamily: 'Zaloga',
-                fontSize: 28,
-              },
-              headerShadowVisible: false,
-            }} 
-          />
-          <Stack.Screen 
-            name="notifications" 
-            options={{ 
-              title: 'Notifications',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#ffffff',
-              },
-              headerTintColor: '#1a1a1a',
-              headerTitleStyle: {
-                fontFamily: 'Zaloga',
-                fontSize: 28,
-              },
-              headerShadowVisible: false,
-            }} 
-          />
-        </Stack>
+        <ErrorBoundary>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen
+              name="liked-items"
+              options={{
+                title: 'Liked Items',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: '#ffffff',
+                },
+                headerTintColor: '#1a1a1a',
+                headerTitleStyle: {
+                  fontFamily: 'Zaloga',
+                  fontSize: 28,
+                },
+                headerShadowVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="notifications"
+              options={{
+                title: 'Notifications',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: '#ffffff',
+                },
+                headerTintColor: '#1a1a1a',
+                headerTitleStyle: {
+                  fontFamily: 'Zaloga',
+                  fontSize: 28,
+                },
+                headerShadowVisible: false,
+              }}
+            />
+          </Stack>
+        </ErrorBoundary>
         <Toast />
       </SafeAreaProvider>
     </GestureHandlerRootView>

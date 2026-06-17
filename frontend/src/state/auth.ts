@@ -149,29 +149,60 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadUser: async () => {
     const { apiCall } = require('../lib/api'); // LAZY REQUIRE
     set({ isLoading: true });
+
+    // Hydrate the wishlist from disk FIRST. If anything below fails on a
+    // network blip, the persisted wishlist still shows up.
+    if (!useWishlistStore.getState().hydrated) {
+      await useWishlistStore.getState().hydrate();
+    }
+
+    let token: string | null = null;
+    let userData: string | null = null;
     try {
-      const token = await AsyncStorage.getItem('user_token');
-      const userData = await AsyncStorage.getItem('user_data');
-      if (token && userData) {
-        const user = JSON.parse(userData);
-        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
-        
-        const wishlistItems = await apiCall('/api/wishlist');
-        if (Array.isArray(wishlistItems)) {
-          const validWishlistProducts = wishlistItems
-            .filter(item => item && item.product)
-            .map(item => item.product);
+      token = await AsyncStorage.getItem('user_token');
+      userData = await AsyncStorage.getItem('user_data');
+    } catch (e) {
+      console.warn('Failed to read auth from storage', e);
+    }
+
+    if (!token || !userData) {
+      // Genuinely no auth → guest.
+      await get().initGuestUser();
+      set({ isLoading: false });
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+    } catch (e) {
+      console.error('Corrupt user_data in storage; clearing it.', e);
+      // The token is real but the user blob is corrupt. Don't silently downgrade
+      // a real user to a guest — clear the corrupt blob so the next login
+      // can rehydrate properly. Token still works on the server.
+      await AsyncStorage.removeItem('user_data').catch(() => {});
+      set({ isLoading: false });
+      return;
+    }
+
+    // Best-effort wishlist sync. A failure here MUST NOT touch the local
+    // wishlist (which is now persisted to AsyncStorage). The persisted list
+    // stays put; the user can retry by pulling-to-refresh later.
+    try {
+      const wishlistItems = await apiCall('/api/wishlist');
+      if (Array.isArray(wishlistItems) && wishlistItems.length > 0) {
+        const validWishlistProducts = wishlistItems
+          .filter(item => item && item.product)
+          .map(item => item.product);
+        if (validWishlistProducts.length > 0) {
           useWishlistStore.getState().setWishlist(validWishlistProducts);
         }
-      } else {
-        await get().initGuestUser();
       }
-    } catch (error) {
-      console.error('Error loading user:', error);
-      await get().initGuestUser(); // Fallback to guest session on error
-    } finally {
-      set({ isLoading: false });
+    } catch (e) {
+      console.warn('Wishlist refresh failed; keeping local list', e);
     }
+
+    set({ isLoading: false });
   },
 
   updateUser: async (user: User) => {

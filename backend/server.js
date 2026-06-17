@@ -41,9 +41,46 @@ const authLimiter = rateLimit({
 });
 
 const vendorSignupLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, 
-  max: 3, 
+  windowMs: 1 * 60 * 1000,
+  max: 3,
   message: { message: "Too many studio applications from this IP, please try again later" },
+});
+
+// Per-resource limiters. The defaults are:
+//   products  — read-heavy (browse/catalogue). 200/min per IP.
+//   cart      — guest or authed. 60/min per IP.
+//   wishlist  — guest or authed. 60/min per IP.
+//   likes     — high-frequency toggle from the swipe UI. 120/min per IP.
+// These are deliberately generous; they're meant to stop a runaway
+// script, not to gate normal users. If a real user hits them, the
+// error message names the resource so support can investigate.
+const productsLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 200,
+  message: { message: "Too many product requests, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const cartLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: { message: "Too many cart requests, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const wishlistLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: { message: "Too many wishlist requests, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const likesLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 120,
+  message: { message: "Too many like requests, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 const app = express();
@@ -91,17 +128,17 @@ app.use("/api/auth/register", authLimiter);
 app.use("/api/vendors/register", vendorSignupLimiter);
 
 app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
+app.use("/api/products", productsLimiter, productRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/orders", orderRoutes);
-app.use("/api/likes", likeRoutes);
-app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/likes", likesLimiter, likeRoutes);
+app.use("/api/wishlist", wishlistLimiter, wishlistRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/upload", uploadRoutes); // Use the upload route
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
-app.use("/api/cart", cartRoutes);
+app.use("/api/cart", cartLimiter, cartRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

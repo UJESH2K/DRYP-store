@@ -137,6 +137,12 @@ const formatPrice = React.useCallback((price: number) =>
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>Your cart is empty</Text>
             <Text style={styles.emptySubtitle}>Items you add to your cart will appear here.</Text>
+            <Pressable
+              onPress={() => router.push('/(tabs)/home')}
+              style={styles.discoverButton}
+            >
+              <Text style={styles.discoverText}>Discover Items</Text>
+            </Pressable>
           </View>
         ) : (
           <>
@@ -265,7 +271,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: { fontSize: 22, marginBottom: 8, fontFamily: 'Zaloga' },
-  emptySubtitle: { fontSize: 16, color: '#666', fontFamily: 'Zaloga' },
+  emptySubtitle: { fontSize: 16, color: '#666', fontFamily: 'Zaloga', marginBottom: 24 },
+  discoverButton: {
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  discoverText: { color: '#fff', fontSize: 14, fontWeight: '500', letterSpacing: 1, textTransform: 'uppercase' },
   itemList: { flex: 1, paddingHorizontal: 16 },
   itemCard: {
     backgroundColor: '#ffffff',

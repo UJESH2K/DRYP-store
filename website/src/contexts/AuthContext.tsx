@@ -2,12 +2,13 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import type { User } from '../types';
 
 // ✅ Define proper type
 type AuthContextType = {
-  user: any;
+  user: User | null;
   token: string | null;
-  login: (userData: any, userToken: string) => void;
+  login: (userData: User, userToken: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
@@ -17,7 +18,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -42,9 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = (userData: any, userToken: string) => {
+  const login = (userData: User, userToken: string) => {
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', userToken);
+    // Mirror to a non-HttpOnly cookie so the Next.js middleware
+    // (Edge runtime, runs before page render) can gate /dashboard and
+    // /admin without a flash of unauthed content. The HttpOnly flag
+    // would be safer but can't be set from client JS — this is a
+    // best-effort defence, not a security boundary. Real authz still
+    // happens server-side in the API.
+    document.cookie = `dryp_token=${encodeURIComponent(userToken)}; path=/; max-age=86400; SameSite=Lax`;
     setUser(userData);
     setToken(userToken);
     router.push('/dashboard');
@@ -53,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    document.cookie = 'dryp_token=; path=/; max-age=0; SameSite=Lax';
     setUser(null);
     setToken(null);
     router.push('/login');

@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect } = require('../middleware/auth');
+const { requireVendor } = require('../middleware/requireRole');
 const Product = require('../models/Product');
 const Like = require('../models/Like');
 const WishlistItem = require('../models/WishlistItem');
@@ -8,11 +8,8 @@ const router = express.Router();
 // @route   GET /api/analytics/summary
 // @desc    Get summary analytics for a vendor
 // @access  Private (Vendor only)
-router.get('/summary', protect, async (req, res, next) => {
+router.get('/summary', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can access analytics' });
-    }
     const vendorId = req.user._id;
 
     // 1. Get all products for the vendor
@@ -40,12 +37,8 @@ router.get('/summary', protect, async (req, res, next) => {
 // @route   GET /api/analytics/products
 // @desc    Get product analytics for a vendor
 // @access  Private (Vendor only)
-router.get('/products', protect, async (req, res, next) => {
+router.get('/products', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can access analytics' });
-    }
-
     const vendorId = req.user._id;
 
     // 1. Get all products for the vendor

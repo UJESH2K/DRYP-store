@@ -157,7 +157,7 @@ router.put('/:id', protect, async (req, res, next) => {
 
     // Ensure the user updating the product is the one who created it
     if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to edit this product' });
+      return res.status(403).json({ message: 'Not authorized to edit this product' });
     }
 
     const { name, description, brand, category, tags, basePrice, options, variants, images } = req.body;
@@ -193,7 +193,7 @@ router.delete('/:id', protect, async (req, res, next) => {
     }
 
     if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to delete this product' });
+      return res.status(403).json({ message: 'Not authorized to delete this product' });
     }
 
     product.isActive = false;

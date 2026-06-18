@@ -15,7 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-// Enable LayoutAnimation for Android
+// Enable LayoutAnimation for Android. iOS doesn't need this shim —
+// `LayoutAnimation` is on by default — so we leave the iOS path untouched.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }

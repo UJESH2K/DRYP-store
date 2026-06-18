@@ -26,6 +26,14 @@ const identifyUser = async (req, res, next) => {
         return res.status(403).json({ message: "Account suspended." });
       }
 
+      // Soft-deleted accounts have no JWTs issued at this point
+      // (the deletion route also clears the token client-side).
+      // This is a defense-in-depth check: a token issued before
+      // the user clicked "delete" can no longer be used.
+      if (user && user.isDeleted) {
+        return res.status(401).json({ message: "Account deleted." });
+      }
+
       req.user = user;
     } catch (error) {
       console.error(`Auth Middleware: ${error.message}. Proceeding as guest.`);

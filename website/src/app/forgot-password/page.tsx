@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+import { apiCall } from "@/lib/api";
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
@@ -16,24 +15,18 @@ const ForgotPasswordPage = () => {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus("success");
-        setMessage(data.message || "If an account exists, a reset link has been sent.");
-      } else {
-        setStatus("error");
-        setMessage(data.message || "Failed to process request.");
-      }
-    } catch (error) {
+      const data = await apiCall<{ message: string }>(
+        "/api/auth/forgot-password",
+        {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        },
+      );
+      setStatus("success");
+      setMessage(data.message || "If an account exists, a reset link has been sent.");
+    } catch (error: any) {
       setStatus("error");
-      setMessage("A network error occurred. Please try again.");
+      setMessage(error.message || "A network error occurred. Please try again.");
     }
   };
 
@@ -53,21 +46,21 @@ const ForgotPasswordPage = () => {
           
           <div className="text-center mb-12">
             <h1 className="font-editorial text-4xl md:text-5xl font-light tracking-tight mb-4">
-              Password <span className="font-cursive text-5xl md:text-6xl lowercase text-gray-400">recovery</span>
+              Reset Your <span className="font-cursive text-5xl md:text-6xl lowercase text-gray-400">Password</span>
             </h1>
             <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-gray-500">
-              Enter your email to receive a secure reset token
+              Enter your email and we&apos;ll send you a reset link
             </p>
           </div>
 
           {status === "success" ? (
             <div className="border border-black p-8 text-center space-y-6">
-              <p className="font-editorial text-xl">Transmission Sent</p>
+              <p className="font-editorial text-xl">Email Sent!</p>
               <p className="font-sans text-xs tracking-widest text-gray-500 leading-relaxed">
-                {message} Please check your inbox and spam folder. The link will expire in 10 minutes.
+                Check your inbox (and spam folder) for a password reset link. The link expires in 10 minutes.
               </p>
               <Link href="/login" className="block w-full bg-black text-white py-4 font-sans text-[10px] uppercase tracking-[0.3em] hover:bg-gray-800 transition-colors">
-                Return to Login
+                Back to Login
               </Link>
             </div>
           ) : (
@@ -96,7 +89,7 @@ const ForgotPasswordPage = () => {
                 disabled={status === "loading"}
                 className="w-full border border-black bg-black text-white py-4 font-sans text-[10px] uppercase tracking-[0.3em] hover:bg-transparent hover:text-black transition-colors disabled:opacity-50"
               >
-                {status === "loading" ? "Requesting..." : "Send Reset Link"}
+                {status === "loading" ? "Sending..." : "Send Reset Link"}
               </button>
 
               <div className="text-center pt-4 border-t border-gray-200">

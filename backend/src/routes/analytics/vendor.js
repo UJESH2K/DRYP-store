@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../../middleware/auth');
+const { requireVendor } = require('../../middleware/requireRole');
 const Product = require('../../models/Product');
 const WishlistItem = require('../../models/WishlistItem');
 const Order = require('../../models/Order');
@@ -8,12 +8,8 @@ const Order = require('../../models/Order');
 // @route   GET /api/analytics/vendor
 // @desc    Get dashboard analytics for the logged-in vendor
 // @access  Private (Vendor only)
-router.get('/vendor', protect, async (req, res, next) => {
+router.get('/vendor', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-
     const vendorId = req.user._id;
 
     // --- Aggregate Metrics ---

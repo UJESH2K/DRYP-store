@@ -4,11 +4,13 @@ const jwt = require("jsonwebtoken");
 const Vendor = require("../models/Vendor");
 const User = require("../models/User");
 const Product = require("../models/Product");
-const { protect } = require("../middleware/auth");
+const { requireAdmin, requireVendor } = require("../middleware/requireRole");
+const requireEmailConfig = require("../middleware/requireEmailConfig");
 const router = express.Router();
 const mongoose = require("mongoose");
 const VendorApplication = require("../models/VendorApplication");
 const sendEmail = require("../utils/sendEmail");
+const logger = require("../utils/logger");
 
 // @route   POST /api/vendors/apply
 // @desc    Submit a studio application to the waitlist
@@ -44,13 +46,10 @@ router.post("/apply", async (req, res, next) => {
 // @route   PUT /api/vendors/applications/:id
 // @desc    Admin: Approve or Reject a vendor application
 // @access  Private (Admin Only)
-router.put("/applications/:id", protect, async (req, res, next) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Admins only." });
-    }
-
-    const { status } = req.body; // 'approved' or 'rejected'
+router.put("/applications/:id", requireAdmin, requireEmailConfig, async (req, res, next) => {
+  let status;
+try {
+    ({ status } = req.body); // 'approved' or 'rejected'
     if (!["approved", "rejected"].includes(status)) {
       return res.status(400).json({ message: "Invalid status update." });
     }
@@ -59,32 +58,108 @@ router.put("/applications/:id", protect, async (req, res, next) => {
     if (!application)
       return res.status(404).json({ message: "Application not found" });
 
+    // Idempotency: if the application is already in the requested state,
+    // don't re-send the email or re-update timestamps. Just return success.
+    if (application.status === status) {
+      return res.json({
+        message: `Application already ${status}. No action taken.`,
+      });
+    }
+
+    const frontendUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
+
+    // Send the email FIRST. If the email throws, we return 502 and the DB
+    // state is unchanged. This avoids the previous bug where the
+    // application was marked "approved" in Mongo but the email never went
+    // out — the vendor would then try to register and find their application
+    // in an inconsistent state.
+    //
+    // Phase 0E: on a transient SMTP failure (e.g. SMTP server
+    // bouncing), we fall back to the background queue with retries.
+    // The synchronous `await` blocks long enough to catch "wrong
+    // email address" (4xx) — those should NOT be silently retried,
+    // they should fail loud. But a timeout / 5xx / DNS error
+    // shouldn't kill the whole approval; it should retry.
+    const queue = require("../utils/jobQueue");
+    const sendOnce = async () => {
+      if (status === "approved") {
+        return sendEmail({
+          email: application.email,
+          subject: "DRYP: Studio Approved",
+          message: `Your application has been accepted. You may now create your account at: ${frontendUrl}/signup`,
+        });
+      }
+      return sendEmail({
+        email: application.email,
+        subject: "DRYP: Application Status",
+        message: `Thank you for your interest in DRYP. Unfortunately, your studio does not align with our current curation. We wish you the best.`,
+      });
+    };
+
+    let emailSent = false;
+    let lastErr = null;
+    try {
+      await sendOnce();
+      emailSent = true;
+    } catch (err) {
+      lastErr = err;
+      // 4xx errors: don't retry, re-throw so the admin sees the error.
+      // For everything else, hand it to the queue and accept the
+      // approval anyway — the queue will retry up to 3 times.
+      const msg = String(err && err.message).toLowerCase();
+      const isPermanent = msg.includes("invalid") || msg.includes("not found") || /\b4\d\d\b/.test(msg);
+      if (isPermanent) throw err;
+      // Phase 0E: enqueue for background retry. We do NOT block
+      // the admin request on this.
+      await queue.enqueue(
+        "sendVendorApprovalEmail",
+        {
+          email: application.email,
+          status,
+          frontendUrl,
+        },
+        { attempts: 3, backoff: { type: "exponential", delay: 30_000 } },
+      );
+      // The approval succeeds; the email is in flight. The admin
+      // gets a slightly different response so they know to expect
+      // a delay.
+      emailSent = "queued";
+    }
+
+    // Email confirmed sent. Now commit the state change.
     application.status = status;
     application.reviewedBy = req.user._id;
     application.reviewedAt = Date.now();
     await application.save();
 
-    const frontendUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
-
-    if (status === "approved") {
-      await sendEmail({
-        email: application.email,
-        subject: "DRYP: Studio Approved",
-        message: `Your application has been accepted. You may now create your account at: ${frontendUrl}/signup`,
-      });
-    } else {
-      await sendEmail({
-        email: application.email,
-        subject: "DRYP: Application Status",
-        message: `Thank you for your interest in DRYP. Unfortunately, your studio does not align with our current curation. We wish you the best.`,
-      });
-    }
-
     res.json({
-      message: `Application ${status} successfully. Email dispatched.`,
+      message: `Application ${status} successfully.${
+        emailSent === "queued" ? " Email queued for retry." : " Email dispatched."
+      }`,
     });
   } catch (error) {
+    // If sendEmail threw, surface a 502 (Bad Gateway) so the admin knows
+    // it's a third-party issue (SMTP) and not a server bug. The DB write
+    // never happened, so the application is still in its prior state.
+    if (
+      error &&
+      (error.code === "EAUTH" ||
+        error.code === "ECONNECTION" ||
+        error.code === "ETIMEDOUT" ||
+        /SMTP|email/i.test(error.message || ""))
+    ) {
+      logger.error(
+        { err: error.message, applicationId: req.params.id, status },
+        "vendor_application_email_failed",
+      );
+      return res.status(502).json({
+        message:
+          "Could not send the application status email. The application " +
+          "state has not been changed. Please check SMTP configuration and " +
+          "try again.",
+      });
+    }
     next(error);
   }
 });
@@ -92,12 +167,8 @@ router.put("/applications/:id", protect, async (req, res, next) => {
 // @route   GET /api/vendors/applications
 // @desc    Admin: View all applications
 // @access  Private (Admin Only)
-router.get("/applications", protect, async (req, res, next) => {
-  console.log(req.user);
+router.get("/applications", requireAdmin, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
-      return res.status(403).json({ message: "Admins only." });
-
     const applications = await VendorApplication.find().sort({ createdAt: -1 });
     res.json(applications);
   } catch (error) {
@@ -233,14 +304,8 @@ router.post("/login", async (req, res, next) => {
 // @route   GET /api/vendors/me/products
 // @desc    Get all products for the logged-in vendor
 // @access  Private (Vendor only)
-router.get("/me/products", protect, async (req, res, next) => {
+router.get("/me/products", requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== "vendor") {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Only vendors can access this route" });
-    }
-
     const vendor = await Vendor.findOne({ owner: req.user._id });
     if (!vendor) {
       return res
@@ -248,7 +313,10 @@ router.get("/me/products", protect, async (req, res, next) => {
         .json({ message: "Vendor profile not found for this user" });
     }
 
-    const products = await Product.find({ vendor: vendor._id });
+    // `Product.vendor` references the owning *User* (_id), not the Vendor
+    // document. Filter by the User id (req.user._id) so vendors actually
+    // see their own products.
+    const products = await Product.find({ vendor: req.user._id });
     res.json(products);
   } catch (error) {
     next(error);
@@ -258,16 +326,9 @@ router.get("/me/products", protect, async (req, res, next) => {
 // @route   GET /api/vendors/me
 // @desc    Get the logged-in vendor's profile
 // @access  Private (Vendor only)
-router.get("/me", protect, async (req, res, next) => {
+router.get("/me", requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== "vendor") {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Only vendors can access this route" });
-    }
-    console.log("Searching for vendor with owner ID:", req.user._id);
     const vendor = await Vendor.findOne({ owner: req.user._id });
-    console.log("Found vendor:", vendor);
     if (!vendor) {
       return res
         .status(404)
@@ -282,13 +343,8 @@ router.get("/me", protect, async (req, res, next) => {
 // @route   PUT /api/vendors/me
 // @desc    Update the logged-in vendor's profile
 // @access  Private (Vendor only)
-router.put("/me", protect, async (req, res, next) => {
+router.put("/me", requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== "vendor") {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Only vendors can access this route" });
-    }
     const vendor = await Vendor.findOneAndUpdate(
       { owner: req.user._id },
       { $set: req.body },
@@ -303,6 +359,109 @@ router.put("/me", protect, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// @route   GET /api/vendors/shopify
+// @desc    Get the vendor's Shopify connection (token is
+//          never returned; the frontend just gets status
+//          fields).
+// @access  Private (Vendor only)
+router.get("/shopify", requireVendor, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    if (!vendor.shopify?.shop) return res.json({ enabled: false });
+    res.json({
+      enabled: !!vendor.shopify.enabled,
+      shop: vendor.shopify.shop,
+      status: vendor.shopify.enabled ? 'connected' : 'disconnected',
+      lastSyncedAt: vendor.shopify.lastSyncedAt,
+      productsSynced: vendor.shopify.productsSynced,
+    });
+  } catch (error) { next(error); }
+});
+
+// @route   PUT /api/vendors/shopify
+// @desc    Connect a Shopify store. The access token is
+//          encrypted at rest with AES-256-GCM (see
+//          utils/shopifyCrypto).
+// @access  Private (Vendor only)
+router.put("/shopify", requireVendor, async (req, res, next) => {
+  try {
+    const { shop, accessToken } = req.body || {};
+    if (!shop || !accessToken) {
+      return res.status(400).json({ message: "shop and accessToken are required" });
+    }
+    // Loose shop-domain check. Don't accept a URL with a path.
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i.test(shop)) {
+      return res.status(400).json({ message: "Shop must look like 'my-store.myshopify.com'" });
+    }
+    const { encrypt } = require('../utils/shopifyCrypto');
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    vendor.shopify = vendor.shopify || {};
+    vendor.shopify.shop = shop;
+    vendor.shopify.accessToken = encrypt(accessToken);
+    vendor.shopify.enabled = true;
+    vendor.shopify.lastSyncError = undefined;
+    await vendor.save();
+    res.json({
+      ok: true,
+      enabled: true,
+      shop: vendor.shopify.shop,
+      status: 'connected',
+      lastSyncedAt: vendor.shopify.lastSyncedAt,
+      productsSynced: vendor.shopify.productsSynced,
+    });
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/vendors/shopify/test
+// @desc    Run a one-off health check against Shopify: list
+//          products and report the count. We do this on a
+//          separate endpoint so a misconfigured connection
+//          doesn't poison the connection-write path.
+// @access  Private (Vendor only)
+router.post("/shopify/test", requireVendor, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor?.shopify?.accessToken) {
+      return res.json({ ok: false, message: "Not connected" });
+    }
+    const { decrypt } = require('../utils/shopifyCrypto');
+    const token = decrypt(vendor.shopify.accessToken);
+    const url = `https://${vendor.shopify.shop}/admin/api/2024-04/products/count.json`;
+    const res2 = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+    });
+    if (!res2.ok) {
+      const body = await res2.text();
+      vendor.shopify.enabled = false;
+      vendor.shopify.lastSyncError = `HTTP ${res2.status}: ${body.slice(0, 200)}`;
+      await vendor.save();
+      return res.json({ ok: false, message: vendor.shopify.lastSyncError });
+    }
+    const data = await res2.json();
+    vendor.shopify.enabled = true;
+    vendor.shopify.lastSyncError = undefined;
+    vendor.shopify.lastSyncedAt = new Date();
+    vendor.shopify.productsSynced = data.count || 0;
+    await vendor.save();
+    res.json({ ok: true, productsCount: data.count || 0 });
+  } catch (error) { next(error); }
+});
+
+// @route   DELETE /api/vendors/shopify
+// @desc    Disconnect Shopify and wipe the stored token.
+// @access  Private (Vendor only)
+router.delete("/shopify", requireVendor, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    vendor.shopify = undefined;
+    await vendor.save();
+    res.json({ ok: true });
+  } catch (error) { next(error); }
 });
 
 // GET /api/vendors/:id
@@ -332,11 +491,8 @@ router.get("/:id/products", async (req, res, next) => {
 // @route   GET /api/vendors/admin/directory
 // @desc    Admin: Get all officially registered studios
 // @access  Private (Admin Only)
-router.get("/admin/directory", protect, async (req, res, next) => {
+router.get("/admin/directory", requireAdmin, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
-      return res.status(403).json({ message: "Admins only." });
-
     // We populate the owner to get their email and isActive suspension status
     const vendors = await Vendor.find().populate(
       "owner",
@@ -351,11 +507,8 @@ router.get("/admin/directory", protect, async (req, res, next) => {
 // @route   PUT /api/vendors/admin/suspend/:vendorId
 // @desc    Admin: Toggle a studio's suspension status and email them
 // @access  Private (Admin Only)
-router.put("/admin/suspend/:vendorId", protect, async (req, res, next) => {
+router.put("/admin/suspend/:vendorId", requireAdmin, requireEmailConfig, async (req, res, next) => {
   try {
-    if (req.user.role !== "admin")
-      return res.status(403).json({ message: "Admins only." });
-
     // 1. Find the Vendor and their associated User account
     const vendor = await Vendor.findById(req.params.vendorId).populate("owner");
     if (!vendor || !vendor.owner) {

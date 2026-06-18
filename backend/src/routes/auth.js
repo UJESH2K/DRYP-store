@@ -8,16 +8,11 @@ const Order = require('../models/Order');
 const router = express.Router();
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
-
-const isValidPassword = (password) => {
-  const rules = [
-    password.length >= 8,
-    /[A-Z]/.test(password),
-    /[a-z]/.test(password),
-    /[0-9]/.test(password)
-  ];
-  return rules.every(Boolean);
-};
+const { verifyGoogleIdToken } = require('../utils/googleAuth');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/auth');
+const requireEmailConfig = require('../middleware/requireEmailConfig');
+const logger = require('../utils/logger');
 
 const mergeGuestData = async (userId, guestId) => {
   if (!guestId) return;
@@ -62,23 +57,20 @@ const mergeGuestData = async (userId, guestId) => {
 
 
 // POST /api/auth/register
-router.post('/register', async (req, res, next) => {
+router.post('/register', validate({ body: schemas.register }), async (req, res, next) => {
   try {
+    // Body has already been validated and trimmed by the zod schema.
     const { name, email, password, guestId } = req.body;
 
-    if (!password || !isValidPassword(password)) {
-      return res.status(400).json({ message: 'Password does not meet security requirements.' });
-    }
-    
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: 'User already exists' });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, passwordHash });
-    
+
     await mergeGuestData(user._id, guestId);
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     const userObj = user.toObject();
     delete userObj.passwordHash;
@@ -88,26 +80,86 @@ router.post('/register', async (req, res, next) => {
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res, next) => {
+router.post('/login', validate({ body: schemas.login }), async (req, res, next) => {
   try {
     const { email, password, guestId } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
-    
+
     await mergeGuestData(user._id, guestId);
-    
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
-    
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({ token, user });
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/auth/google
+// @desc    Sign in or register via a Google ID token (mobile + web).
+//          The client (Expo or Next.js) gets the ID token from the
+//          GoogleSignin SDK / google.accounts.id, then POSTs it here.
+//          We verify with Google, find or create the user, and
+//          return the same { token, user } shape as /login.
+// @access  Public
+router.post('/google', async (req, res, next) => {
+  try {
+    const { idToken, guestId } = req.body || {};
+    if (!idToken) return res.status(400).json({ message: 'idToken is required' });
+
+    const expectedAud = process.env.GOOGLE_CLIENT_ID;
+    const info = await verifyGoogleIdToken(idToken, expectedAud);
+    if (!info.ok) {
+      return res.status(401).json({ message: 'Google sign-in failed: ' + info.error });
+    }
+
+    // Find by googleId first, then by email (covers the case where
+    // the user signed up with email/password first and is now adding
+    // Google as a linked provider).
+    let user = await User.findOne({ googleId: info.sub });
+    if (!user) {
+      user = await User.findOne({ email: info.email });
+      if (user) {
+        // Link: existing email/password user starts using Google too.
+        user.googleId = info.sub;
+        user.authProvider = 'google';
+        if (!user.avatar && info.picture) user.avatar = info.picture;
+        await user.save();
+      } else {
+        // Brand new SSO user. No passwordHash.
+        user = await User.create({
+          name: info.name,
+          email: info.email,
+          googleId: info.sub,
+          authProvider: 'google',
+          avatar: info.picture || undefined,
+        });
+      }
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Account is suspended' });
+    }
+
+    if (guestId) await mergeGuestData(user._id, guestId);
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user });
   } catch (error) { next(error); }
 });
 
 // @route   POST /api/auth/forgot-password
 // @desc    Generate token and send email
-router.post('/forgot-password', async (req, res, next) => {
+router.post('/forgot-password', requireEmailConfig, validate({ body: schemas.forgotPassword }), async (req, res, next) => {
   try {
+    if (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
+      logger.error({}, 'forgot_password called but SMTP is not configured');
+      return res.status(500).json({
+        message: 'Email service is not configured. Please contact support.'
+      });
+    }
+
     const user = await User.findOne({ email: req.body.email });
     
     if (!user) {
@@ -126,6 +178,13 @@ router.post('/forgot-password', async (req, res, next) => {
     // 3. Create the reset URL pointing to your NEXT.JS FRONTEND
     // Ensure NEXT_PUBLIC_FRONTEND_URL is in your .env (e.g., http://localhost:3000)
     const resetUrl = `${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+    // Mobile deep link. The Expo app's `scheme: "dryp"` lets us register
+    // dryp://reset-password/<token> as a deep link, and the app's Linking
+    // listener will route it to /reset-password/[token] inside the app.
+    // This is the iOS-friendly path: tapping the email on a phone opens
+    // the app directly instead of bouncing through Safari to the website.
+    const mobileResetUrl = `${process.env.MOBILE_RESET_SCHEME || 'dryp://reset-password'}/${resetToken}`;
 
     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. \n\nPlease make a PUT request to: \n\n ${resetUrl}`;
 
@@ -183,6 +242,13 @@ router.post('/forgot-password', async (req, res, next) => {
                 </tr>
 
                 <tr>
+                  <td align="center" style="padding-bottom: 50px;">
+                    <p style="margin: 0 0 16px 0; font-size: 9px; color: #999999; text-transform: uppercase; letter-spacing: 3px;">On Mobile?</p>
+                    <a href="${mobileResetUrl}" class="button" style="display: inline-block; background-color: #ffffff; color: #000000; text-decoration: none; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 4px; padding: 20px 45px; border: 1px solid #000000;">Open in DRYP App</a>
+                  </td>
+                </tr>
+
+                <tr>
                   <td align="center" style="border-top: 1px solid #f0f0f0; padding-top: 30px;">
                     <p style="margin: 0; font-size: 9px; color: #bbbbbb; text-transform: uppercase; letter-spacing: 2px; line-height: 18px;">
                       If you did not request this, you may safely ignore this transmission.<br>No changes have been made to your account.
@@ -208,7 +274,7 @@ router.post('/forgot-password', async (req, res, next) => {
 
       res.status(200).json({ message: 'Email sent' });
     } catch (err) {
-      console.error(err);
+      logger.error({ err: err.message }, 'forgot_password: email send failed');
       // If email fails, wipe the token from the DB so they can try again
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
@@ -221,37 +287,39 @@ router.post('/forgot-password', async (req, res, next) => {
 
 // @route   PUT /api/auth/reset-password/:token
 // @desc    Verify token and save new password
-router.put('/reset-password/:token', async (req, res, next) => {
-  try {
-    // 1. Re-hash the token from the URL to match what is saved in the DB
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+router.put(
+  '/reset-password/:token',
+  validate({ params: schemas.resetTokenParam, body: schemas.resetPassword }),
+  async (req, res, next) => {
+    try {
+      // 1. Re-hash the token from the URL to match what is saved in the DB
+      const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
 
-    // 2. Find user by token AND ensure the token hasn't expired
-    const user = await User.findOne({
-      resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() } // $gt means "Greater Than" current time
-    });
+      // 2. Find user by token AND ensure the token hasn't expired
+      const user = await User.findOne({
+        resetPasswordToken,
+        resetPasswordExpire: { $gt: Date.now() } // $gt means "Greater Than" current time
+      });
 
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired token' });
-    }
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid or expired token' });
+      }
 
-    // 3. Check password strength (re-using the validation logic from your register route)
-    if (!req.body.password || !isValidPassword(req.body.password)) {
-      return res.status(400).json({ message: 'Password does not meet security requirements.' });
-    }
+      // 3. The password has already been validated by the zod schema; we
+      //    can rely on it being 8+ chars with upper/lower/digit.
 
-    // 4. Hash the new password and update user
-    user.passwordHash = await bcrypt.hash(req.body.password, 10);
-    
-    // 5. Clear the reset fields so the token can't be reused
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save();
+      // 4. Hash the new password and update user
+      user.passwordHash = await bcrypt.hash(req.body.password, 10);
 
-    res.status(200).json({ message: 'Password successfully reset. You may now log in.' });
-  } catch (error) { next(error); }
-});
+      // 5. Clear the reset fields so the token can't be reused
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+
+      res.status(200).json({ message: 'Password successfully reset. You may now log in.' });
+    } catch (error) { next(error); }
+  },
+);
 
 module.exports = router;
 

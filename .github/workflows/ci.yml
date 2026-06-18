@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck-and-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: backend
+            install: cd backend && npm ci
+            script: cd backend && npm run lint
+          - app: frontend
+            install: cd frontend && npm ci
+            # The frontend has no `test` script; `typecheck` is the only real
+            # gate. `lint` runs eslint.
+            script: |
+              cd frontend
+              npm run typecheck
+              npm run lint
+          - app: website
+            install: cd website && npm ci
+            # The website's next.config.ts sets typescript.ignoreBuildErrors,
+            # so we run `tsc --noEmit` explicitly here — `next build` would
+            # hide type errors. `lint` runs eslint.
+            script: |
+              cd website
+              npx tsc --noEmit
+              npm run lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            website/package-lock.json
+      - name: Install (${{ matrix.app }})
+        run: ${{ matrix.install }}
+      - name: Typecheck + lint (${{ matrix.app }})
+        run: ${{ matrix.script }}

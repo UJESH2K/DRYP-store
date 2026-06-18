@@ -37,13 +37,26 @@ const UserSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
-    passwordHash: { type: String, required: true },
+    // passwordHash is required for email/password accounts; SSO
+    // users (Phase 4B: Google sign-in) have no password.
+    passwordHash: { type: String, required: false },
+    googleId: { type: String, index: true, sparse: true, unique: true },
+    authProvider: {
+      type: String,
+      enum: ["password", "google"],
+      default: "password",
+    },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },
     paymentMethods: { type: [PaymentMethodSchema], default: [] },
     role: { type: String, enum: ["user", "vendor", "admin"], default: "user" },
     isActive: { type: Boolean, default: true },
+    // Soft-delete fields — used by DELETE /api/users/me. We
+    // anonymize rather than hard-delete so historical orders
+    // and reviews keep a stable reference.
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date },
     likedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
     preferences: {
       currency: { type: String, default: "USD" },
@@ -53,6 +66,15 @@ const UserSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    // Expo push tokens, one per (token, platform) pair. We keep
+    // them as a list so a user can have an iPhone, an Android,
+    // and a tablet all registered at once.
+    pushTokens: [{
+      token: { type: String, required: true },
+      platform: { type: String, enum: ['ios', 'android', 'web'], required: true },
+      appVersion: { type: String },
+      registeredAt: { type: Date, default: Date.now },
+    }],
   },
   { timestamps: true },
 );

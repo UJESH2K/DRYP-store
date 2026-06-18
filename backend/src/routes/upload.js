@@ -2,71 +2,55 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { protect } = require('../middleware/auth');
+const { requireVendor } = require('../middleware/requireRole');
+const storage = require('../utils/storageProvider');
 
 const router = express.Router();
 
-// Ensure the uploads directory exists
+// Ensure the uploads directory exists (used by the local-disk
+// storage backend; harmless in S3 mode).
 const uploadDir = path.join(__dirname, '../../public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Set up storage engine for multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
-// Check file type
-function checkFileType(file, cb) {
-  const filetypes = /jpeg|jpg|png|gif/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb('Error: Images Only!');
-  }
-}
-
+// Phase 2A: memory storage so we can route the buffer to either the
+// local disk or S3 via the storageProvider.
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10000000 }, // 10MB limit
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
+    const filetypes = /jpeg|jpg|png|gif/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype && extname) return cb(null, true);
+    cb('Error: Images Only!');
   },
-}).single('image'); // 'image' is the name of the form field
+}).single('image');
 
 // @route   POST /api/upload
-// @desc    Upload an image
+// @desc    Upload an image. Routes the buffer to local disk or S3
+//          based on STORAGE_PROVIDER env. Returns a public URL.
 // @access  Private (Vendor only)
-router.post('/', protect, (req, res) => {
-  if (req.user.role !== 'vendor') {
-    return res.status(403).json({ message: 'Forbidden: Only vendors can upload images.' });
-  }
+router.post('/', requireVendor, (req, res) => {
+  upload(req, res, async (err) => {
+    if (err) return res.status(400).json({ message: typeof err === 'string' ? err : err.message });
+    if (!req.file) return res.status(400).json({ message: 'Error: No File Selected!' });
 
-  upload(req, res, (err) => {
-    if (err) {
-      res.status(400).json({ message: err });
-    } else {
-      if (req.file == undefined) {
-        res.status(400).json({ message: 'Error: No File Selected!' });
-      } else {
-        // Construct the URL to be returned
-        const fileUrl = `/uploads/${req.file.filename}`;
-        res.status(200).json({
-          message: 'Image Uploaded Successfully!',
-          url: fileUrl,
-        });
-      }
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const key = `image-${uniqueSuffix}${path.extname(req.file.originalname)}`;
+
+    const result = await storage.put(req.file.buffer, key, req.file.mimetype);
+    if (!result.ok) {
+      return res.status(502).json({ message: 'Storage provider failed: ' + result.error });
     }
+
+    res.status(200).json({
+      message: 'Image Uploaded Successfully!',
+      url: result.url,
+      key: result.key,
+      provider: result.provider,
+    });
   });
 });
 

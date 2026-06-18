@@ -3,8 +3,13 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { identifyUser, protect } = require('../middleware/auth');
+const { requireVendor } = require('../middleware/requireRole');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/orders');
 const router = express.Router();
 const Cart = require('../models/Cart');
+const stockCheck = require('../utils/stockCheck');
+const reservation = require('../utils/stockReservation');
 
 
 // @route   POST /api/orders
@@ -29,6 +34,17 @@ router.post('/', protect, async (req, res, next) => {
     
     if (productsInCart.length !== new Set(productIds).size) {
         return res.status(400).json({ message: 'One or more items in your cart are no longer available.' });
+    }
+
+    // Phase 3B: pre-check stock (DB + active holds + optional live
+    // Shopify check). Fail 409 with per-line details so the client
+    // can adjust quantities or remove the item.
+    const stockResult = await stockCheck.validate(items, productsInCart);
+    if (!stockResult.ok) {
+      return res.status(409).json({
+        message: 'Some items are out of stock',
+        issues: stockResult.issues,
+      });
     }
 
     const productMap = productsInCart.reduce((acc, product) => {
@@ -101,7 +117,7 @@ router.post('/', protect, async (req, res, next) => {
 
     for (const item of items) {
       const quantityToDeduct = Math.abs(parseInt(item.quantity) || 1); // Ensure it's a positive number
-      
+
       if (item.options && item.options.size) {
         await Product.updateOne(
           { _id: item.productId, "variants.options.Size": item.options.size },
@@ -113,6 +129,11 @@ router.post('/', protect, async (req, res, next) => {
           { $inc: { stock: -quantityToDeduct } }
         );
       }
+
+      // Phase 4A: release the reservation. The deduction above is
+      // permanent; the hold is what the cart was using. After this
+      // point the order owns the stock, not the hold.
+      reservation.release(item.productId, item.options || {});
     }
     
     res.status(201).json(savedOrders);
@@ -141,11 +162,8 @@ router.get('/mine', identifyUser, async (req, res, next) => {
 // @route   GET /api/orders/vendor
 // @desc    Get all orders for the logged-in vendor
 // @access  Private (Vendor only)
-router.get('/vendor', protect, async (req, res, next) => {
+router.get('/vendor', requireVendor, async (req, res, next) => {
     try {
-        if (req.user.role !== 'vendor') {
-            return res.status(403).json({ message: 'Forbidden: Only vendors can access this route' });
-        }
         const orders = await Order.find({ 'items.vendor': req.user._id })
             .populate('user', 'name email')
             .populate('items.product', 'name sku')
@@ -173,7 +191,7 @@ router.get('/by-number/:orderNumber', protect, async (req, res, next) => {
 // @route   GET /api/orders/:id
 // @desc    Get a single order by ID
 // @access  Private
-router.get('/:id', protect, async (req, res, next) => {
+router.get('/:id', validate({ params: schemas.idParam }), protect, async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id).populate('items.product', 'name images brand');
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -181,6 +199,85 @@ router.get('/:id', protect, async (req, res, next) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
     res.json(order);
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/orders/:id/cancel
+// @desc    Cancel an order (only the buyer, only before shipping).
+//          Restores stock. Writes a tracking-history entry.
+// @access  Private
+router.post('/:id/cancel', validate({ params: schemas.idParam }), protect, async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const cancellable = ['pending', 'confirmed', 'processing'];
+    if (!cancellable.includes(order.status)) {
+      return res.status(409).json({
+        message: `Order in status "${order.status}" can no longer be cancelled`,
+      });
+    }
+    const Product = require('../models/Product');
+    for (const item of order.items) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+    }
+    order.cancelledReason = (req.body && req.body.reason) || 'Cancelled by customer';
+    order.status = 'cancelled';
+    // pre('save') hook sets cancelledAt and pushes a tracking entry.
+    await order.save();
+    res.json({ ok: true, order });
+  } catch (error) { next(error); }
+});
+
+// @route   POST /api/orders/:id/track
+// @desc    Add a tracking event to an order (vendor or admin).
+// @access  Private (vendor)
+router.post('/:id/track', validate({ params: schemas.idParam }), requireVendor, async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    // Vendor can only update their own orders. Admins can update any.
+    if (req.user.role !== 'admin' && order.items[0]?.vendor?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const { status, note } = req.body || {};
+    if (!status) return res.status(400).json({ message: 'status is required' });
+    const previous = order.status;
+    order.status = status;
+    // The pre('save') hook will append to trackingHistory and set
+    // deliveredAt/cancelledAt automatically. We pass the note and
+    // by-user through transient fields so the hook can pick them up.
+    order._pendingTrackingNote = note || '';
+    order._pendingTrackingBy = req.user._id;
+    await order.save();
+
+    // Notify the buyer when status changes to something the
+    // customer cares about. We deliberately do NOT notify on
+    // every status change — only on the meaningful milestones.
+    const notifyOn = ['shipped', 'out_for_delivery', 'delivered'];
+    if (notifyOn.includes(status) && previous !== status && order.user) {
+      try {
+        const { sendPush } = require('../utils/pushNotifications');
+        const titles = {
+          shipped: 'Your order shipped',
+          out_for_delivery: 'Out for delivery',
+          delivered: 'Delivered',
+        };
+        await sendPush([order.user], {
+          title: titles[status] || 'Order update',
+          body: note || `Order #${order.orderNumber || order._id} is now ${status}`,
+          data: { url: `/orders/${order._id}`, orderId: String(order._id) },
+          sound: 'default',
+        });
+      } catch (e) {
+        // Push delivery is best-effort; the route should not fail
+        // just because the notification couldn't be sent.
+        console.warn('[orders/track] push failed:', e?.message);
+      }
+    }
+    res.json({ ok: true, order });
   } catch (error) { next(error); }
 });
 

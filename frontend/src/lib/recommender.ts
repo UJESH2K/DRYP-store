@@ -47,32 +47,6 @@ export async function initRecommender() {
   await loadProfile()
 }
 
-// Cold start + category filter + diverse seed ordering
-export async function getInitialItems(): Promise<Item[]> {
-  const selectedCategoriesJson = await AsyncStorage.getItem('categories:selected')
-  const selectedCategories: string[] = selectedCategoriesJson ? JSON.parse(selectedCategoriesJson) : []
-
-  const source = selectedCategories.length
-    ? ITEMS.filter(i => selectedCategories.includes(i.category))
-    : ITEMS
-
-  // Cold start: mix categories for diversity
-  const byCategory: Record<string, Item[]> = {}
-  for (const it of source) {
-    byCategory[it.category] = byCategory[it.category] || []
-    byCategory[it.category].push(it)
-  }
-  const maxLen = Math.max(...Object.values(byCategory).map(a => a.length)) || 0
-  const mixed: Item[] = []
-  for (let i = 0; i < maxLen; i++) {
-    for (const cat of Object.keys(byCategory)) {
-      const arr = byCategory[cat]
-      if (arr[i]) mixed.push(arr[i])
-    }
-  }
-  return mixed.length ? mixed : source
-}
-
 function scoreItem(item: Item): number {
   let s = 0
   // tags
@@ -173,4 +147,39 @@ export function updateModel(action: 'like' | 'dislike' | 'cart', item: Item) {
 // Utility to mark that an item was viewed
 export function onItemViewed(item: Item) {
   recordEvent('view', item)
+}
+
+/**
+ * recordInteraction — single entry point for the swipe stack.
+ *
+ * Updates the on-device recommender profile (which feeds the
+ * ranker) AND the persistent interaction store (which survives
+ * a refresh and is used by the home feed). Use this from the
+ * card UI instead of calling the two functions separately.
+ */
+export function recordInteraction(
+  action: 'view' | 'like' | 'dislike' | 'cart' | 'purchase',
+  item: Item,
+) {
+  if (action === 'view') {
+    onItemViewed(item)
+  } else if (action === 'dislike') {
+    updateModel('dislike', item)
+  } else {
+    recordEvent(action === 'cart' ? 'cart' : action, item)
+  }
+  // Fire-and-forget the persistent log. The recommender's in-memory
+  // profile is the fast path; the store is the durable one.
+  import('../state/interactions').then(({ useInteractionStore }) => {
+    useInteractionStore.getState().pushInteraction({
+      itemId: String(item.id),
+      action,
+      at: Date.now(),
+      tags: item.tags || [],
+      priceTier: item.priceTier,
+      brand: item.brand,
+      category: item.category,
+      color: item.colors?.[0],
+    })
+  })
 }

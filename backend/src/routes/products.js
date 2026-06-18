@@ -1,21 +1,32 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
 const Product = require('../models/Product');
-const Cart = require('../models/Cart'); 
-const WishlistItem = require('../models/WishlistItem'); 
-const Like = require('../models/Like'); 
-const { protect } = require('../middleware/auth');
+const Cart = require('../models/Cart');
+const WishlistItem = require('../models/WishlistItem');
+const Like = require('../models/Like');
+const { requireVendor } = require('../middleware/requireRole');
+const { parseAndValidate } = require('../utils/excelImport');
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/products');
 const router = express.Router();
+
+// Phase 3A: in-memory upload for Excel import. 5MB cap, xlsx/xls/csv only.
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(xlsx|xls|csv)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Only .xlsx, .xls, .csv allowed'), ok);
+  },
+});
 
 // @route   POST /api/products
 // @desc    Create a new product
 // @access  Private (Vendor only)
-router.post('/', protect, async (req, res, next) => {
+router.post('/', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can create products' });
-    }
     const productData = { ...req.body, vendor: req.user._id };
     const product = await Product.create(productData);
     res.status(201).json(product);
@@ -53,6 +64,32 @@ router.get('/', async (req, res, next) => {
     res.json(products);
   } catch (error) {
     next(error);
+  }
+});
+
+// @route   POST /api/products/import
+// @desc    Bulk-import products from an Excel/CSV file (Phase 3A).
+//          Vendor-only. Always returns 200 with per-row results so the
+//          client can render "imported N, failed M" without a 4xx.
+// @access  Private (Vendor only)
+//   form-data: file=<binary>, dryRun=true|false
+router.post('/import', requireVendor, importUpload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded. Use form-data "file".' });
+    }
+    const dryRun = String(req.body.dryRun || 'false').toLowerCase() === 'true';
+    const result = await parseAndValidate(req.file.buffer, req.user._id, { dryRun });
+    const okCount = result.rows.filter((r) => r.ok).length;
+    res.json({
+      total: result.rows.length,
+      imported: okCount,
+      failed: result.errors.length,
+      dryRun,
+      rows: result.rows,
+    });
+  } catch (e) {
+    next(e);
   }
 });
 
@@ -144,12 +181,8 @@ router.get('/suggestions', async (req, res, next) => {
 // @route   PUT /api/products/:id
 // @desc    Update a product
 // @access  Private (Vendor only)
-router.put('/:id', protect, async (req, res, next) => {
+router.put('/:id', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can edit products' });
-    }
-
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -157,7 +190,7 @@ router.put('/:id', protect, async (req, res, next) => {
 
     // Ensure the user updating the product is the one who created it
     if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to edit this product' });
+      return res.status(403).json({ message: 'Not authorized to edit this product' });
     }
 
     const { name, description, brand, category, tags, basePrice, options, variants, images } = req.body;
@@ -181,19 +214,15 @@ router.put('/:id', protect, async (req, res, next) => {
 // @route   DELETE /api/products/:id
 // @desc    Delete a product and all its associated data
 // @access  Private (Vendor only)
-router.delete('/:id', protect, async (req, res, next) => {
+router.delete('/:id', requireVendor, async (req, res, next) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ message: 'Forbidden: Only vendors can delete products' });
-    }
-
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
     if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to delete this product' });
+      return res.status(403).json({ message: 'Not authorized to delete this product' });
     }
 
     product.isActive = false;
@@ -211,10 +240,53 @@ router.delete('/:id', protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/trending
+// @desc    Trending products — most-liked in the last 7 days.
+//          Falls back to highest-rated if there aren't enough
+//          recent likes. Returns up to 20.
+// @access  Public
+//
+// IMPORTANT: this route MUST be declared before `/:id` so
+// Express's first-match-wins routing doesn't interpret
+// "trending" as a product id.
+router.get('/trending', async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+    const windowMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const since = new Date(Date.now() - windowMs);
+
+    const Like = require('../models/Like');
+    const recent = await Like.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: '$product', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit },
+    ]);
+
+    let products;
+    if (recent.length >= 2) {
+      const ids = recent.map((r) => r._id);
+      products = await Product.find({ _id: { $in: ids }, isActive: true })
+        .select('name brand basePrice images rating category');
+      // Preserve the trending order from the aggregation.
+      const order = new Map(ids.map((id, i) => [String(id), i]));
+      products.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+    } else {
+      // Not enough recent signal — fall back to highest-rated
+      // products, weighted by review count.
+      products = await Product.find({ isActive: true })
+        .select('name brand basePrice images rating reviews category')
+        .sort({ rating: -1, reviews: -1 })
+        .limit(limit);
+    }
+    res.json(products);
+  } catch (error) { next(error); }
+});
+
 // @route   GET /api/products/:id
 // @desc    Get a single product by ID
 // @access  Public
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', validate({ params: schemas.idParam }), async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id).populate('vendor', 'name');
     if (!product) {

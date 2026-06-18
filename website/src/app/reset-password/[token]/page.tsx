@@ -81,21 +81,21 @@ const ResetPasswordPage = () => {
           
           <div className="text-center mb-12">
             <h1 className="font-editorial text-4xl md:text-5xl font-light tracking-tight mb-4">
-              New <span className="font-cursive text-5xl md:text-6xl lowercase text-gray-400">credentials</span>
+              Create New <span className="font-cursive text-5xl md:text-6xl lowercase text-gray-400">Password</span>
             </h1>
             <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-gray-500">
-              Enter your new security phrase
+              Choose a new password for your account
             </p>
           </div>
 
           {status === "success" ? (
             <div className="border border-black p-8 text-center space-y-6">
-              <p className="font-editorial text-xl">Access Restored</p>
+              <p className="font-editorial text-xl">Password Reset!</p>
               <p className="font-sans text-xs tracking-widest text-gray-500 leading-relaxed">
-                Your password has been successfully reset. You may now log in to the portal.
+                Your password has been updated. You can now log in.
               </p>
               <Link href="/login" className="block w-full bg-black text-white py-4 font-sans text-[10px] uppercase tracking-[0.3em] hover:bg-gray-800 transition-colors">
-                Proceed to Login
+                Go to Login
               </Link>
             </div>
           ) : (
@@ -137,7 +137,7 @@ const ResetPasswordPage = () => {
                 disabled={status === "loading"}
                 className="w-full border border-black bg-black text-white py-4 font-sans text-[10px] uppercase tracking-[0.3em] hover:bg-transparent hover:text-black transition-colors disabled:opacity-50"
               >
-                {status === "loading" ? "Processing..." : "Commit Credentials"}
+                {status === "loading" ? "Processing..." : "Save New Password"}
               </button>
             </form>
           )}

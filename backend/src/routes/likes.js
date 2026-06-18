@@ -4,6 +4,8 @@ const Product = require('../models/Product');
 const { identifyUser } = require('../middleware/auth'); // Use identifyUser
 const mongoose = require('mongoose');
 const router = express.Router();
+const { validate } = require('../middleware/validate');
+const schemas = require('../schemas/cart');
 
 // @route   GET /api/likes
 // @desc    Get all products liked by the current user or guest
@@ -61,7 +63,7 @@ router.post('/:productId', identifyUser, async (req, res, next) => {
 // @route   DELETE /api/likes/:productId
 // @desc    Unlike a product
 // @access  Public / Private
-router.delete('/:productId', identifyUser, async (req, res, next) => {
+router.delete('/:productId', validate({ params: schemas.productIdParam }), identifyUser, async (req, res, next) => {
   try {
     const { productId } = req.params;
     const userId = req.user ? req.user._id : null;

@@ -110,3 +110,12 @@ Here are some features and improvements planned for the future:
 ---
 
 This project is under active development. New features and improvements are being added regularly.
+
+---
+
+## 📍 Roadmap
+
+See **[`docs/ROADMAP.md`](docs/ROADMAP.md)** for the phase-by-phase plan, including
+the iOS App Store submission checklist, the bug-fix queue, and the UX pass.
+
+For codebase conventions and architecture, see **[`CLAUDE.md`](CLAUDE.md)**.

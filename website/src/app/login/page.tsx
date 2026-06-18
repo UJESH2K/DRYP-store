@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+import { apiCall } from "@/lib/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -50,20 +49,76 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/vendors/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to authenticate");
-      }
+      // apiCall throws ApiError on non-2xx and on missing-config, with
+      // the server's `{ message }` in `error.message`. It also handles
+      // malformed/HTML responses internally so we never get a JSON
+      // parse error here.
+      const data = await apiCall<{ user: any; token: string }>(
+        "/api/vendors/login",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        },
+      );
 
       login(data.user, data.token);
-    } catch (error) {
-      setServerError(error.message);
+    } catch (error: any) {
+      setServerError(error.message || "Failed to authenticate");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Phase 4B: Google sign-in.
+   *
+   * The website uses Google's "render-button" + `google.accounts.id`
+   * library loaded as a one-time script tag. When the user picks an
+   * account, the library returns an `id_token` (a JWT). We POST it
+   * to `/api/auth/google` and the backend verifies + signs the user
+   * in.
+   *
+   * If the Google script isn't loaded yet (e.g. the user is offline),
+   * we surface a friendly error. We do not silently fall back to
+   * email/password — that would mask a real config issue.
+   */
+  const handleGoogleSignIn = async () => {
+    setServerError("");
+    const google = (window as any).google;
+    if (!google?.accounts?.id) {
+      setServerError(
+        "Google sign-in is not available. Please use email and password.",
+      );
+      return;
+    }
+    setIsLoading(true);
+    try {
+      // Use the popup callback flow. We wrap the deprecated
+      // `prompt()` notification with a one-shot callback.
+      const idToken: string = await new Promise((resolve, reject) => {
+        google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          callback: (resp: any) => {
+            if (resp?.credential) resolve(resp.credential);
+            else reject(new Error("No credential returned"));
+          },
+        });
+        google.accounts.id.prompt((notif: any) => {
+          if (notif?.isNotDisplayed() || notif?.isSkippedMoment()) {
+            reject(new Error("Google sign-in was closed"));
+          }
+        });
+      });
+      const data = await apiCall<{ user: any; token: string }>(
+        "/api/auth/google",
+        {
+          method: "POST",
+          body: JSON.stringify({ idToken }),
+        },
+      );
+      login(data.user, data.token);
+    } catch (error: any) {
+      setServerError(error.message || "Google sign-in failed");
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +130,7 @@ export default function LoginPage() {
     return (
       <div className="mb-6 border-l border-black bg-white p-4 text-sm tracking-wide shadow-sm">
         <p className="font-editorial italic text-black text-base mb-1">
-          Access Denied
+          Login Failed
         </p>
         <p className="text-gray-500 font-light text-xs mt-1">{serverError}</p>
       </div>
@@ -144,10 +199,10 @@ export default function LoginPage() {
           <div className="max-w-[380px] w-full mx-auto lg:mx-0">
             <div className="mb-10 space-y-2">
               <h3 className="font-editorial text-5xl font-normal tracking-tight text-black">
-                Access the Studio
+                Welcome Back
               </h3>
               <p className="font-cursive text-4xl text-gray-500">
-                Authenticate your dossier
+                Log in to your studio
               </p>
             </div>
 
@@ -168,13 +223,13 @@ export default function LoginPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.email ? "border-red-300" : ""
                     }`}
-                    placeholder="Studio Email"
+                    placeholder="Email"
                   />
                   <label
                     htmlFor="email-address"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Studio Email
+                    Email
                   </label>
                   {fieldErrors.email && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
@@ -196,13 +251,13 @@ export default function LoginPage() {
                     className={`peer w-full border-b border-gray-200 bg-transparent pb-2 pt-1 text-base tracking-widest text-black placeholder-transparent transition-all focus:border-black focus:outline-none ${
                       fieldErrors.password ? "border-red-300" : ""
                     }`}
-                    placeholder="Security Key"
+                    placeholder="Password"
                   />
                   <label
                     htmlFor="password"
                     className="absolute left-0 -top-4 text-[10px] tracking-[0.2em] text-gray-400 transition-all peer-placeholder-shown:top-1 peer-placeholder-shown:text-sm peer-placeholder-shown:tracking-wider peer-focus:-top-4 peer-focus:text-[10px] peer-focus:tracking-[0.2em] peer-focus:text-black uppercase"
                   >
-                    Security Key
+                    Password
                   </label>
                   {fieldErrors.password && (
                     <span className="absolute right-0 -top-4 text-[10px] text-red-500 uppercase tracking-widest">
@@ -229,20 +284,44 @@ export default function LoginPage() {
                 >
                   <div className="absolute inset-0 h-full w-full translate-x-[-100%] bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
                   <span className="relative z-10 transition-colors duration-500">
-                    {isLoading ? "Authenticating..." : "Enter the Studio"}
+                    {isLoading ? "Authenticating..." : "Log In"}
                   </span>
                 </button>
               </div>
             </form>
 
+            <div className="mt-8 flex items-center gap-4">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-gray-400">
+                or
+              </span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="mt-6 w-full flex items-center justify-center gap-3 border border-gray-300 bg-white px-6 py-3 font-sans text-sm font-medium uppercase tracking-[0.18em] text-[#1a1a1a] transition hover:bg-gray-50 disabled:opacity-50"
+              aria-label="Continue with Google"
+            >
+              <span
+                aria-hidden
+                className="font-serif font-bold text-lg leading-none text-[#4285F4]"
+              >
+                G
+              </span>
+              <span>Continue with Google</span>
+            </button>
+
             <div className="mt-10 text-center">
               <p className="font-editorial text-sm italic text-gray-500">
-                Not curated yet?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
-                  href="/signup"
+                  href="/apply"
                   className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors ml-2"
                 >
-                  Apply Here
+                  Apply first
                 </Link>
               </p>
             </div>

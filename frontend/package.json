@@ -9,7 +9,10 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:ios": "node scripts/check-ios-readiness.mjs",
+    "check:ios:launch": "node scripts/check-ios-launch.mjs",
+    "test:deeplink": "node scripts/test-deep-link-handler.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
@@ -21,11 +24,14 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@types/lodash": "^4.17.20",
     "expo": "~54.0.0",
+    "expo-build-properties": "~1.0.9",
     "expo-constants": "~18.0.13",
     "expo-font": "~14.0.11",
     "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.11",
+    "expo-notifications": "~0.32.0",
+    "expo-device": "~8.0.0",
     "expo-router": "~6.0.23",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",

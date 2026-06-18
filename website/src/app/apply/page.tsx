@@ -61,21 +61,37 @@ const ApplicationPage = () => {
           
           <div className="text-center mb-12">
             <h1 className="font-editorial text-4xl md:text-5xl font-light tracking-tight mb-4">
-              Studio <span className="font-cursive text-5xl md:text-6xl lowercase text-gray-400">application</span>
+              Apply to <span className="font-cursive text-5xl md:text-6xl lowercase text-gray-400">DRYP</span>
             </h1>
-            <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-gray-500 leading-relaxed mt-4">
-              Submit your dossier for review. <br/> Access is strictly curated.
-            </p>
+            <div className="flex items-center justify-center gap-4 mb-10">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.2em] text-black">Step 1</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] bg-black text-white">1</div>
+                <span className="text-[9px] tracking-[0.15em] mt-1 text-black">Apply</span>
+              </div>
+              <span className="text-gray-300 text-lg">→</span>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.2em] text-gray-400">Step 2</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] border border-gray-300 text-gray-400">2</div>
+                <span className="text-[9px] tracking-[0.15em] mt-1 text-gray-400">Approval</span>
+              </div>
+              <span className="text-gray-300 text-lg">→</span>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.2em] text-gray-400">Step 3</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] border border-gray-300 text-gray-400">3</div>
+                <span className="text-[9px] tracking-[0.15em] mt-1 text-gray-400">Account</span>
+              </div>
+            </div>
           </div>
 
           {status === "success" ? (
             <div className="border border-black p-8 text-center space-y-6">
-              <p className="font-editorial text-xl">Dossier Received</p>
+              <p className="font-editorial text-xl">Application Submitted!</p>
               <p className="font-sans text-xs tracking-widest text-gray-500 leading-relaxed">
-                Your application has been added to the archive for review. You will receive an electronic transmission once a decision has been made.
+                We&apos;ll review your application and email you within 1-2 business days. Once approved, come back to create your account.
               </p>
               <Link href="/" className="block w-full bg-black text-white py-4 font-sans text-[10px] uppercase tracking-[0.3em] hover:bg-gray-800 transition-colors">
-                Return to Surface
+                Back to Home
               </Link>
             </div>
           ) : (
@@ -83,7 +99,7 @@ const ApplicationPage = () => {
               
               <div>
                 <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">
-                  Studio / Brand Name
+                  Studio Name
                 </label>
                 <input
                   type="text"
@@ -97,7 +113,7 @@ const ApplicationPage = () => {
 
               <div>
                 <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">
-                  Contact Email
+                  Email
                 </label>
                 <input
                   type="email"
@@ -111,7 +127,7 @@ const ApplicationPage = () => {
 
               <div>
                 <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">
-                  Digital Footprint (URL)
+                  Website or Instagram
                 </label>
                 <input
                   type="url"
@@ -123,7 +139,7 @@ const ApplicationPage = () => {
                   required
                 />
                 <p className="font-sans text-[8px] uppercase tracking-[0.1em] text-gray-400 mt-2">
-                  Link your portfolio, Instagram, or current storefront.
+                  Share a link to your work
                 </p>
               </div>
 
@@ -138,12 +154,12 @@ const ApplicationPage = () => {
                 disabled={status === "loading"}
                 className="w-full border border-black bg-black text-white py-4 font-sans text-[10px] uppercase tracking-[0.3em] hover:bg-transparent hover:text-black transition-colors disabled:opacity-50"
               >
-                {status === "loading" ? "Transmitting..." : "Submit Application"}
+                {status === "loading" ? "Submitting..." : "Submit Application"}
               </button>
 
               <div className="text-center pt-4 border-t border-gray-200">
                 <Link href="/login" className="font-sans text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors">
-                  Already approved? Login here
+                  Already have an account? Log in
                 </Link>
               </div>
             </form>

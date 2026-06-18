@@ -30,6 +30,11 @@ interface AuthState {
   initGuestUser: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<User | null>;
   login: (email: string, password: string) => Promise<User | null>;
+  // Phase 4B: Google sign-in. The idToken comes from
+  // expo-auth-session / expo-google-sign-in on the client; the
+  // backend verifies it with Google and returns the same
+  // { token, user } as the email/password flow.
+  signInWithGoogle: (idToken: string) => Promise<User | null>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (user: User) => Promise<void>;
@@ -130,6 +135,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false });
     }
   },
+
+  signInWithGoogle: async (idToken) => {
+    const { apiCall } = require('../lib/api');
+    set({ isLoading: true });
+    try {
+      const guestId = get().guestId;
+      const response = await apiCall('/api/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ idToken, guestId }),
+      });
+      if (response && response.token) {
+        const { token, user } = response;
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        await AsyncStorage.setItem('user_token', token);
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await AsyncStorage.removeItem('guest_id');
+        // Refresh the wishlist for the new account.
+        try {
+          const wl = await apiCall('/api/wishlist');
+          if (Array.isArray(wl)) {
+            const items = wl.filter((it: any) => it && it.product).map((it: any) => it.product);
+            useWishlistStore.getState().setWishlist(items);
+          }
+        } catch (_) { /* non-fatal */ }
+        useToastStore.getState().showToast('Signed in with Google.');
+        return user;
+      }
+      useToastStore.getState().showToast(response?.message || 'Google sign-in failed.', 'error');
+      return null;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      useToastStore.getState().showToast('Google sign-in failed. Please try again.', 'error');
+      return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
   
   logout: async () => {
     set({ isLoading: true });
@@ -149,29 +191,60 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadUser: async () => {
     const { apiCall } = require('../lib/api'); // LAZY REQUIRE
     set({ isLoading: true });
+
+    // Hydrate the wishlist from disk FIRST. If anything below fails on a
+    // network blip, the persisted wishlist still shows up.
+    if (!useWishlistStore.getState().hydrated) {
+      await useWishlistStore.getState().hydrate();
+    }
+
+    let token: string | null = null;
+    let userData: string | null = null;
     try {
-      const token = await AsyncStorage.getItem('user_token');
-      const userData = await AsyncStorage.getItem('user_data');
-      if (token && userData) {
-        const user = JSON.parse(userData);
-        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
-        
-        const wishlistItems = await apiCall('/api/wishlist');
-        if (Array.isArray(wishlistItems)) {
-          const validWishlistProducts = wishlistItems
-            .filter(item => item && item.product)
-            .map(item => item.product);
+      token = await AsyncStorage.getItem('user_token');
+      userData = await AsyncStorage.getItem('user_data');
+    } catch (e) {
+      console.warn('Failed to read auth from storage', e);
+    }
+
+    if (!token || !userData) {
+      // Genuinely no auth → guest.
+      await get().initGuestUser();
+      set({ isLoading: false });
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userData);
+      set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+    } catch (e) {
+      console.error('Corrupt user_data in storage; clearing it.', e);
+      // The token is real but the user blob is corrupt. Don't silently downgrade
+      // a real user to a guest — clear the corrupt blob so the next login
+      // can rehydrate properly. Token still works on the server.
+      await AsyncStorage.removeItem('user_data').catch(() => {});
+      set({ isLoading: false });
+      return;
+    }
+
+    // Best-effort wishlist sync. A failure here MUST NOT touch the local
+    // wishlist (which is now persisted to AsyncStorage). The persisted list
+    // stays put; the user can retry by pulling-to-refresh later.
+    try {
+      const wishlistItems = await apiCall('/api/wishlist');
+      if (Array.isArray(wishlistItems) && wishlistItems.length > 0) {
+        const validWishlistProducts = wishlistItems
+          .filter(item => item && item.product)
+          .map(item => item.product);
+        if (validWishlistProducts.length > 0) {
           useWishlistStore.getState().setWishlist(validWishlistProducts);
         }
-      } else {
-        await get().initGuestUser();
       }
-    } catch (error) {
-      console.error('Error loading user:', error);
-      await get().initGuestUser(); // Fallback to guest session on error
-    } finally {
-      set({ isLoading: false });
+    } catch (e) {
+      console.warn('Wishlist refresh failed; keeping local list', e);
     }
+
+    set({ isLoading: false });
   },
 
   updateUser: async (user: User) => {

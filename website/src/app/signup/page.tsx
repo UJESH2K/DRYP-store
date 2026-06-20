@@ -4,7 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+const parseApiResponse = async (res: Response) => {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+
+  const text = await res.text();
+  throw new Error(
+    `API returned non-JSON response (${res.status}). Check backend server and API URL configuration. Received: ${text.slice(0, 80)}...`,
+  );
+};
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -70,7 +82,7 @@ export default function SignupPage() {
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
       if (!res.ok) {
         throw new Error(data.message || "Failed to sign up");
       }
@@ -88,6 +100,9 @@ export default function SignupPage() {
     const isUserExistsError = serverError
       .toLowerCase()
       .includes("already exists");
+    const isApprovalRequiredError = serverError
+      .toLowerCase()
+      .includes("must be approved");
 
     return (
       <div className="mb-6 border-l border-black bg-white p-4 text-sm tracking-wide shadow-sm">
@@ -102,6 +117,18 @@ export default function SignupPage() {
               className="font-normal text-black underline underline-offset-4 hover:text-gray-400 transition-colors"
             >
               Sign in here
+            </Link>
+            .
+          </p>
+        ) : isApprovalRequiredError ? (
+          <p className="text-gray-500 font-light text-xs mt-1">
+            This email is not yet approved for studio access. Submit an
+            application first{" "}
+            <Link
+              href="/apply"
+              className="font-normal text-black underline underline-offset-4 hover:text-gray-400 transition-colors"
+            >
+              here
             </Link>
             .
           </p>

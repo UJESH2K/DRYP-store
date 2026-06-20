@@ -28,10 +28,22 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const vendorSignupLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, 
-  max: 3, 
-  message: { message: "Too many studio applications from this IP, please try again later" },
+  max: isProduction ? 5 : 50,
+  message: { message: "Too many signup attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const vendorApplyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 5 : 20,
+  message: { message: "Too many studio applications from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 const app = express();
@@ -71,6 +83,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/vendors/register", vendorSignupLimiter);
+app.use("/api/vendors/apply", vendorApplyLimiter);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -107,7 +120,8 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
       ),
     );
   } catch (error) {
-    console.warn("Starting server without database connection:", error.message);
+    console.error("Failed to start server:", error.message);
+    process.exitCode = 1;
   }
 })();
 

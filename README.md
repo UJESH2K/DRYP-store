@@ -66,7 +66,14 @@ You will need to create a `.env` file in both the `frontend` and `backend` direc
 ```env
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_super_secret_jwt_key
+AWS_REGION=your_aws_region
+AWS_BUCKET_NAME=your_s3_bucket_name
+AWS_ACCESS_KEY_ID=your_iam_access_key_id
+AWS_SECRET_ACCESS_KEY=your_iam_secret_access_key
+# Optional if you serve images from a custom CDN or bucket URL
+AWS_S3_PUBLIC_URL=https://your-public-bucket-url
 ```
+The upload API now sends images directly to S3, so the IAM user needs permission to `s3:PutObject` on the target bucket. If the bucket is private, use a public bucket policy, CloudFront, or set `AWS_S3_PUBLIC_URL` to the publicly reachable image base URL.
 > **Note on MongoDB Atlas:** If you are using MongoDB Atlas, make sure to whitelist your IP address to allow connections from your machine.
 
 **Frontend `.env` file (`/frontend/.env`):**

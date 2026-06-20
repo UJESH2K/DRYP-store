@@ -1,73 +1,145 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { protect } = require('../middleware/auth');
+const express = require("express");
+const path = require("path");
+const crypto = require("crypto");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const rateLimit = require("express-rate-limit");
+const { protect } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Ensure the uploads directory exists
-const uploadDir = path.join(__dirname, '../../public/uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const ALLOWED_EXTENSIONS = /jpeg|jpg|png|gif|webp/;
+const ALLOWED_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+
+const bucketName =
+  process.env.AWS_BUCKET_NAME || process.env.AWS_S3_BUCKET;
+const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
+const publicBaseUrl = process.env.AWS_S3_PUBLIC_URL;
+
+const s3Client =
+  bucketName && region ? new S3Client({ region }) : null;
+
+function buildPublicUrl(key) {
+  if (publicBaseUrl) {
+    return `${publicBaseUrl.replace(/\/$/, "")}/${encodeURI(key)}`;
+  }
+
+  return `https://${bucketName}.s3.${region}.amazonaws.com/${key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
 }
 
-// Set up storage engine for multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  },
+function buildKey(originalName) {
+  const fileExtension =
+    path.extname(originalName || "").toLowerCase() || ".jpg";
+  return `uploads/${Date.now()}-${crypto
+    .randomBytes(8)
+    .toString("hex")}${fileExtension}`;
+}
+
+// Stricter than the auth login limiter because each request mints a URL that
+// can be used to push arbitrary amounts of data to S3.
+const uploadPresignLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: { message: "Too many upload requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// Check file type
-function checkFileType(file, cb) {
-  const filetypes = /jpeg|jpg|png|gif/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb('Error: Images Only!');
+function assertS3Configured() {
+  if (!s3Client) {
+    const error = new Error(
+      "AWS S3 is not configured. Set AWS_BUCKET_NAME and AWS_REGION."
+    );
+    error.status = 503;
+    throw error;
   }
 }
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10000000 }, // 10MB limit
-  fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
-  },
-}).single('image'); // 'image' is the name of the form field
-
-// @route   POST /api/upload
-// @desc    Upload an image
-// @access  Private (Vendor only)
-router.post('/', protect, (req, res) => {
-  if (req.user.role !== 'vendor') {
-    return res.status(403).json({ message: 'Forbidden: Only vendors can upload images.' });
+function validateUploadPayload({ fileName, contentType, fileSize }) {
+  if (!fileName || typeof fileName !== "string") {
+    return "fileName is required";
   }
-
-  upload(req, res, (err) => {
-    if (err) {
-      res.status(400).json({ message: err });
-    } else {
-      if (req.file == undefined) {
-        res.status(400).json({ message: 'Error: No File Selected!' });
-      } else {
-        // Construct the URL to be returned
-        const fileUrl = `/uploads/${req.file.filename}`;
-        res.status(200).json({
-          message: 'Image Uploaded Successfully!',
-          url: fileUrl,
-        });
-      }
+  if (!contentType || !ALLOWED_CONTENT_TYPES.has(contentType)) {
+    return "contentType must be one of image/jpeg, image/png, image/gif, image/webp";
+  }
+  if (!ALLOWED_EXTENSIONS.test(path.extname(fileName).toLowerCase())) {
+    return "fileName must have a .jpg, .jpeg, .png, .gif, or .webp extension";
+  }
+  const maxBytes = 10 * 1024 * 1024;
+  if (fileSize !== undefined && fileSize !== null) {
+    const size = Number(fileSize);
+    if (!Number.isFinite(size) || size <= 0) {
+      return "fileSize must be a positive number";
     }
-  });
-});
+    if (size > maxBytes) {
+      return `fileSize must be <= ${maxBytes} bytes`;
+    }
+  }
+  return null;
+}
+
+// POST /api/upload/presign
+// Body: { fileName: string, contentType: string, fileSize?: number }
+// Returns: { url: string, key: string, publicUrl: string, expiresIn: number }
+router.post(
+  "/presign",
+  protect,
+  uploadPresignLimiter,
+  async (req, res, next) => {
+    try {
+      if (req.user.role !== "vendor") {
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Only vendors can upload images." });
+      }
+
+      try {
+        assertS3Configured();
+      } catch (configError) {
+        return res
+          .status(configError.status || 500)
+          .json({ message: configError.message });
+      }
+
+      const { fileName, contentType, fileSize } = req.body || {};
+      const validationError = validateUploadPayload({
+        fileName,
+        contentType,
+        fileSize,
+      });
+      if (validationError) {
+        return res.status(400).json({ message: validationError });
+      }
+
+      const key = buildKey(fileName);
+      const command = new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        ContentType: contentType,
+        CacheControl: "public, max-age=31536000, immutable",
+      });
+
+      const expiresIn = 60 * 5; // 5 minutes
+      const url = await getSignedUrl(s3Client, command, { expiresIn });
+
+      return res.status(200).json({
+        url,
+        key,
+        publicUrl: buildPublicUrl(key),
+        expiresIn,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 
 module.exports = router;

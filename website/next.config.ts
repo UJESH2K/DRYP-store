@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+const s3PublicUrl =
+  process.env.NEXT_PUBLIC_S3_PUBLIC_URL ||
+  "https://casa-app-s3.s3.ap-southeast-2.amazonaws.com";
+const s3RemoteUrl = new URL(s3PublicUrl);
+
 const nextConfig: NextConfig = {
   reactCompiler: true,
 
@@ -12,7 +17,7 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "localhost",
-        port: "8080", // ⬅️ Changed from 5000
+        port: "5000",
         pathname: "/**",
       },
       {
@@ -24,7 +29,12 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "plus.unsplash.com",
         pathname: "/**",
-      }
+      },
+      {
+        protocol: s3RemoteUrl.protocol.replace(":", ""),
+        hostname: s3RemoteUrl.hostname,
+        pathname: "/**",
+      },
     ],
   },
 
@@ -32,11 +42,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:8080/api/:path*", // ⬅️ Changed from 5000
+        destination: "http://localhost:5000/api/:path*",
       },
       {
         source: "/uploads/:path*",
-        destination: "http://localhost:8080/uploads/:path*", // ⬅️ Changed from 5000
+        destination: "http://localhost:5000/uploads/:path*",
       },
     ];
   },

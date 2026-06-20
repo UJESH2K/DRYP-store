@@ -4,7 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+const parseApiResponse = async (res: Response) => {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+
+  const text = await res.text();
+  throw new Error(
+    `API returned non-JSON response (${res.status}). Check backend server and API URL configuration. Received: ${text.slice(0, 80)}...`,
+  );
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -56,14 +68,14 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
       if (!res.ok) {
         throw new Error(data.message || "Failed to authenticate");
       }
 
       login(data.user, data.token);
     } catch (error) {
-      setServerError(error.message);
+      setServerError(error instanceof Error ? error.message : "Login failed");
     } finally {
       setIsLoading(false);
     }

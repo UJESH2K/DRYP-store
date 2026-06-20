@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import ImageCropper from "./ImageCropper";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 // --- Minimalist Editorial Input Components ---
 const Input = ({
@@ -94,10 +94,6 @@ const ProductForm = React.forwardRef(
       variantIndex: number;
       image: string;
     } | null>(null);
-    const [croppedImage, setCroppedImage] = useState<{
-      variantIndex: number;
-      file: File;
-    } | null>(null);
 
     const resetForm = () => {
       setFormData({
@@ -144,6 +140,77 @@ const ProductForm = React.forwardRef(
       setVariants(newVariants);
     };
 
+    const appendImageToVariant = (variantIndex: number, imageUrl: string) => {
+      setVariants((previousVariants) => {
+        const nextVariants = previousVariants.map((variant) => ({
+          ...variant,
+          images: [...variant.images],
+        }));
+
+        nextVariants[variantIndex].images.push(imageUrl);
+        return nextVariants;
+      });
+    };
+
+    const uploadImage = async (imageFile: File) => {
+      if (!token) {
+        throw new Error("You need to sign in again before uploading images.");
+      }
+
+      const presignResponse = await fetch(`${API_BASE_URL}/api/upload/presign`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fileName: imageFile.name,
+          contentType: imageFile.type,
+          fileSize: imageFile.size,
+        }),
+      });
+
+      const presignData = await presignResponse.json();
+      if (!presignResponse.ok) {
+        throw new Error(
+          presignData.message || "Failed to prepare image upload",
+        );
+      }
+
+      const uploadResponse = await fetch(presignData.url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": imageFile.type,
+        },
+        body: imageFile,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("S3 rejected the image upload");
+      }
+
+      return presignData.publicUrl || presignData.url.split("?")[0];
+    };
+
+    const uploadVariantImage = async (variantIndex: number, imageFile: File) => {
+      setIsUploading(true);
+      setFormStatus({ type: null, message: "" });
+
+      try {
+        const uploadedUrl = await uploadImage(imageFile);
+        appendImageToVariant(variantIndex, uploadedUrl);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Image processing error";
+        setFormStatus({
+          type: "error",
+          message: `Image processing error: ${message}`,
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    };
+
     const handleImageSelect = async (variantIndex, e) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
@@ -159,7 +226,7 @@ const ProductForm = React.forwardRef(
                 image: reader.result as string,
               });
             } else {
-              uploadImage(variantIndex, file);
+              void uploadVariantImage(variantIndex, file);
             }
           };
           img.src = event.target?.result as string;
@@ -171,42 +238,28 @@ const ProductForm = React.forwardRef(
     const handleCropComplete = async (croppedImageUrl: string) => {
       if (croppingImage) {
         const { variantIndex } = croppingImage;
-        const response = await fetch(croppedImageUrl);
-        const blob = await response.blob();
-        const file = new File([blob], "cropped-image.jpg", {
-          type: "image/jpeg",
-        });
-        setCroppedImage({ variantIndex, file });
-        setCroppingImage(null);
-      }
-    };
+        setIsUploading(true);
+        setFormStatus({ type: null, message: "" });
 
-    const uploadImage = async (variantIndex, imageFile) => {
-      setIsUploading(true);
-      setFormStatus({ type: null, message: "" });
-      const formData = new FormData();
-      formData.append("image", imageFile);
-
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/upload`, {
-          method: "POST",
-          body: formData,
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const data = await res.json();
-        if (res.ok && data.url) {
-          const newVariants = [...variants];
-          newVariants[variantIndex].images.push(data.url);
-          setVariants(newVariants);
-        } else {
-          throw new Error(data.message || "Image synchronization failed");
+        try {
+          const response = await fetch(croppedImageUrl);
+          const blob = await response.blob();
+          const file = new File([blob], "cropped-image.jpg", {
+            type: "image/jpeg",
+          });
+          const uploadedUrl = await uploadImage(file);
+          appendImageToVariant(variantIndex, uploadedUrl);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Image processing error";
+          setFormStatus({
+            type: "error",
+            message: `Image processing error: ${message}`,
+          });
+        } finally {
+          setCroppingImage(null);
+          setIsUploading(false);
         }
-      } catch (error) {
-        // Replaced alert with elegant status message
-        setFormStatus({ type: 'error', message: `Image processing error: ${error.message}` });
-      } finally {
-        setIsUploading(false);
       }
     };
 
@@ -231,11 +284,6 @@ const ProductForm = React.forwardRef(
     const handleSubmit = async (e) => {
       if (e) e.preventDefault();
       setFormStatus({ type: null, message: "" });
-
-      if (croppedImage) {
-        await uploadImage(croppedImage.variantIndex, croppedImage.file);
-        setCroppedImage(null);
-      }
 
       setIsSubmitting(true);
       const allVariantImages = variants.flatMap((v) => v.images);
@@ -364,7 +412,7 @@ const ProductForm = React.forwardRef(
           <ImageCropper
             image={croppingImage.image}
             onCropComplete={(croppedImageUrl) =>
-              handleCropComplete(croppedImageUrl)
+              void handleCropComplete(croppedImageUrl)
             }
             onCancel={() => setCroppingImage(null)}
           />

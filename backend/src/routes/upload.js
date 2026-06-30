@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, CreatePresignedPostCommand } = require("@aws-sdk/client-s3");
 const rateLimit = require("express-rate-limit");
 const { protect } = require("../middleware/auth");
 
@@ -19,82 +19,9 @@ const bucketName =
   process.env.AWS_BUCKET_NAME || process.env.AWS_S3_BUCKET;
 const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
 const publicBaseUrl = process.env.AWS_S3_PUBLIC_URL;
-const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
 
 const s3Client =
   bucketName && region ? new S3Client({ region }) : null;
-
-// Manual presigned URL generation - sign headers the browser will send
-function createPresignedUrl({ bucket, key, contentType, expiresIn = 300 }) {
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
-  const dateStamp = amzDate.substring(0, 8);
-
-  const host = `${bucket}.s3.${region}.amazonaws.com`;
-  const endpoint = `https://${host}/${key}`;
-
-  // Create canonical request
-  const algorithm = "AWS4-HMAC-SHA256";
-  const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
-
-  // Sign all headers that browser will send
-  const signedHeaders = "content-type;host";
-
-  // Create canonical request (PUT for upload)
-  const canonicalUri = `/${key}`;
-  const canonicalQuerystring = [
-    `X-Amz-Algorithm=${algorithm}`,
-    `X-Amz-Credential=${encodeURIComponent(`${accessKeyId}/${credentialScope}`)}`,
-    `X-Amz-Date=${amzDate}`,
-    `X-Amz-Expires=${expiresIn}`,
-    `X-Amz-SignedHeaders=${signedHeaders}`,
-    `x-id=PutObject`,
-  ].join("&");
-
-  // IMPORTANT: Headers must be in alphabetical order and end with newline
-  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\n`;
-
-  const canonicalRequest = [
-    "PUT",
-    canonicalUri,
-    canonicalQuerystring,
-    canonicalHeaders,
-    signedHeaders,
-    "UNSIGNED-PAYLOAD",
-  ].join("\n");
-
-  // Create string to sign
-  const hashedCanonicalRequest = crypto
-    .createHash("sha256")
-    .update(canonicalRequest)
-    .digest("hex");
-
-  const stringToSign = [
-    algorithm,
-    amzDate,
-    credentialScope,
-    hashedCanonicalRequest,
-  ].join("\n");
-
-  // Calculate signature
-  const kDate = crypto
-    .createHmac("sha256", `AWS4${secretAccessKey}`)
-    .update(dateStamp)
-    .digest();
-  const kRegion = crypto.createHmac("sha256", kDate).update(region).digest();
-  const kService = crypto.createHmac("sha256", kRegion).update("s3").digest();
-  const kSigning = crypto.createHmac("sha256", kService).update("aws4_request").digest();
-  const signature = crypto
-    .createHmac("sha256", kSigning)
-    .update(stringToSign)
-    .digest("hex");
-
-  // Build final URL
-  const signedUrl = `${endpoint}?${canonicalQuerystring}&X-Amz-Signature=${signature}`;
-
-  return signedUrl;
-}
 
 function buildPublicUrl(key) {
   if (publicBaseUrl) {
@@ -126,9 +53,9 @@ const uploadPresignLimiter = rateLimit({
 });
 
 function assertS3Configured() {
-  if (!s3Client || !accessKeyId || !secretAccessKey) {
+  if (!s3Client) {
     const error = new Error(
-      "AWS S3 is not configured. Set AWS_BUCKET_NAME, AWS_REGION, and AWS credentials."
+      "AWS S3 is not configured. Set AWS_BUCKET_NAME and AWS_REGION."
     );
     error.status = 503;
     throw error;
@@ -160,7 +87,7 @@ function validateUploadPayload({ fileName, contentType, fileSize }) {
 
 // POST /api/upload/presign
 // Body: { fileName: string, contentType: string, fileSize?: number }
-// Returns: { url: string, key: string, publicUrl: string, expiresIn: number }
+// Returns: { url: string, fields: object, key: string, publicUrl: string, expiresIn: number }
 router.post(
   "/presign",
   protect,
@@ -192,21 +119,26 @@ router.post(
       }
 
       const key = buildKey(fileName);
-      const expiresIn = 60 * 5; // 5 minutes
-
-      // Use manual presigning to avoid SDK adding checksum headers
-      const url = createPresignedUrl({
-        bucket: bucketName,
-        key: key,
-        contentType: contentType,
-        expiresIn,
+      const command = new CreatePresignedPostCommand({
+        Bucket: bucketName,
+        Key: key,
+        Expires: 300, // 5 minutes
+        Fields: {
+          "Content-Type": contentType,
+        },
+        Conditions: [
+          ["content-length-range", 1, 10 * 1024 * 1024],
+          ["eq", "$Content-Type", contentType],
+        ],
       });
+
+      const { url, fields } = await s3Client.send(command);
 
       return res.status(200).json({
         url,
+        fields,
         key,
         publicUrl: buildPublicUrl(key),
-        expiresIn,
       });
     } catch (error) {
       return next(error);

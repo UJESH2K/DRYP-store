@@ -22,7 +22,10 @@ const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
 const publicBaseUrl = process.env.AWS_S3_PUBLIC_URL;
 
 const s3Client =
-  bucketName && region ? new S3Client({ region }) : null;
+  bucketName && region ? new S3Client({
+    region,
+    checksumAlgorithm: null // Disable automatic checksums
+  }) : null;
 
 function buildPublicUrl(key) {
   if (publicBaseUrl) {
@@ -128,7 +131,9 @@ router.post(
       const expiresIn = 60 * 5; // 5 minutes
       const url = await getSignedUrl(s3Client, command, {
         expiresIn,
-        unsignableHeaders: new Set(['x-amz-checksum-crc32']),
+        // Include all headers that might be sent by the browser
+        signingRegion: region,
+        signingService: 's3',
       });
 
       return res.status(200).json({

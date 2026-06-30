@@ -25,8 +25,8 @@ const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
 const s3Client =
   bucketName && region ? new S3Client({ region }) : null;
 
-// Manual presigned URL generation without checksum headers
-function createPresignedUrl({ bucket, key, expiresIn = 300 }) {
+// Manual presigned URL generation - sign headers the browser will send
+function createPresignedUrl({ bucket, key, contentType, expiresIn = 300 }) {
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDate.substring(0, 8);
@@ -38,10 +38,10 @@ function createPresignedUrl({ bucket, key, expiresIn = 300 }) {
   const algorithm = "AWS4-HMAC-SHA256";
   const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
 
-  // Only sign the host header - no checksum headers
-  const signedHeaders = "host";
+  // Sign all headers that browser will send
+  const signedHeaders = "content-type;host";
 
-  // Create canonical request (GET for presigned URL)
+  // Create canonical request (PUT for upload)
   const canonicalUri = `/${key}`;
   const canonicalQuerystring = [
     `X-Amz-Algorithm=${algorithm}`,
@@ -52,11 +52,14 @@ function createPresignedUrl({ bucket, key, expiresIn = 300 }) {
     `x-id=PutObject`,
   ].join("&");
 
+  // IMPORTANT: Headers must be in alphabetical order and end with newline
+  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\n`;
+
   const canonicalRequest = [
     "PUT",
     canonicalUri,
     canonicalQuerystring,
-    `host:${host}`,
+    canonicalHeaders,
     signedHeaders,
     "UNSIGNED-PAYLOAD",
   ].join("\n");
@@ -195,6 +198,7 @@ router.post(
       const url = createPresignedUrl({
         bucket: bucketName,
         key: key,
+        contentType: contentType,
         expiresIn,
       });
 

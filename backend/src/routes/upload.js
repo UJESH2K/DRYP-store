@@ -126,7 +126,10 @@ router.post(
       });
 
       const expiresIn = 60 * 5; // 5 minutes
-      const url = await getSignedUrl(s3Client, command, { expiresIn });
+      const url = await getSignedUrl(s3Client, command, {
+        expiresIn,
+        unsignableHeaders: new Set(['x-amz-checksum-crc32']),
+      });
 
       return res.status(200).json({
         url,

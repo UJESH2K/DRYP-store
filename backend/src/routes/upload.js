@@ -123,8 +123,6 @@ router.post(
       const command = new PutObjectCommand({
         Bucket: bucketName,
         Key: key,
-        ContentType: contentType,
-        CacheControl: "public, max-age=31536000, immutable",
       });
 
       const expiresIn = 60 * 5; // 5 minutes

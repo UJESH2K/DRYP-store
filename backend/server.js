@@ -48,6 +48,9 @@ const vendorApplyLimiter = rateLimit({
 
 const app = express();
 
+// Trust proxy (needed for rate limiting behind nginx reverse proxy)
+app.set('trust proxy', 1);
+
 // Middlewares
 // app.use(cors());
 app.use(

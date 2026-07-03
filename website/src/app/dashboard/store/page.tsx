@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeShopDomain } from "@/lib/shopify";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 interface Vendor {
-  _id?: string; 
+  _id?: string;
   owner?: string; // Added owner reference
   name?: string;
   description?: string;
@@ -21,6 +22,22 @@ interface Vendor {
     zipCode?: string;
     country?: string;
   };
+  shopify?: {
+    shopDomain?: string;
+    importStatus?: "not_connected" | "pending" | "importing" | "completed" | "failed";
+    importError?: string;
+    lastImportedAt?: string;
+  };
+}
+
+interface ShopifyImportStatus {
+  shopify?: Vendor["shopify"];
+  import?: {
+    status?: string;
+    productsImported?: number;
+    objectCount?: number;
+    error?: string;
+  } | null;
 }
 
 const StoreProfilePage = () => {
@@ -36,11 +53,52 @@ const StoreProfilePage = () => {
   const [formData, setFormData] = useState<Vendor>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  // Shopify Integration States
+  const [shopifyStatus, setShopifyStatus] = useState<ShopifyImportStatus | null>(null);
+  const [showShopifyInput, setShowShopifyInput] = useState(false);
+  const [shopDomain, setShopDomain] = useState("");
+  const [shopifyError, setShopifyError] = useState("");
+
   useEffect(() => {
-    if (!token) return; 
+    if (!token) return;
     fetchVendorProfile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const fetchShopifyStatus = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vendors/me/shopify-import`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setShopifyStatus(await res.json());
+    } catch (err) {
+      console.error("Failed to fetch Shopify import status:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!token || !vendor) return;
+    fetchShopifyStatus();
+
+    const importStatus = shopifyStatus?.shopify?.importStatus;
+    if (importStatus === "pending" || importStatus === "importing") {
+      const interval = setInterval(fetchShopifyStatus, 5000);
+      return () => clearInterval(interval);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, vendor, shopifyStatus?.shopify?.importStatus]);
+
+  const handleShopifyConnect = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    const domain = normalizeShopDomain(shopDomain);
+    if (!domain) {
+      setShopifyError("Enter a valid Shopify domain, e.g. your-store.myshopify.com");
+      return;
+    }
+    window.location.href = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=web&token=${encodeURIComponent(token)}`;
+  };
 
   const fetchVendorProfile = async () => {
     setLoading(true);
@@ -309,6 +367,90 @@ const StoreProfilePage = () => {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Shopify Integration */}
+              <div className="mt-4">
+                <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 mb-6 pb-2 border-b border-gray-100">
+                  Shopify Integration
+                </p>
+                {(() => {
+                  const importStatus = shopifyStatus?.shopify?.importStatus || "not_connected";
+                  if (importStatus === "not_connected") {
+                    return showShopifyInput ? (
+                      <form onSubmit={handleShopifyConnect} className="space-y-3">
+                        <input
+                          type="text"
+                          value={shopDomain}
+                          onChange={(e) => {
+                            setShopDomain(e.target.value);
+                            setShopifyError("");
+                          }}
+                          placeholder="your-store.myshopify.com"
+                          autoFocus
+                          className={`w-full border-b bg-transparent py-2 text-sm focus:outline-none transition-colors ${
+                            shopifyError ? "border-red-300 focus:border-red-400" : "border-gray-300 focus:border-black"
+                          }`}
+                        />
+                        {shopifyError && (
+                          <p className="text-[9px] text-red-500 uppercase tracking-widest">{shopifyError}</p>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={!shopDomain.trim()}
+                          className="w-full border border-black bg-black py-3 font-sans text-[10px] font-medium uppercase tracking-[0.3em] text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
+                        >
+                          Connect Store
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        onClick={() => setShowShopifyInput(true)}
+                        className="w-full border border-black bg-transparent py-3 font-sans text-[10px] font-medium uppercase tracking-[0.3em] text-black hover:bg-black hover:text-white transition-colors"
+                      >
+                        Connect Shopify Store
+                      </button>
+                    );
+                  }
+
+                  const badgeText: Record<string, string> = {
+                    pending: "Queued",
+                    importing: "Importing…",
+                    completed: "Synced",
+                    failed: "Import Failed",
+                  };
+
+                  return (
+                    <div className="space-y-2">
+                      <span className="font-sans text-sm tracking-widest text-black">
+                        {shopifyStatus?.shopify?.shopDomain}
+                      </span>
+                      <div>
+                        <span
+                          className={`inline-block font-sans text-[9px] uppercase tracking-widest px-3 py-1 border ${
+                            importStatus === "completed"
+                              ? "border-black text-black"
+                              : importStatus === "failed"
+                                ? "border-red-400 text-red-500"
+                                : "border-gray-300 text-gray-500 animate-pulse"
+                          }`}
+                        >
+                          {badgeText[importStatus] || importStatus}
+                        </span>
+                      </div>
+                      {importStatus === "completed" && shopifyStatus?.import?.productsImported !== undefined && (
+                        <p className="font-sans text-xs text-gray-400">
+                          {shopifyStatus.import.productsImported} products imported
+                        </p>
+                      )}
+                      {importStatus === "failed" && (
+                        <p className="font-sans text-xs text-red-500">
+                          {shopifyStatus?.import?.error || shopifyStatus?.shopify?.importError}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Show address section if they have at least a street or a city */}

@@ -97,6 +97,12 @@ export default function DashboardPage() {
               >
                 Update Profile
               </Link>
+              <Link
+                href="/dashboard/catalog-import"
+                className="border-b border-gray-300 pb-1 font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-black hover:border-black transition-colors"
+              >
+                Import Catalog
+              </Link>
             </div>
           </div>
 

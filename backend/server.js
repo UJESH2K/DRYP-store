@@ -7,6 +7,7 @@ const connectDatabase = require("./src/config/database");
 
 // Route imports
 const authRoutes = require("./src/routes/auth");
+const shopifyAuthRoutes = require("./src/routes/shopifyAuth");
 const productRoutes = require("./src/routes/products");
 const vendorRoutes = require("./src/routes/vendors");
 const orderRoutes = require("./src/routes/orders");
@@ -42,6 +43,14 @@ const vendorApplyLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: isProduction ? 5 : 20,
   message: { message: "Too many studio applications from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const shopifyAuthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -84,7 +93,9 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/vendors/register", vendorSignupLimiter);
 app.use("/api/vendors/apply", vendorApplyLimiter);
+app.use("/api/auth/shopify", shopifyAuthLimiter);
 
+app.use("/api/auth/shopify", shopifyAuthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/vendors", vendorRoutes);
@@ -113,7 +124,11 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
 (async () => {
   try {
     await connectDatabase(process.env.MONGO_URI);
-    
+
+    const agenda = require("./src/config/agenda");
+    require("./src/jobs/shopifyImport")(agenda);
+    await agenda.start();
+
     app.listen(PORT, "0.0.0.0", () =>
     console.log(
         `Server running on port ${PORT} and accessible from all interfaces`,

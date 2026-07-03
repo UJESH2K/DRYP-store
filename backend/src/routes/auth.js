@@ -8,6 +8,7 @@ const Order = require('../models/Order');
 const router = express.Router();
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
+const { protect } = require('../middleware/auth');
 
 const isValidPassword = (password) => {
   const rules = [
@@ -102,6 +103,13 @@ router.post('/login', async (req, res, next) => {
     
     res.json({ token, user });
   } catch (error) { next(error); }
+});
+
+// @route   GET /api/auth/me
+// @desc    Hydrate the logged-in user from a bearer token (e.g. after an OAuth redirect
+//          that only carries a token, not a full user object)
+router.get('/me', protect, async (req, res) => {
+  res.json({ user: req.user });
 });
 
 // @route   POST /api/auth/forgot-password

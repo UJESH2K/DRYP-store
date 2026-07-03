@@ -1,6 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const multer = require("multer");
 const Vendor = require("../models/Vendor");
 const User = require("../models/User");
 const Product = require("../models/Product");
@@ -8,7 +10,38 @@ const { protect } = require("../middleware/auth");
 const router = express.Router();
 const mongoose = require("mongoose");
 const VendorApplication = require("../models/VendorApplication");
+const ShopifyImport = require("../models/ShopifyImport");
 const sendEmail = require("../utils/sendEmail");
+const {
+  parseCatalogFile,
+  groupRowsIntoProducts,
+  buildProductBulkOps,
+} = require("../utils/catalogImport");
+
+const MAX_CATALOG_FILE_SIZE_MB = 20;
+const catalogUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_CATALOG_FILE_SIZE_MB * 1024 * 1024 },
+});
+
+// Wraps multer's single-file middleware so size/type errors come back as a
+// clean 400 with a helpful message instead of falling through to the generic
+// 500 error handler (multer errors aren't `instanceof Error` in a way that
+// carries a `.status`, so they'd otherwise be reported as server errors).
+const catalogUploadSingle = (req, res, next) => {
+  catalogUpload.single("file")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          message: `File is too large. Maximum size is ${MAX_CATALOG_FILE_SIZE_MB}MB.`,
+        });
+      }
+      return res.status(400).json({ message: err.message });
+    }
+    if (err) return next(err);
+    next();
+  });
+};
 
 // @route   POST /api/vendors/apply
 // @desc    Submit a studio application to the waitlist
@@ -305,6 +338,98 @@ router.put("/me", protect, async (req, res, next) => {
   }
 });
 
+// @route   POST /api/vendors/me/catalog-preview
+// @desc    Vendor: Parse an uploaded spreadsheet into draft products for review (no DB writes)
+// @access  Private (Vendor only)
+router.post(
+  "/me/catalog-preview",
+  protect,
+  catalogUploadSingle,
+  async (req, res, next) => {
+    try {
+      if (req.user.role !== "vendor") {
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Only vendors can access this route" });
+      }
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ message: "No file uploaded (expected field name 'file')." });
+      }
+
+      const rows = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { products, skippedRows } = groupRowsIntoProducts(rows);
+      res.json({ products, skippedRows });
+    } catch (error) {
+      if (error.status) return res.status(error.status).json({ message: error.message });
+      next(error);
+    }
+  },
+);
+
+// @route   POST /api/vendors/me/catalog-import
+// @desc    Vendor: Commit reviewed products into their own catalog
+// @access  Private (Vendor only)
+router.post("/me/catalog-import", protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== "vendor") {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: Only vendors can access this route" });
+    }
+
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ message: "Vendor profile not found for this user" });
+    }
+
+    const { products } = req.body;
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ message: "No products to import." });
+    }
+
+    const ops = buildProductBulkOps(vendor, products);
+    await Product.bulkWrite(ops);
+    res.json({ imported: ops.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   GET /api/vendors/me/shopify-import
+// @desc    Get the logged-in vendor's Shopify connection + latest import status
+// @access  Private (Vendor only)
+router.get("/me/shopify-import", protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== "vendor") {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: Only vendors can access this route" });
+    }
+
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ message: "Vendor profile not found for this user" });
+    }
+
+    const latestImport = await ShopifyImport.findOne({ vendor: vendor._id }).sort({
+      createdAt: -1,
+    });
+
+    res.json({
+      shopify: vendor.shopify,
+      import: latestImport,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/vendors/:id
 router.get("/:id", async (req, res, next) => {
   try {
@@ -324,6 +449,132 @@ router.get("/:id/products", async (req, res, next) => {
       isActive: true,
     });
     res.json(products);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/vendors/admin/onboard
+// @desc    Admin: Create a vendor account on a brand's behalf, skipping the
+//          application/approval flow, and email them a link to claim it
+// @access  Private (Admin Only)
+router.post("/admin/onboard", protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== "admin")
+      return res.status(403).json({ message: "Admins only." });
+
+    const { name, email, description, phone, website } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ message: "name and email are required." });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ message: "A user with this email already exists." });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    let user;
+    let vendor;
+    try {
+      const createdUsers = await User.create(
+        [{ name, email, role: "vendor", authProvider: "invited" }],
+        { session },
+      );
+      user = createdUsers[0];
+
+      const createdVendors = await Vendor.create(
+        [{ name, email, description, phone, website, owner: user._id }],
+        { session },
+      );
+      vendor = createdVendors[0];
+
+      await session.commitTransaction();
+    } catch (transactionError) {
+      await session.abortTransaction();
+      throw transactionError;
+    } finally {
+      session.endSession();
+    }
+
+    // Reuse the forgot-password token pattern (see /api/auth/forgot-password) so
+    // the vendor claims their account through the existing reset-password page,
+    // just with a longer expiry since this isn't a time-sensitive security reset.
+    const claimToken = crypto.randomBytes(20).toString("hex");
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(claimToken)
+      .digest("hex");
+    user.resetPasswordExpire = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    await user.save();
+
+    const frontendUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
+    const claimUrl = `${frontendUrl}/reset-password/${claimToken}`;
+
+    await sendEmail({
+      email: user.email,
+      subject: "DRYP: Your Studio Account Is Ready",
+      message: `A DRYP studio account has been created for ${name}. Set your password to claim it: ${claimUrl}`,
+    });
+
+    res.status(201).json({ vendor });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/vendors/admin/catalog-preview
+// @desc    Admin: Parse an uploaded spreadsheet into draft products for review (no DB writes)
+// @access  Private (Admin Only)
+router.post(
+  "/admin/catalog-preview",
+  protect,
+  catalogUploadSingle,
+  async (req, res, next) => {
+    try {
+      if (req.user.role !== "admin")
+        return res.status(403).json({ message: "Admins only." });
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ message: "No file uploaded (expected field name 'file')." });
+      }
+
+      const rows = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { products, skippedRows } = groupRowsIntoProducts(rows);
+      res.json({ products, skippedRows });
+    } catch (error) {
+      if (error.status) return res.status(error.status).json({ message: error.message });
+      next(error);
+    }
+  },
+);
+
+// @route   POST /api/vendors/admin/:vendorId/catalog-import
+// @desc    Admin: Commit reviewed products into a vendor's catalog
+// @access  Private (Admin Only)
+router.post("/admin/:vendorId/catalog-import", protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== "admin")
+      return res.status(403).json({ message: "Admins only." });
+
+    const vendor = await Vendor.findById(req.params.vendorId);
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+
+    const { products } = req.body;
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ message: "No products to import." });
+    }
+
+    const ops = buildProductBulkOps(vendor, products);
+    await Product.bulkWrite(ops);
+    res.json({ imported: ops.length });
   } catch (error) {
     next(error);
   }

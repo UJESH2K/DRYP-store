@@ -42,7 +42,14 @@ const ProductSchema = new mongoose.Schema({
   rating: { type: Number, default: 0 },
   reviews: { type: Number, default: 0 },
   likes: { type: Number, default: 0 },
+
+  // Provenance (for products imported from external sources like Shopify)
+  externalId: { type: String, index: true },
+  source: { type: String, enum: ['dryp', 'shopify', 'manual_import'], default: 'dryp' },
 }, { timestamps: true });
+
+// Re-importing from the same external source should update, not duplicate, a product.
+ProductSchema.index({ vendor: 1, externalId: 1 }, { unique: true, sparse: true });
 
 // Ensure that for a given product, each variant has a unique combination of options
 ProductSchema.path('variants').validate(function(variants) {

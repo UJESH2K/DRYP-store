@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeShopDomain } from "@/lib/shopify";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -23,6 +24,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [showShopifyInput, setShowShopifyInput] = useState(false);
+  const [shopDomain, setShopDomain] = useState("");
+  const [shopifyError, setShopifyError] = useState("");
 
   const [fieldErrors, setFieldErrors] = useState({
     email: "",
@@ -79,6 +83,16 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleShopifyConnect = (e: React.FormEvent) => {
+    e.preventDefault();
+    const domain = normalizeShopDomain(shopDomain);
+    if (!domain) {
+      setShopifyError("Enter a valid Shopify domain, e.g. your-store.myshopify.com");
+      return;
+    }
+    window.location.href = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=web`;
   };
 
   const renderServerError = () => {
@@ -246,6 +260,50 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
+
+            <div className="mt-8 flex items-center gap-4">
+              <span className="h-[1px] flex-1 bg-gray-200" />
+              <span className="text-[9px] uppercase tracking-[0.2em] text-gray-400">Or</span>
+              <span className="h-[1px] flex-1 bg-gray-200" />
+            </div>
+
+            <div className="mt-6">
+              {!showShopifyInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowShopifyInput(true)}
+                  className="w-full border border-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-black transition-colors hover:bg-black hover:text-white"
+                >
+                  Continue with Shopify
+                </button>
+              ) : (
+                <form onSubmit={handleShopifyConnect} className="space-y-3">
+                  <input
+                    type="text"
+                    value={shopDomain}
+                    onChange={(e) => {
+                      setShopDomain(e.target.value);
+                      setShopifyError("");
+                    }}
+                    placeholder="your-store.myshopify.com"
+                    autoFocus
+                    className={`w-full border-b bg-transparent pb-2 pt-1 text-base text-black placeholder-gray-300 transition-all focus:outline-none ${
+                      shopifyError ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-black"
+                    }`}
+                  />
+                  {shopifyError && (
+                    <p className="text-[10px] text-red-500 uppercase tracking-widest">{shopifyError}</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!shopDomain.trim()}
+                    className="w-full bg-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-white transition-colors hover:bg-zinc-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    Connect Store
+                  </button>
+                </form>
+              )}
+            </div>
 
             <div className="mt-10 text-center">
               <p className="font-editorial text-sm italic text-gray-500">

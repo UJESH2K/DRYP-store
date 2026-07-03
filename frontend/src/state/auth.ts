@@ -30,6 +30,7 @@ interface AuthState {
   initGuestUser: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<User | null>;
   login: (email: string, password: string) => Promise<User | null>;
+  loginWithToken: (token: string) => Promise<User | null>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (user: User) => Promise<void>;
@@ -131,6 +132,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
   
+  // Hydrates the auth store from a DRYP JWT minted by a backend OAuth redirect
+  // (e.g. after the Shopify OAuth callback), which only carries a token.
+  loginWithToken: async (token: string) => {
+    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+    set({ isLoading: true, token });
+    try {
+      const response = await apiCall('/api/auth/me');
+
+      if (response && response.user) {
+        const { user } = response;
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        await AsyncStorage.setItem('user_token', token);
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await AsyncStorage.removeItem('guest_id');
+
+        const wishlistItems = await apiCall('/api/wishlist');
+        if (Array.isArray(wishlistItems)) {
+          const validWishlistProducts = wishlistItems
+            .filter(item => item && item.product)
+            .map(item => item.product);
+          useWishlistStore.getState().setWishlist(validWishlistProducts);
+        }
+
+        useToastStore.getState().showToast('Logged in successfully!');
+        return user;
+      } else {
+        set({ token: null });
+        useToastStore.getState().showToast('Failed to complete Shopify login.', 'error');
+        return null;
+      }
+    } catch (error) {
+      set({ token: null });
+      console.error('Error completing Shopify login:', error);
+      useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
+      return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   logout: async () => {
     set({ isLoading: true });
     try {

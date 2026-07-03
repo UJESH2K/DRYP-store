@@ -37,7 +37,13 @@ const UserSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
-    passwordHash: { type: String, required: true },
+    passwordHash: {
+      type: String,
+      required: function () {
+        return this.authProvider === "local";
+      },
+    },
+    authProvider: { type: String, enum: ["local", "shopify", "invited"], default: "local" },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },

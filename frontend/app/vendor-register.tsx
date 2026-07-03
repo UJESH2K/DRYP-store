@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { normalizeShopDomain } from '@/lib/shopify';
 import {
   View,
   Text,
@@ -11,16 +12,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../src/state/auth';
 import { apiCall } from '../src/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VendorHeader } from '../src/components/vendor/Header';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+
 export default function VendorRegisterScreen() {
   const router = useCustomRouter();
   const { user, token, ...authActions } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [showShopifyInput, setShowShopifyInput] = useState(false);
+  const [shopDomain, setShopDomain] = useState('');
+  const [shopifyError, setShopifyError] = useState('');
 
   // User details
   const [ownerName, setOwnerName] = useState('');
@@ -79,6 +86,16 @@ export default function VendorRegisterScreen() {
 
   const handleSocialLogin = (provider: string) => {
     Alert.alert('Coming Soon', `Login with ${provider} is not available yet.`);
+  };
+
+  const handleShopifyConnect = async () => {
+    const domain = normalizeShopDomain(shopDomain);
+    if (!domain) {
+      setShopifyError('Enter a valid Shopify domain, e.g. your-store.myshopify.com');
+      return;
+    }
+    const startUrl = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=mobile`;
+    await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
   };
 
   return (
@@ -140,6 +157,34 @@ export default function VendorRegisterScreen() {
           <Pressable style={styles.socialButton} onPress={() => handleSocialLogin('Apple')}>
             <Text style={styles.socialButtonText}>Continue with Apple</Text>
           </Pressable>
+
+          {showShopifyInput ? (
+            <View>
+              <TextInput
+                style={styles.input}
+                placeholder="your-store.myshopify.com"
+                value={shopDomain}
+                onChangeText={(text) => {
+                  setShopDomain(text);
+                  setShopifyError('');
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable
+                style={[styles.registerButton, !shopDomain.trim() && styles.disabledButton]}
+                onPress={handleShopifyConnect}
+                disabled={!shopDomain.trim()}
+              >
+                <Text style={styles.registerButtonText}>Connect Shopify Store</Text>
+              </Pressable>
+            </View>
+            {shopifyError ? <Text style={styles.errorText}>{shopifyError}</Text> : null}
+          ) : (
+            <Pressable style={styles.socialButton} onPress={() => setShowShopifyInput(true)}>
+              <Text style={styles.socialButtonText}>Continue with Shopify</Text>
+            </Pressable>
+          )}
         </View>
 
         <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -185,6 +230,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Zaloga',
   },
   disabledButton: { backgroundColor: '#cccccc' },
+  errorText: { color: '#ef4444', fontSize: 11, fontFamily: 'Zaloga', marginTop: -4, textTransform: 'uppercase', letterSpacing: 0.5 },
   backButton: { marginTop: 16, alignItems: 'center' },
   backButtonText: { color: '#666666', fontFamily: 'Zaloga' },
   socialLoginContainer: {

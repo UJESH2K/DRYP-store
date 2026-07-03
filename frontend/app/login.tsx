@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { normalizeShopDomain } from '@/lib/shopify';
+import { normalizeShopifyDomain } from '@/lib/shopify';
 import {
   View,
   Text,
@@ -13,8 +15,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
 import { FontAwesome } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../src/state/auth';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
 
 export default function LoginScreen() {
   const router = useCustomRouter();
@@ -22,7 +27,10 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+  const [showShopifyInput, setShowShopifyInput] = useState(false);
+  const [shopDomain, setShopDomain] = useState('');
+  const [shopifyError, setShopifyError] = useState('');
+
   const { login, register, isLoading } = useAuthStore();
 
   const handleAuthAction = async () => {
@@ -51,6 +59,18 @@ export default function LoginScreen() {
 
   const handleSocialLogin = (provider: string) => {
     Alert.alert('Coming Soon', `Login with ${provider} is not available yet.`);
+  };
+
+  const handleShopifyConnect = async () => {
+    const domain = normalizeShopDomain(shopDomain);
+    if (!domain) {
+      setShopifyError('Enter a valid Shopify domain, e.g. your-store.myshopify.com');
+      return;
+    }
+    const startUrl = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=mobile`;
+    // Opens Shopify's authorize page; the OS intercepts the final redirect to
+    // dryp://oauth-callback, which app/oauth-callback.tsx handles.
+    await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
   };
 
   const handleSkip = () => {
@@ -141,6 +161,36 @@ export default function LoginScreen() {
               <FontAwesome name="apple" size={24} color="black" />
             </Pressable>
           </View>
+
+          {showShopifyInput ? (
+            <View style={styles.shopifyInputRow}>
+              <TextInput
+                style={[styles.input, styles.shopifyInput]}
+                placeholder="your-store.myshopify.com"
+                value={shopDomain}
+                onChangeText={(text) => {
+                  setShopDomain(text);
+                  setShopifyError('');
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable
+                style={styles.primaryButton}
+                onPress={handleShopifyConnect}
+                disabled={!shopDomain.trim()}
+              >
+                <Text style={styles.primaryButtonText}>Connect Shopify Store</Text>
+              </Pressable>
+            </View>
+            {shopifyError ? (
+              <Text style={styles.errorText}>{shopifyError}</Text>
+            ) : null}
+          ) : (
+            <Pressable style={styles.toggleButton} onPress={() => setShowShopifyInput(true)}>
+              <Text style={styles.toggleButtonText}>Continue with Shopify</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.footer}>
@@ -264,6 +314,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 10,
   },
+  shopifyInputRow: {
+    marginTop: 15,
+  },
+  shopifyInput: {
+    marginBottom: 8,
+  },
   footer: {
     paddingBottom: 20,
   },
@@ -285,6 +341,14 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 16,
     fontFamily: 'Zaloga',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontFamily: 'Zaloga',
+    marginTop: -4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   terms: {
     fontSize: 12,

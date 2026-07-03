@@ -2,7 +2,6 @@
 
 import { Product } from "@/types/Product";
 import React, { useState, useImperativeHandle, useEffect } from "react";
-import Image from "next/image";
 
 import { useAuth } from "@/contexts/AuthContext";
 import ImageCropper from "./ImageCropper";
@@ -617,12 +616,11 @@ const ProductForm = React.forwardRef(
                             key={imgIndex}
                             className="group relative w-24 h-32 md:w-32 md:h-40 bg-gray-100 overflow-hidden border border-gray-200"
                           >
-                            <Image
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
                               src={imgUrl}
                               alt="Variant preview"
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 96px, 128px"
+                              className="absolute inset-0 h-full w-full object-cover"
                             />
 
                             {(!isSubmitting && formStatus.type !== 'success') && (

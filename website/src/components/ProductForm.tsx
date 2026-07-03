@@ -176,12 +176,18 @@ const ProductForm = React.forwardRef(
         );
       }
 
+      // Use FormData for presigned POST (not PUT)
+      const formData = new FormData();
+      if (presignData.fields) {
+        Object.entries(presignData.fields).forEach(([key, value]) => {
+          formData.append(key, value as string);
+        });
+      }
+      formData.append("file", imageFile);
+
       const uploadResponse = await fetch(presignData.url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": imageFile.type,
-        },
-        body: imageFile,
+        method: "POST",
+        body: formData,
       });
 
       if (!uploadResponse.ok) {

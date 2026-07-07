@@ -1,7 +1,8 @@
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
-const { S3Client, CreatePresignedPostCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const rateLimit = require("express-rate-limit");
 const { protect } = require("../middleware/auth");
 
@@ -87,7 +88,7 @@ function validateUploadPayload({ fileName, contentType, fileSize }) {
 
 // POST /api/upload/presign
 // Body: { fileName: string, contentType: string, fileSize?: number }
-// Returns: { url: string, fields: object, key: string, publicUrl: string, expiresIn: number }
+// Returns: { url: string, key: string, publicUrl: string, expiresIn: number }
 router.post(
   "/presign",
   protect,
@@ -119,26 +120,27 @@ router.post(
       }
 
       const key = buildKey(fileName);
-      const command = new CreatePresignedPostCommand({
+      const command = new PutObjectCommand({
         Bucket: bucketName,
         Key: key,
-        Expires: 300, // 5 minutes
-        Fields: {
-          "Content-Type": contentType,
-        },
-        Conditions: [
-          ["content-length-range", 1, 10 * 1024 * 1024],
-          ["eq", "$Content-Type", contentType],
-        ],
+        ContentType: contentType,
+        CacheControl: "public, max-age=31536000, immutable",
       });
 
-      const { url, fields } = await s3Client.send(command);
+      const expiresIn = 60 * 5;
+  const url = await getSignedUrl(s3Client, command, { expiresIn });
+      const getCommand = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      });
+      const viewUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 60 * 15 });
 
       return res.status(200).json({
         url,
-        fields,
         key,
         publicUrl: buildPublicUrl(key),
+        viewUrl,
+        expiresIn,
       });
     } catch (error) {
       return next(error);

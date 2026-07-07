@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
+import { getPrimaryProductImage, getRenderableImageUrl } from "@/lib/imageUrls";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -369,9 +370,9 @@ const AdminApplicationsPage = () => {
                     {vendorProducts.map((product) => (
                       <div key={product._id} className="group cursor-pointer">
                         <div className="aspect-[3/4] bg-gray-100 overflow-hidden mb-4 border border-gray-200">
-                          {product.images && product.images.length > 0 ? (
+                          {getPrimaryProductImage(product) ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover transition-all duration-700 ease-out scale-105 group-hover:scale-100" />
+                            <img src={getRenderableImageUrl(getPrimaryProductImage(product))} alt={product.name} className="w-full h-full object-cover transition-all duration-700 ease-out scale-105 group-hover:scale-100" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-300 font-editorial">No Image</div>
                           )}

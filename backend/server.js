@@ -16,6 +16,7 @@ const wishlistRoutes = require("./src/routes/wishlist");
 const paymentRoutes = require("./src/routes/payments");
 const userRoutes = require("./src/routes/users");
 const uploadRoutes = require("./src/routes/upload"); // Import the new upload route
+const mediaRoutes = require("./src/routes/media");
 const analyticsRoutes = require("./src/routes/analytics"); // Import analytics routes
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
@@ -108,6 +109,7 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/upload", uploadRoutes); // Use the upload route
+app.use("/api/media", mediaRoutes);
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartRoutes);

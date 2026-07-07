@@ -6,6 +6,7 @@ const Cart = require('../models/Cart');
 const WishlistItem = require('../models/WishlistItem'); 
 const Like = require('../models/Like'); 
 const { protect } = require('../middleware/auth');
+const { signProductImages, normalizeImageKeys } = require('../utils/imageUrls');
 const router = express.Router();
 
 // @route   POST /api/products
@@ -16,9 +17,19 @@ router.post('/', protect, async (req, res, next) => {
     if (req.user.role !== 'vendor') {
       return res.status(403).json({ message: 'Forbidden: Only vendors can create products' });
     }
-    const productData = { ...req.body, vendor: req.user._id };
+    const productData = {
+      ...req.body,
+      vendor: req.user._id,
+      images: normalizeImageKeys(req.body.images),
+      variants: Array.isArray(req.body.variants)
+        ? req.body.variants.map((variant) => ({
+            ...variant,
+            images: normalizeImageKeys(variant.images),
+          }))
+        : req.body.variants,
+    };
     const product = await Product.create(productData);
-    res.status(201).json(product);
+    res.status(201).json(await signProductImages(product));
   } catch (error) {
     if (error.name === 'ValidationError') res.status(400).json({ message: error.message });
     else next(error);
@@ -50,7 +61,7 @@ router.get('/', async (req, res, next) => {
       .limit(50)
       .sort({ createdAt: -1 });
     console.log('Found products:', products.length);
-    res.json(products);
+    res.json(await Promise.all(products.map((product) => signProductImages(product))));
   } catch (error) {
     next(error);
   }
@@ -162,7 +173,20 @@ router.put('/:id', protect, async (req, res, next) => {
 
     const { name, description, brand, category, tags, basePrice, options, variants, images } = req.body;
     const safeUpdateData = {
-        name, description, brand, category, tags, basePrice, options, variants, images
+        name,
+        description,
+        brand,
+        category,
+        tags,
+        basePrice,
+        options,
+        variants: Array.isArray(variants)
+          ? variants.map((variant) => ({
+              ...variant,
+              images: normalizeImageKeys(variant.images),
+            }))
+          : variants,
+        images: normalizeImageKeys(images),
     };
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -171,7 +195,7 @@ router.put('/:id', protect, async (req, res, next) => {
       { new: true, runValidators: true }
     );
 
-    res.json(updatedProduct);
+    res.json(await signProductImages(updatedProduct));
   } catch (error) {
     if (error.name === 'ValidationError') res.status(400).json({ message: error.message });
     else next(error);
@@ -220,7 +244,7 @@ router.get('/:id', async (req, res, next) => {
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    res.json(product);
+    res.json(await signProductImages(product));
   } catch (error) {
     next(error);
   }

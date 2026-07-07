@@ -5,8 +5,41 @@ import React, { useState, useImperativeHandle, useEffect } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import ImageCropper from "./ImageCropper";
+import { getRenderableImageUrl, getS3StorageImages } from "@/lib/imageUrls";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+const resolveApiBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
+      return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+    }
+  }
+
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "";
+};
+
+const normalizeRenderableUrl = (url: string) => {
+  if (url.startsWith("/api/media?")) {
+    return `${resolveApiBaseUrl()}${url}`;
+  }
+  return getRenderableImageUrl(url);
+};
+
+type ImageDraft = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
+type VariantState = {
+  color: string;
+  sizes: string;
+  price: string;
+  stock: Record<string, string>;
+  images: string[];
+  imageDrafts: ImageDraft[];
+};
 
 // --- Minimalist Editorial Input Components ---
 const Input = ({
@@ -84,8 +117,8 @@ const ProductForm = React.forwardRef(
       tags: "",
       basePrice: "",
     });
-    const [variants, setVariants] = useState([
-      { color: "", sizes: "", price: "", stock: {}, images: [] },
+    const [variants, setVariants] = useState<VariantState[]>([
+      { color: "", sizes: "", price: "", stock: {}, images: [], imageDrafts: [] },
     ]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -94,7 +127,16 @@ const ProductForm = React.forwardRef(
       image: string;
     } | null>(null);
 
+    const revokeDraftPreviews = (variantList: VariantState[]) => {
+      variantList.forEach((variant) => {
+        variant.imageDrafts.forEach((draft) => {
+          URL.revokeObjectURL(draft.previewUrl);
+        });
+      });
+    };
+
     const resetForm = () => {
+      revokeDraftPreviews(variants);
       setFormData({
         name: "",
         description: "",
@@ -103,17 +145,17 @@ const ProductForm = React.forwardRef(
         tags: "",
         basePrice: "",
       });
-      setVariants([{ color: "", sizes: "", price: "", stock: {}, images: [] }]);
+      setVariants([{ color: "", sizes: "", price: "", stock: {}, images: [], imageDrafts: [] }]);
       setFormStatus({ type: null, message: "" });
     };
 
-    const handleProductChange = (e) => {
+    const handleProductChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
       setFormData((prev) => ({ ...prev, [name]: value }));
       if (formStatus.type === 'error') setFormStatus({ type: null, message: "" }); // Clear errors on typing
     };
 
-    const handleVariantChange = (index, e) => {
+    const handleVariantChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value } = e.target;
       const newVariants = [...variants];
       newVariants[index][name] = value;
@@ -123,7 +165,7 @@ const ProductForm = React.forwardRef(
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean);
-        const newStock = {};
+        const newStock: Record<string, string> = {};
         sizesArray.forEach((size) => {
           newStock[size] = newVariants[index].stock[size] || "0";
         });
@@ -133,20 +175,49 @@ const ProductForm = React.forwardRef(
       if (formStatus.type === 'error') setFormStatus({ type: null, message: "" });
     };
 
-    const handleStockChange = (variantIndex, size, value) => {
+    const handleStockChange = (variantIndex: number, size: string, value: string) => {
       const newVariants = [...variants];
       newVariants[variantIndex].stock[size] = value;
       setVariants(newVariants);
     };
 
-    const appendImageToVariant = (variantIndex: number, imageUrl: string) => {
+    const appendDraftToVariant = (variantIndex: number, file: File) => {
+      const draft: ImageDraft = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      };
+
       setVariants((previousVariants) => {
         const nextVariants = previousVariants.map((variant) => ({
           ...variant,
           images: [...variant.images],
+          imageDrafts: [...variant.imageDrafts],
         }));
 
-        nextVariants[variantIndex].images.push(imageUrl);
+        nextVariants[variantIndex].imageDrafts.push(draft);
+        return nextVariants;
+      });
+    };
+
+    const removeDraftFromVariant = (variantIndex: number, draftId: string) => {
+      setVariants((previousVariants) => {
+        const nextVariants = previousVariants.map((variant) => ({
+          ...variant,
+          images: [...variant.images],
+          imageDrafts: [...variant.imageDrafts],
+        }));
+
+        const draft = nextVariants[variantIndex].imageDrafts.find(
+          (item) => item.id === draftId,
+        );
+        if (draft) {
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+
+        nextVariants[variantIndex].imageDrafts = nextVariants[
+          variantIndex
+        ].imageDrafts.filter((item) => item.id !== draftId);
         return nextVariants;
       });
     };
@@ -156,7 +227,8 @@ const ProductForm = React.forwardRef(
         throw new Error("You need to sign in again before uploading images.");
       }
 
-      const presignResponse = await fetch(`${API_BASE_URL}/api/upload/presign`, {
+      const apiBaseUrl = resolveApiBaseUrl();
+      const presignResponse = await fetch(`${apiBaseUrl}/api/upload/presign`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -176,51 +248,42 @@ const ProductForm = React.forwardRef(
         );
       }
 
-      // Use FormData for presigned POST (not PUT)
-      const formData = new FormData();
-      if (presignData.fields) {
-        Object.entries(presignData.fields).forEach(([key, value]) => {
-          formData.append(key, value as string);
-        });
-      }
-      formData.append("file", imageFile);
-
       const uploadResponse = await fetch(presignData.url, {
-        method: "POST",
-        body: formData,
+        method: "PUT",
+        headers: {
+          "Content-Type": imageFile.type,
+        },
+        body: imageFile,
       });
 
       if (!uploadResponse.ok) {
         throw new Error("S3 rejected the image upload");
       }
 
-      return presignData.publicUrl || presignData.url.split("?")[0];
+      return presignData.viewUrl || presignData.publicUrl || presignData.url.split("?")[0];
     };
 
-    const uploadVariantImage = async (variantIndex: number, imageFile: File) => {
-      setIsUploading(true);
-      setFormStatus({ type: null, message: "" });
-
-      try {
-        const uploadedUrl = await uploadImage(imageFile);
-        appendImageToVariant(variantIndex, uploadedUrl);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Image processing error";
-        setFormStatus({
-          type: "error",
-          message: `Image processing error: ${message}`,
-        });
-      } finally {
-        setIsUploading(false);
-      }
-    };
-
-    const handleImageSelect = async (variantIndex, e) => {
+    const handleImageSelect = async (variantIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
 
       for (const file of files) {
+        if (!file.type.startsWith("image/")) {
+          setFormStatus({
+            type: "error",
+            message: "Please choose image files only.",
+          });
+          continue;
+        }
+
+        if (file.size > MAX_UPLOAD_BYTES) {
+          setFormStatus({
+            type: "error",
+            message: "Image is too large. Please choose a file up to 10 MB.",
+          });
+          continue;
+        }
+
         const reader = new FileReader();
         reader.onload = (event) => {
           const img = document.createElement("img");
@@ -231,58 +294,72 @@ const ProductForm = React.forwardRef(
                 image: reader.result as string,
               });
             } else {
-              void uploadVariantImage(variantIndex, file);
+              appendDraftToVariant(variantIndex, file);
             }
           };
           img.src = event.target?.result as string;
         };
         reader.readAsDataURL(file);
       }
+
+      e.target.value = "";
     };
 
     const handleCropComplete = async (croppedImageUrl: string) => {
       if (croppingImage) {
         const { variantIndex } = croppingImage;
-        setIsUploading(true);
-        setFormStatus({ type: null, message: "" });
-
         try {
           const response = await fetch(croppedImageUrl);
           const blob = await response.blob();
           const file = new File([blob], "cropped-image.jpg", {
             type: "image/jpeg",
           });
-          const uploadedUrl = await uploadImage(file);
-          appendImageToVariant(variantIndex, uploadedUrl);
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Image processing error";
-          setFormStatus({
-            type: "error",
-            message: `Image processing error: ${message}`,
-          });
+          appendDraftToVariant(variantIndex, file);
         } finally {
           setCroppingImage(null);
-          setIsUploading(false);
         }
       }
     };
 
-    const handleRemoveImage = (variantIndex, imageIndex) => {
+    const uploadQueuedImages = async () => {
+      const nextVariants = variants.map((variant) => ({
+        ...variant,
+        images: [...variant.images],
+        imageDrafts: [...variant.imageDrafts],
+      }));
+
+      for (const variant of nextVariants) {
+        for (const draft of variant.imageDrafts) {
+          const uploadedUrl = await uploadImage(draft.file);
+          variant.images.push(uploadedUrl);
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+        variant.imageDrafts = [];
+      }
+
+      return nextVariants;
+    };
+
+    const handleRemoveImage = (variantIndex: number, imageIndex: number) => {
       const newVariants = [...variants];
       newVariants[variantIndex].images.splice(imageIndex, 1);
       setVariants(newVariants);
     };
 
+    const handleRemoveDraft = (variantIndex: number, draftId: string) => {
+      removeDraftFromVariant(variantIndex, draftId);
+    };
+
     const addVariant = () => {
       setVariants([
         ...variants,
-        { color: "", sizes: "", price: "", stock: {}, images: [] },
+        { color: "", sizes: "", price: "", stock: {}, images: [], imageDrafts: [] },
       ]);
     };
 
-    const removeVariant = (index) => {
+    const removeVariant = (index: number) => {
       const newVariants = variants.filter((_, i) => i !== index);
+      variants[index]?.imageDrafts.forEach((draft) => URL.revokeObjectURL(draft.previewUrl));
       setVariants(newVariants);
     };
 
@@ -291,55 +368,63 @@ const ProductForm = React.forwardRef(
       setFormStatus({ type: null, message: "" });
 
       setIsSubmitting(true);
-      const allVariantImages = variants.flatMap((v) => v.images);
-
-      const productData = {
-        ...formData,
-        basePrice: parseFloat(formData.basePrice),
-        tags: formData.tags.split(",").map((t) => t.trim()),
-        images: allVariantImages,
-        options: [],
-        variants: [],
-      };
-
-      const allColors = variants.map((v) => v.color).filter(Boolean);
-      const allSizes = [
-        ...new Set(
-          variants.flatMap((v) =>
-            v.sizes
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
-          ),
-        ),
-      ];
-
-      if (allColors.length > 0)
-        productData.options.push({ name: "Color", values: allColors });
-      if (allSizes.length > 0)
-        productData.options.push({ name: "Size", values: allSizes });
-
-      variants.forEach((variant) => {
-        const sizes = variant.sizes
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        sizes.forEach((size) => {
-          productData.variants.push({
-            options: { Color: variant.color, Size: size },
-            stock: parseInt(variant.stock[size] || "0", 10),
-            price: parseFloat(variant.price || formData.basePrice),
-            images: variant.images,
-          });
-        });
-      });
-
-      const method = product?._id ? "PUT" : "POST";
-      const url = product?._id
-        ? `${API_BASE_URL}/api/products/${product._id}`
-        : `${API_BASE_URL}/api/products`;
 
       try {
+        setIsUploading(true);
+        const uploadedVariants = await uploadQueuedImages();
+        setVariants(uploadedVariants);
+
+        const allVariantImages = uploadedVariants.flatMap((variant) => variant.images);
+
+        const productData = {
+          ...formData,
+          basePrice: parseFloat(formData.basePrice),
+          tags: formData.tags.split(",").map((t) => t.trim()),
+          images: getS3StorageImages(allVariantImages),
+          options: [],
+          variants: [],
+        };
+
+        const allColors = uploadedVariants.map((variant) => variant.color).filter(Boolean);
+        const allSizes = [
+          ...new Set(
+            uploadedVariants.flatMap((variant) =>
+              variant.sizes
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            ),
+          ),
+        ];
+
+        if (allColors.length > 0) {
+          productData.options.push({ name: "Color", values: allColors });
+        }
+        if (allSizes.length > 0) {
+          productData.options.push({ name: "Size", values: allSizes });
+        }
+
+        uploadedVariants.forEach((variant) => {
+          const sizes = variant.sizes
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          sizes.forEach((size) => {
+            productData.variants.push({
+              options: { Color: variant.color, Size: size },
+              stock: parseInt(variant.stock[size] || "0", 10),
+            price: parseFloat(variant.price || formData.basePrice),
+              images: getS3StorageImages(variant.images),
+            });
+          });
+        });
+
+        const method = product?._id ? "PUT" : "POST";
+        const apiBaseUrl = resolveApiBaseUrl();
+        const url = product?._id
+          ? `${apiBaseUrl}/api/products/${product._id}`
+          : `${apiBaseUrl}/api/products`;
+
         const res = await fetch(url, {
           method,
           headers: {
@@ -372,6 +457,8 @@ const ProductForm = React.forwardRef(
         // Replaced alert with elegant error status message
         setFormStatus({ type: 'error', message: `Network Sync Error: ${error.message}` });
         setIsSubmitting(false); // Only set false on error, so it stays "submitting" during success delay
+      } finally {
+        setIsUploading(false);
       }
     };
 
@@ -400,12 +487,13 @@ const ProductForm = React.forwardRef(
               color: v.options && v.options.Color ? v.options.Color : "",
               price: v.price || "",
               stock: v.options && v.options.Size ? { [v.options.Size]: v.stock } : {},
-              images: v.images || [],
+              images: getS3StorageImages(v.images || []),
+              imageDrafts: [],
             })),
           );
         } else {
           setVariants([
-            { color: "", sizes: "", price: "", stock: {}, images: [] },
+            { color: "", sizes: "", price: "", stock: {}, images: [], imageDrafts: [] },
           ]);
         }
       }
@@ -609,11 +697,15 @@ const ProductForm = React.forwardRef(
                             disabled={isSubmitting || formStatus.type === 'success'}
                           />
                         </label>
-                        {isUploading && (
+                        {isUploading ? (
                           <span className="font-sans text-[10px] uppercase tracking-widest text-gray-500 animate-pulse">
-                            Processing...
+                            Uploading to S3...
                           </span>
-                        )}
+                        ) : variant.imageDrafts.length > 0 ? (
+                          <span className="font-sans text-[10px] uppercase tracking-widest text-gray-500">
+                            Preview ready
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="flex flex-wrap gap-6">
@@ -624,7 +716,7 @@ const ProductForm = React.forwardRef(
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={imgUrl}
+                              src={normalizeRenderableUrl(imgUrl)}
                               alt="Variant preview"
                               className="absolute inset-0 h-full w-full object-cover"
                             />
@@ -636,6 +728,34 @@ const ProductForm = React.forwardRef(
                                   onClick={() =>
                                     handleRemoveImage(index, imgIndex)
                                   }
+                                  className="font-sans text-[9px] font-bold uppercase tracking-[0.2em] text-red-600 hover:text-red-900"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {variant.imageDrafts.map((draft) => (
+                          <div
+                            key={draft.id}
+                            className="group relative w-24 h-32 md:w-32 md:h-40 bg-gray-100 overflow-hidden border border-gray-200"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={draft.previewUrl}
+                              alt="Pending upload preview"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                            <div className="absolute left-2 top-2 bg-black/75 px-2 py-1 text-[8px] uppercase tracking-[0.25em] text-white">
+                              Local preview
+                            </div>
+
+                            {(!isSubmitting && formStatus.type !== 'success') && (
+                              <div className="absolute inset-0 bg-white/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDraft(index, draft.id)}
                                   className="font-sans text-[9px] font-bold uppercase tracking-[0.2em] text-red-600 hover:text-red-900"
                                 >
                                   Remove

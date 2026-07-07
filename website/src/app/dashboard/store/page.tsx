@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeShopDomain } from "@/lib/shopify";
+import { getRenderableImageUrl, getS3Images } from "@/lib/imageUrls";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -38,6 +39,15 @@ interface ShopifyImportStatus {
     objectCount?: number;
     error?: string;
   } | null;
+}
+
+interface ArchiveVariant {
+  images?: string[];
+}
+
+interface ArchiveProduct {
+  images?: string[];
+  variants?: ArchiveVariant[];
 }
 
 const StoreProfilePage = () => {
@@ -123,10 +133,12 @@ const StoreProfilePage = () => {
               const products = await prodRes.json();
               
               // Extract all images from root and variants
-              const allImages = products.flatMap((p: any) => [
-                ...(p.images || []),
-                ...(p.variants?.flatMap((v: any) => v.images || []) || [])
-              ]);
+              const allImages = (products as ArchiveProduct[]).flatMap((p) =>
+                getS3Images([
+                  ...(p.images || []),
+                  ...(p.variants?.flatMap((variant) => variant.images || []) || []),
+                ]),
+              );
               
               // Deduplicate and limit to 10 images
               const uniqueImages = Array.from(new Set(allImages)).slice(0, 10) as string[];
@@ -329,7 +341,7 @@ const StoreProfilePage = () => {
                       <div key={index} className="break-inside-avoid overflow-hidden bg-gray-100">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img 
-                          src={imgUrl} 
+                          src={getRenderableImageUrl(imgUrl)} 
                           alt={`Archive piece ${index + 1}`} 
                           className="w-full h-auto object-cover grayscale hover:grayscale-0 transition-all duration-700 ease-in-out hover:scale-105"
                         />

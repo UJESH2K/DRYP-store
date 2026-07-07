@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import ProductForm from "@/components/ProductForm";
 import { useAuth } from "@/contexts/AuthContext";
 import ProductModal from "@/components/ProductModal";
+import { getPrimaryProductImage } from "@/lib/imageUrls";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -197,10 +198,10 @@ const ProductsPage = () => {
                 <div key={product._id} className="group relative flex flex-col">
                   {/* High-Fashion Image Container (4:5 Aspect Ratio) */}
                   <div className="relative w-full aspect-4/5 overflow-hidden bg-[#F2F2F0] mb-5">
-                    {product.images && product.images.length > 0 ? (
+                    {getPrimaryProductImage(product) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={product.images[0]}
+                        src={getPrimaryProductImage(product)}
                         alt={product.name}
                         className="absolute inset-0 h-full w-full object-cover transition-transform duration-[15s] ease-out group-hover:scale-110"
                       />

@@ -15,18 +15,17 @@ import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { useFocusEffect } from 'expo-router';
 import { apiCall } from '../../src/lib/api';
 import { useAuthStore } from '../../src/state/auth';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../../src/lib/config';
 
 export default function OrdersScreen() {
   const router = useCustomRouter();
-  const { user, isGuest, guestId } = useAuthStore();
+  const { user } = useAuthStore();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchOrders = useCallback(async () => {
-    if (!user && (!isGuest || !guestId)) {
+    if (!user) {
       setError("Please log in to see your orders.");
       setLoading(false);
       return;
@@ -42,7 +41,7 @@ export default function OrdersScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user, isGuest, guestId]);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {

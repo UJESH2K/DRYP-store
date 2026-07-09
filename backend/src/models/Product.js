@@ -43,6 +43,9 @@ const ProductSchema = new mongoose.Schema({
   reviews: { type: Number, default: 0 },
   likes: { type: Number, default: 0 },
 
+  // AI / embedding
+  embedding: { type: [Number], default: undefined },
+
   // Provenance (for products imported from external sources like Shopify)
   externalId: { type: String, index: true },
   source: { type: String, enum: ['dryp', 'shopify', 'manual_import'], default: 'dryp' },

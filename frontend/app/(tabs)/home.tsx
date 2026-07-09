@@ -9,6 +9,7 @@ import AnimatedLoadingScreen from '../../src/components/common/AnimatedLoadingSc
 import { EmptyState } from '../../src/components/home/EmptyState';
 import { Card } from '../../src/components/home/Card';
 import ProductDetailModal from '../../src/components/ProductDetailModal';
+import AIStylistSheet from '../../src/components/AIStylistSheet';
 import { Item } from '../../src/types';
 
 export default function HomeScreen() {
@@ -23,6 +24,8 @@ export default function HomeScreen() {
   
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  const [showStylist, setShowStylist] = useState(false);
 
   const showDetailsWithAnimation = (item: Item) => {
     swipeAnimations.showDetailsAnimation();
@@ -80,7 +83,7 @@ export default function HomeScreen() {
     <>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <Header />
+        <Header onAIStylistPress={() => setShowStylist(true)} />
         <Filters 
           filters={filters}
           selectedFilters={selectedFilters}
@@ -142,6 +145,11 @@ export default function HomeScreen() {
           onClose={hideDetailsWithAnimation}
         />
       )}
+
+      <AIStylistSheet
+        visible={showStylist}
+        onClose={() => setShowStylist(false)}
+      />
     </>
   );
 }

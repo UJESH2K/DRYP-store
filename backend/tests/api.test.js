@@ -2,7 +2,7 @@
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8080';
 
 async function runTests() {
   console.log('🚀 Starting API tests...\n');
@@ -33,7 +33,7 @@ async function runTests() {
       body: JSON.stringify({
         name: 'Test User',
         email: testEmail,
-        password: 'password123',
+        password: 'Password123',
       }),
     });
     if (response.status !== 200) throw new Error(`Status code: ${response.status}`);
@@ -114,6 +114,29 @@ async function runTests() {
     } catch(error) {
         console.error('❌ Unlike a Product: Failed -', error.message, '\n');
     }
+  }
+
+  // Test 6: Zaloga AI Stylist endpoint (Guest)
+  try {
+    console.log('🧪 6. Testing Zaloga AI Stylist endpoint...');
+    const response = await fetch(`${API_BASE_URL}/api/ai/zaloga`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-guest-id': `test_guest_${Date.now()}`,
+      },
+      body: JSON.stringify({
+        message: 'Suggest tops',
+      }),
+    });
+    if (response.status !== 200) throw new Error(`Status code: ${response.status}`);
+    const data = await response.json();
+    if (!data.reply) throw new Error('Reply not received');
+    if (!data.conversationId) throw new Error('Conversation ID not received');
+    if (!Array.isArray(data.suggestions)) throw new Error('Suggestions array not received');
+    console.log('✅ Zaloga AI Stylist endpoint: Passed\n');
+  } catch(error) {
+    console.error('❌ Zaloga AI Stylist endpoint: Failed -', error.message, '\n');
   }
 
 

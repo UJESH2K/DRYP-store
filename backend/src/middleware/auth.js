@@ -2,53 +2,71 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const identifyUser = async (req, res, next) => {
-  let token;
+  const authHeader = req.headers.authorization;
+  const token =
+    authHeader && authHeader.startsWith("Bearer")
+      ? authHeader.split(" ")[1]
+      : null;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
+  if (token && token !== "null" && token !== "undefined") {
     try {
-      token = req.headers.authorization.split(" ")[1];
-
-      if (!token || token === "null" || token === "undefined") {
-        throw new Error("Token is missing or stringified null/undefined");
+      // 1. Try Supabase verification
+      let sbUser;
+      try {
+        const { getSupabaseAdmin } = require("../lib/supabase");
+        const supabase = getSupabaseAdmin();
+        const { data, error } = await supabase.auth.getUser(token);
+        if (!error && data?.user) sbUser = data.user;
+      } catch {
+        // supabase not configured yet — skip
       }
 
-      const secret = process.env.JWT_SECRET;
-      if (!secret) throw new Error("JWT_SECRET missing");
+      if (sbUser) {
+        let user = await User.findOne({ supabaseId: sbUser.id });
+        if (!user) {
+          user = await User.create({
+            supabaseId: sbUser.id,
+            name:
+              sbUser.user_metadata?.full_name ||
+              sbUser.email?.split("@")[0] ||
+              "User",
+            email: sbUser.email,
+            authProvider: sbUser.app_metadata?.provider === "email" ? "email" : sbUser.app_metadata?.provider || "local",
+          });
+        }
+        req.user = user;
+      }
 
-      const decoded = jwt.verify(token, secret);
-      const user = await User.findById(decoded.id).select("-passwordHash");
+      // 2. Fallback: verify old JWT format (pre-migration tokens)
+      if (!req.user) {
+        const secret = process.env.JWT_SECRET;
+        if (secret) {
+          const decoded = jwt.verify(token, secret);
+          const user = await User.findById(decoded.id).select("-passwordHash");
+          if (user) req.user = user;
+        }
+      }
 
-      if (user && !user.isActive) {
-        console.warn(`Blocked access attempt by suspended user: ${user._id}`);
+      // 3. Single isActive check
+      if (req.user && !req.user.isActive) {
+        console.warn(`Blocked access attempt by suspended user: ${req.user._id}`);
         return res.status(403).json({ message: "Account suspended." });
       }
 
-      req.user = user;
+      if (req.user) return next();
     } catch (error) {
-      console.error(`Auth Middleware: ${error.message}. Proceeding as guest.`);
-      req.user = null;
+      console.error(`Auth Middleware: ${error.message}.`);
     }
   }
 
-  const guestId = req.headers["x-guest-id"] || req.body.guestId;
-  if (guestId) {
-    req.guestId = guestId;
-  }
-
+  req.user = null;
   next();
 };
 
-// This middleware ensures that a user is logged in.
 const protect = (req, res, next) => {
   identifyUser(req, res, () => {
-    if (req.user) {
-      next();
-    } else {
-      res.status(401).json({ message: "Not authorized" });
-    }
+    if (req.user) next();
+    else res.status(401).json({ message: "Not authorized" });
   });
 };
 

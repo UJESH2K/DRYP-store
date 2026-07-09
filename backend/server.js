@@ -20,41 +20,24 @@ const mediaRoutes = require("./src/routes/media");
 const analyticsRoutes = require("./src/routes/analytics"); // Import analytics routes
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
+const stylistRoutes = require("./src/routes/stylist");
 const rateLimit = require('express-rate-limit');
-
-const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10, 
-  message: { message: "Too many login attempts from this IP, please try again after 15 minutes" },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 const isProduction = process.env.NODE_ENV === "production";
 
-const vendorSignupLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, 
-  max: isProduction ? 5 : 50,
-  message: { message: "Too many signup attempts from this IP. Please wait 1 minute and try again." },
+const limiter = (max, message) => rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max,
+  message: { message },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-const vendorApplyLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: isProduction ? 5 : 20,
-  message: { message: "Too many studio applications from this IP. Please wait 1 minute and try again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const shopifyAuthLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: isProduction ? 10 : 50,
-  message: { message: "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const authLimiter = limiter(10, "Too many login attempts from this IP, please try again after 15 minutes");
+const vendorSignupLimiter = limiter(isProduction ? 5 : 50, "Too many signup attempts from this IP. Please wait 1 minute and try again.");
+const vendorApplyLimiter = limiter(isProduction ? 5 : 20, "Too many studio applications from this IP. Please wait 1 minute and try again.");
+const shopifyAuthLimiter = limiter(isProduction ? 10 : 50, "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again.");
+const stylistLimiter = limiter(20, "Too many requests to the AI stylist. Please wait a moment.");
 
 const app = express();
 
@@ -113,6 +96,8 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/ai/zaloga", stylistLimiter);
+app.use("/api/ai/zaloga", stylistRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

@@ -21,10 +21,10 @@ import AnimatedLoadingScreen from './common/AnimatedLoadingScreen';
 import CustomAlert from './common/CustomAlert';
 import { Product, ProductOption, ProductVariant } from '../types';
 import { useCustomRouter } from '../hooks/useCustomRouter';
+import { API_BASE_URL } from '../lib/config';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
 
 const generateCartId = (productId: string, options?: Record<string, string>) => {
   if (!options || Object.keys(options).length === 0) {

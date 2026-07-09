@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const rateLimit = require("express-rate-limit");
-const { protect } = require("../middleware/auth");
+const { identifyUser } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -91,14 +91,15 @@ function validateUploadPayload({ fileName, contentType, fileSize }) {
 // Returns: { url: string, key: string, publicUrl: string, expiresIn: number }
 router.post(
   "/presign",
-  protect,
+  identifyUser,
   uploadPresignLimiter,
   async (req, res, next) => {
     try {
-      if (req.user.role !== "vendor") {
-        return res
-          .status(403)
-          .json({ message: "Forbidden: Only vendors can upload images." });
+      // Allow any identified user (including guests via x-guest-id) for stylist image uploads etc.
+      // Vendors/admins for product images.
+      const canUpload = req.user || req.guestId;
+      if (!canUpload) {
+        return res.status(403).json({ message: "Authentication or guest ID required for uploads." });
       }
 
       try {

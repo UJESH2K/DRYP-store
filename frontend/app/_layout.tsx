@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import {
@@ -18,7 +17,7 @@ import { useCustomRouter } from '../src/hooks/useCustomRouter';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isAuthenticated, isGuest, user, loadUser } = useAuthStore();
+  const { isAuthenticated, user, loadUser } = useAuthStore();
   const [fontsLoaded] = useFonts({
     JosefinSans_400Regular,
     JosefinSans_500Medium,
@@ -67,58 +66,54 @@ export default function RootLayout() {
         } else {
           router.replace('/onboarding');
         }
-      } else if (isGuest) {
-        router.replace('/(tabs)/home');
       } else {
         router.replace('/login');
       }
     }
-  }, [isAuthenticated, isGuest, user, appIsReady]);
+  }, [isAuthenticated, user, appIsReady]);
 
   if (!appIsReady) {
     return null; // Or a loading indicator
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'black' }}>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen 
-            name="liked-items" 
-            options={{ 
-              title: 'Liked Items',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#ffffff',
-              },
-              headerTintColor: '#1a1a1a',
-              headerTitleStyle: {
-                fontFamily: 'Zaloga',
-                fontSize: 28,
-              },
-              headerShadowVisible: false,
-            }} 
-          />
-          <Stack.Screen 
-            name="notifications" 
-            options={{ 
-              title: 'Notifications',
-              headerShown: true,
-              headerStyle: {
-                backgroundColor: '#ffffff',
-              },
-              headerTintColor: '#1a1a1a',
-              headerTitleStyle: {
-                fontFamily: 'Zaloga',
-                fontSize: 28,
-              },
-              headerShadowVisible: false,
-            }} 
-          />
-        </Stack>
-        <Toast />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen 
+          name="liked-items" 
+          options={{ 
+            title: 'Liked Items',
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: '#ffffff',
+            },
+            headerTintColor: '#1a1a1a',
+            headerTitleStyle: {
+              fontFamily: 'Zaloga',
+              fontSize: 28,
+            },
+            headerShadowVisible: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="notifications" 
+          options={{ 
+            title: 'Notifications',
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: '#ffffff',
+            },
+            headerTintColor: '#1a1a1a',
+            headerTitleStyle: {
+              fontFamily: 'Zaloga',
+              fontSize: 28,
+            },
+            headerShadowVisible: false,
+          }} 
+        />
+      </Stack>
+      <Toast />
+    </SafeAreaProvider>
   );
 }

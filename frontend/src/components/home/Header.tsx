@@ -5,7 +5,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export function Header() {
+interface HeaderProps {
+  onAIStylistPress?: () => void;
+}
+
+export function Header({ onAIStylistPress }: HeaderProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.header}>
@@ -16,6 +20,12 @@ export function Header() {
         </Pressable>
         <Pressable onPress={() => router.push('/notifications')}>
           <Ionicons name="notifications-outline" size={28} color="#000" />
+        </Pressable>
+        <Pressable 
+          onPress={onAIStylistPress} 
+          accessibilityLabel="Ask Zaloga, the AI Stylist"
+        >
+          <Ionicons name="sparkles-outline" size={28} color="#000" />
         </Pressable>
       </View>
     </View>

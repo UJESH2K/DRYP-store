@@ -3,6 +3,19 @@ const router = express.Router();
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
+// @route   GET /api/users/me
+// @desc    Get current user (creates MongoDB user from Supabase JWT if new)
+// @access  Private
+router.get('/me', protect, async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
+    res.json({ user: req.user, token: req.headers.authorization?.split(' ')[1] });
+  } catch (error) {
+    console.error('Error fetching current user:', error.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // @route   PUT /api/users/preferences
 // @desc    Update user preferences
 // @access  Private

@@ -37,7 +37,7 @@ const Row = ({ title, icon, onPress, isFirst, isLast, isDestructive = false }) =
 
 export default function ProfileScreen() {
   const router = useCustomRouter();
-  const { user, isAuthenticated, isGuest, guestId, logout } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const showToast = useToastStore((state) => state.showToast);
 
   const handleLogout = () => {
@@ -71,7 +71,7 @@ export default function ProfileScreen() {
     { id: 'about', title: 'About Us', icon: <Ionicons name="information-circle-outline" size={22} color="#333" />, onPress: () => router.push('/account/about') },
   ];
 
-  if (isGuest || !isAuthenticated) {
+  if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" />
@@ -79,14 +79,8 @@ export default function ProfileScreen() {
             <Text style={styles.headerTitle}>Account</Text>
         </View>
         <ScrollView style={styles.scrollView}>
-            <View style={styles.profileHeader}>
-                <View style={[styles.avatar, styles.guestAvatar]}>
-                    <Ionicons name="person-outline" size={40} color="#8e8e93" />
-                </View>
-                <Text style={styles.profileName}>Guest User</Text>
-            </View>
             <View style={styles.guestCtaContainer}>
-                <Text style={styles.guestCtaText}>Create an account to save your preferences and unlock all features.</Text>
+                <Text style={styles.guestCtaText}>Please sign in to access your account settings and orders.</Text>
                 <Pressable style={styles.signInButton} onPress={() => router.replace('/login')}>
                     <Text style={styles.signInButtonText}>Sign In or Create Account</Text>
                 </Pressable>

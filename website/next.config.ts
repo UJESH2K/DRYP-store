@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "localhost",
-        port: "5000",
+        port: "8080",
         pathname: "/**",
       },
       {
@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: process.env.NODE_ENV === "production"
           ? process.env.NEXT_PUBLIC_API_BASE_URL + "/api/:path*"
-          : "http://localhost:5000/api/:path*",
+          : "http://localhost:8080/api/:path*",
       },
     ];
   },

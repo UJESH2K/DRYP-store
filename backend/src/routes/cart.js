@@ -4,43 +4,8 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { identifyUser } = require("../middleware/auth");
 
-// The Ultimate Hammer: Match the frontend's cart ID logic perfectly
-const generateCartId = (productId, options) => {
-  const idStr =
-    productId && productId._id
-      ? productId._id.toString()
-      : productId.toString();
-
-  if (!options) return idStr;
-
-  let plainOptions = {};
-  try {
-    if (options instanceof Map) {
-      plainOptions = Object.fromEntries(options);
-    } else {
-      // Strips away ALL database internals instantly
-      plainOptions = JSON.parse(JSON.stringify(options));
-    }
-  } catch (error) {
-    console.error("Cart ID parsing error:", error);
-  }
-
-  // Filter out DB internals
-  const keys = Object.keys(plainOptions || {}).filter(
-    (k) => k !== "_id" && k !== "id",
-  );
-
-  if (keys.length === 0) {
-    return idStr;
-  }
-
-  const sortedOptions = keys
-    .sort()
-    .map((key) => `${key}-${plainOptions[key]}`)
-    .join("_");
-
-  return `${idStr}_${sortedOptions}`;
-};
+const generateCartId = (productId, options) =>
+  productId.toString() + (options ? '_' + Object.entries(options).filter(([k]) => k !== '_id' && k !== 'id').sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k + '-' + v).join('_') : '');
 
 // Helper function to find or create a cart
 const getOrCreateCart = async (req) => {
@@ -80,34 +45,18 @@ router.post("/", identifyUser, async (req, res) => {
   try {
     const { productId, quantity, price, options } = req.body;
 
-    // --- SECURITY VALIDATION (THE BOUNCER) ---
     let sanitizedOptions = {};
-    if (options && typeof options === "object" && !Array.isArray(options)) {
-      const keys = Object.keys(options);
-
-      // Prevent payload bloat
-      if (keys.length > 5) {
-        return res.status(400).json({ message: "Too many options provided." });
-      }
-
-      for (const key of keys) {
-        const value = String(options[key]); // Force value to string
-
-        // Prevent massive strings
-        if (key.length > 30 || value.length > 50) {
-          return res
-            .status(400)
-            .json({ message: "Invalid option format or length." });
+    const ALLOWED_KEYS = ['size', 'color', 'material', 'style', 'fit'];
+    if (options && typeof options === 'object' && !Array.isArray(options)) {
+      for (const key of ALLOWED_KEYS) {
+        if (options[key] !== undefined) {
+          const val = String(options[key]).trim();
+          if (val.length > 0 && val.length <= 50) sanitizedOptions[key] = val;
         }
-
-        // Strip out database injection characters from the key
-        const sanitizedKey = key.replace(/[^a-zA-Z0-9 ]/g, "");
-        sanitizedOptions[sanitizedKey] = value;
       }
     } else if (options) {
       return res.status(400).json({ message: "Invalid options format." });
     }
-    // --- END SECURITY VALIDATION ---
 
     const cart = await getOrCreateCart(req);
     if (!cart) {

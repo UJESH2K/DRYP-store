@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "active_work_id": "zaloga-ai-stylist",
+  "works": {
+    "zaloga-ai-stylist": {
+      "work_id": "zaloga-ai-stylist",
+      "active_plan": ".omo/plans/zaloga-ai-stylist.md",
+      "plan_name": "zaloga-ai-stylist",
+      "session_ids": [
+        "opencode:ses_0c0f33f2effejh03W1yUGUJgq0"
+      ],
+      "status": "completed",
+      "worktree_path": null,
+      "session_origins": {},
+      "ended_at": "2026-07-09T12:20:34.749Z",
+      "updated_at": "2026-07-09T12:20:34.749Z",
+      "task_sessions": {}
+    }
+  },
+  "session_ids": [
+    "opencode:ses_0c0f33f2effejh03W1yUGUJgq0"
+  ],
+  "session_origins": {},
+  "task_sessions": {},
+  "active_plan": ".omo/plans/zaloga-ai-stylist.md",
+  "plan_name": "zaloga-ai-stylist",
+  "status": "completed",
+  "ended_at": "2026-07-09T12:20:34.749Z",
+  "updated_at": "2026-07-09T12:20:34.749Z",
+  "worktree_path": null
+}

@@ -29,6 +29,7 @@ const PaymentMethodSchema = new mongoose.Schema(
 
 const UserSchema = new mongoose.Schema(
   {
+    supabaseId: { type: String, required: false, index: true, sparse: true },
     name: { type: String, required: true, trim: true },
     email: {
       type: String,
@@ -43,7 +44,7 @@ const UserSchema = new mongoose.Schema(
         return this.authProvider === "local";
       },
     },
-    authProvider: { type: String, enum: ["local", "shopify", "invited"], default: "local" },
+    authProvider: { type: String, enum: ["local", "shopify", "google", "invited", "email"], default: "local" },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },

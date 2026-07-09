@@ -18,8 +18,7 @@ import { apiCall } from '../src/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VendorHeader } from '../src/components/vendor/Header';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../src/lib/config';
 
 export default function VendorRegisterScreen() {
   const router = useCustomRouter();
@@ -159,27 +158,29 @@ export default function VendorRegisterScreen() {
           </Pressable>
 
           {showShopifyInput ? (
-            <View>
-              <TextInput
-                style={styles.input}
-                placeholder="your-store.myshopify.com"
-                value={shopDomain}
-                onChangeText={(text) => {
-                  setShopDomain(text);
-                  setShopifyError('');
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Pressable
-                style={[styles.registerButton, !shopDomain.trim() && styles.disabledButton]}
-                onPress={handleShopifyConnect}
-                disabled={!shopDomain.trim()}
-              >
-                <Text style={styles.registerButtonText}>Connect Shopify Store</Text>
-              </Pressable>
-            </View>
-            {shopifyError ? <Text style={styles.errorText}>{shopifyError}</Text> : null}
+            <>
+              <View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="your-store.myshopify.com"
+                  value={shopDomain}
+                  onChangeText={(text) => {
+                    setShopDomain(text);
+                    setShopifyError('');
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  style={[styles.registerButton, !shopDomain.trim() && styles.disabledButton]}
+                  onPress={handleShopifyConnect}
+                  disabled={!shopDomain.trim()}
+                >
+                  <Text style={styles.registerButtonText}>Connect Shopify Store</Text>
+                </Pressable>
+              </View>
+              {shopifyError ? <Text style={styles.errorText}>{shopifyError}</Text> : null}
+            </>
           ) : (
             <Pressable style={styles.socialButton} onPress={() => setShowShopifyInput(true)}>
               <Text style={styles.socialButtonText}>Continue with Shopify</Text>

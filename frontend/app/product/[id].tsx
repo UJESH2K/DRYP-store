@@ -1,15 +1,15 @@
-import { View, Text, StyleSheet, Image, ScrollView, Pressable, ActivityIndicator, Alert, RefreshControl, FlatList, Dimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
-import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, Pressable, ActivityIndicator, Alert, RefreshControl, FlatList, Dimensions, Animated } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '../../src/lib/api';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../../src/lib/config';
 const { width: screenWidth } = Dimensions.get('window');
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ProductDetailScreen() {
     const { id } = useLocalSearchParams();
@@ -25,37 +25,35 @@ export default function ProductDetailScreen() {
 
     const isProductInWishlist = isWishlisted(id as string);
 
-    // Animation values
-    const wishlistScale = useSharedValue(1);
-    const cartScale = useSharedValue(1);
-    const cartBgColor = useSharedValue('#000');
+    // Animation values (core Animated)
+    const wishlistScale = useRef(new Animated.Value(1)).current;
+    const cartScale = useRef(new Animated.Value(1)).current;
+    const cartColor = useRef(new Animated.Value(0)).current; // 0 normal, 1 added
 
-    // Animated styles
-    const animatedWishlistStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: wishlistScale.value }],
-    }));
-    const animatedCartStyle = useAnimatedStyle(() => ({
-        backgroundColor: withTiming(isInCart ? '#4B0082' : '#000', { duration: 300 }),
-        transform: [{ scale: cartScale.value }],
-    }));
-
+    // Trigger wishlist pop animation on change
     useEffect(() => {
-        // Trigger wishlist animation
-        wishlistScale.value = withSpring(isProductInWishlist ? 1.2 : 1, {}, (isFinished) => {
-            if (isFinished) {
-                wishlistScale.value = withSpring(1);
-            }
-        });
-    }, [isProductInWishlist]);
+        wishlistScale.setValue(isProductInWishlist ? 1.2 : 1);
+        Animated.spring(wishlistScale, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 3,
+        }).start();
+    }, [isProductInWishlist, wishlistScale]);
 
+    // Trigger cart scale + color anim
     useEffect(() => {
-        // Trigger cart animation
-        cartScale.value = withSpring(isInCart ? 1.1 : 1, {}, (isFinished) => {
-            if (isFinished) {
-                cartScale.value = withSpring(1);
-            }
-        });
-    }, [isInCart]);
+        const toVal = isInCart ? 1 : 0;
+        Animated.spring(cartScale, {
+            toValue: isInCart ? 1.1 : 1,
+            useNativeDriver: true,
+            friction: 3,
+        }).start();
+        Animated.timing(cartColor, {
+            toValue: toVal,
+            duration: 300,
+            useNativeDriver: false,
+        }).start();
+    }, [isInCart, cartScale, cartColor]);
 
     useEffect(() => {
         // Determine if the product/variant is in the cart
@@ -78,7 +76,7 @@ export default function ProductDetailScreen() {
             setIsInCart(inCart);
         }
     }, [cart, product, selectedOptions]);
-    
+
     const fetchProduct = async () => {
         if (!id) return;
         setLoading(true);
@@ -197,7 +195,7 @@ export default function ProductDetailScreen() {
 
                 <View style={styles.actions}>
                     <Pressable onPress={handleWishlistToggle}>
-                        <Animated.View style={[styles.wishlistButton, animatedWishlistStyle]}>
+                        <Animated.View style={[styles.wishlistButton, { transform: [{ scale: wishlistScale }] }]}>
                             <Ionicons 
                                 name={isProductInWishlist ? "heart" : "heart-outline"} 
                                 size={30} 
@@ -205,14 +203,23 @@ export default function ProductDetailScreen() {
                             />
                         </Animated.View>
                     </Pressable>
-                    <Animated.Pressable 
-                        style={[styles.cartButton, animatedCartStyle]} 
+                    <AnimatedPressable 
+                        style={[
+                            styles.cartButton, 
+                            { 
+                                transform: [{ scale: cartScale }],
+                                backgroundColor: cartColor.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['#000', '#4B0082'],
+                                }),
+                            }
+                        ]} 
                         onPress={handleCartToggle}
                         disabled={(product.options.length > 0 && !selectedVariant) || stockStatus === 'Out of Stock'}
                     >
                         <Ionicons name={isInCart ? "checkmark-done" : "cart-outline"} size={22} color="#fff" />
                         <Text style={styles.cartButtonText}>{isInCart ? 'Added to Cart' : 'Add to Cart'}</Text>
-                    </Animated.Pressable>
+                    </AnimatedPressable>
                 </View>
             </View>
         </>

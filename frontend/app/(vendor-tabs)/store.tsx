@@ -19,8 +19,7 @@ import { VendorHeader } from '../../src/components/vendor/Header';
 import { useAuthStore } from '../../src/state/auth';
 import { apiCall } from '../../src/lib/api';
 import { Ionicons } from '@expo/vector-icons';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../../src/lib/config';
 
 export default function StoreProfileScreen() {
   const { user, token, logout } = useAuthStore();
@@ -194,27 +193,29 @@ export default function StoreProfileScreen() {
               <Text style={styles.subTitle}>Shopify Integration</Text>
               {(!shopifyStatus?.shopify?.importStatus || shopifyStatus.shopify.importStatus === 'not_connected') ? (
                 showShopifyInput ? (
-                  <View style={styles.shopifyInputRow}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="your-store.myshopify.com"
-                      value={shopDomain}
-                      onChangeText={(text) => {
-                        setShopDomain(text);
-                        setShopifyError('');
-                      }}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    <Pressable
-                      style={[styles.saveButton, !shopDomain.trim() && styles.disabledButton]}
-                      onPress={handleShopifyConnect}
-                      disabled={!shopDomain.trim()}
-                    >
-                      <Text style={styles.saveButtonText}>Connect Store</Text>
-                    </Pressable>
-                  </View>
-                  {shopifyError ? <Text style={styles.errorText}>{shopifyError}</Text> : null}
+                  <>
+                    <View style={styles.shopifyInputRow}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="your-store.myshopify.com"
+                        value={shopDomain}
+                        onChangeText={(text) => {
+                          setShopDomain(text);
+                          setShopifyError('');
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <Pressable
+                        style={[styles.saveButton, !shopDomain.trim() && styles.disabledButton]}
+                        onPress={handleShopifyConnect}
+                        disabled={!shopDomain.trim()}
+                      >
+                        <Text style={styles.saveButtonText}>Connect Store</Text>
+                      </Pressable>
+                    </View>
+                    {shopifyError ? <Text style={styles.errorText}>{shopifyError}</Text> : null}
+                  </>
                 ) : (
                   <Pressable style={styles.saveButton} onPress={() => setShowShopifyInput(true)}>
                     <Text style={styles.saveButtonText}>Connect Shopify Store</Text>

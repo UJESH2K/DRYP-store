@@ -5,8 +5,8 @@ import { CartItem as CartItemType } from '../../state/cart';
 interface CartItemProps {
   item: CartItemType;
 }
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+ 
+import { API_BASE_URL } from '../../lib/config';
 
 const CartItem: React.FC<CartItemProps> = ({ item }) => {
   return (

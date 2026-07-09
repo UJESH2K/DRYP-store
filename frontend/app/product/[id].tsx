@@ -6,8 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '../../src/lib/api';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../../src/lib/config';
 const { width: screenWidth } = Dimensions.get('window');
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);

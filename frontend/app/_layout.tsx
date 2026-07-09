@@ -17,7 +17,7 @@ import { useCustomRouter } from '../src/hooks/useCustomRouter';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isAuthenticated, isGuest, user, loadUser } = useAuthStore();
+  const { isAuthenticated, user, loadUser } = useAuthStore();
   const [fontsLoaded] = useFonts({
     JosefinSans_400Regular,
     JosefinSans_500Medium,
@@ -66,13 +66,11 @@ export default function RootLayout() {
         } else {
           router.replace('/onboarding');
         }
-      } else if (isGuest) {
-        router.replace('/(tabs)/home');
       } else {
         router.replace('/login');
       }
     }
-  }, [isAuthenticated, isGuest, user, appIsReady]);
+  }, [isAuthenticated, user, appIsReady]);
 
   if (!appIsReady) {
     return null; // Or a loading indicator

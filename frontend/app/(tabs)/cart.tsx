@@ -10,8 +10,7 @@ import { useAuthStore } from '../../src/state/auth';
 import ProductDetailModal from '../../src/components/ProductDetailModal';
 import AnimatedLoadingScreen from '../../src/components/common/AnimatedLoadingScreen';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../../src/lib/config';
 
 export default function CartScreen() {
   const router = useCustomRouter();

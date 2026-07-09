@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+import { API_BASE_URL } from '../lib/config';
 
 /**
  * Derives a price tier ('low', 'mid', 'high') from a product's price.
@@ -48,13 +48,13 @@ export const mapProductToItem = (product) => {
 
   const { sizes, colors } = getSizesAndColors(product);
 
+  if (!product.images || product.images.length === 0) return null;
+
   return {
     id: product._id,
     title: product.name,
-    subtitle: product.description.substring(0, 50) + '...', // Create a subtitle
-    image: product.images && product.images.length > 0 
-      ? `${API_BASE_URL}${product.images[0]}`
-      : 'https://via.placeholder.com/800x1200', // Placeholder
+    subtitle: product.description.substring(0, 50) + '...',
+    image: product.images[0].startsWith('http') ? product.images[0] : `${API_BASE_URL}${product.images[0]}`,
     tags: product.tags || [],
     category: product.category,
     priceTier: getPriceTier(product.basePrice),

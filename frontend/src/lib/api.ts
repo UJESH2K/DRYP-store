@@ -1,10 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../state/auth';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
-
-// Log the API URL being used for debugging
-console.log('🌐 API Base URL:', API_BASE_URL);
+import { API_BASE_URL } from './config';
 
 // Simple fetch wrapper with error handling and auth token injection
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
@@ -12,14 +9,11 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     const fullUrl = `${API_BASE_URL}${endpoint}`;
     console.log(`🚀 FRONTEND API CALL: ${options.method || 'GET'} ${fullUrl}`);
 
-    const { token, isGuest, guestId } = useAuthStore.getState();
-    console.log(`🔑 Auth Token:`, token ? 'Present' : 'Missing');
+    const { token } = useAuthStore.getState();
     
     const headers = { ...options.headers };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-    } else if (isGuest && guestId) {
-      headers['x-guest-id'] = guestId;
     }
 
     let body = options.body;
@@ -73,11 +67,6 @@ export async function sendInteraction(action: 'like' | 'dislike', itemId: string
   const payload: { [key: string]: any } = {
     productId: itemId,
   };
-  
-  const { isGuest, guestId } = useAuthStore.getState();
-  if (isGuest && guestId) {
-    payload.guestId = guestId;
-  }
 
   if (action === 'like') {
     return apiCall(`/api/likes/${itemId}`, {

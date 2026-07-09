@@ -77,7 +77,7 @@ The upload API now sends images directly to S3, so the IAM user needs permission
 > **Note on MongoDB Atlas:** If you are using MongoDB Atlas, make sure to whitelist your IP address to allow connections from your machine.
 
 **Frontend `.env` file (`/frontend/.env`):**
-`EXPO_PUBLIC_API_BASE_URL=http://<your_local_ip_address>:5000`
+`EXPO_PUBLIC_API_BASE_URL=http://<your_local_ip_address>:8080`
 
 > *Do not use `localhost` if you are running the app on your mobile device via Expo Go.*
 
@@ -86,7 +86,7 @@ The upload API now sends images directly to S3, so the IAM user needs permission
 1.  Navigate to the backend directory: `cd backend`
 2.  Install dependencies: `npm install`
 3.  Start the server: `npm start`
-    (The server will run on `http://localhost:5000`)
+    (The server will run on `http://localhost:8080`)
 
 ### 3. Frontend Setup
 
@@ -101,6 +101,20 @@ The upload API now sends images directly to S3, so the IAM user needs permission
 2.  Install dependencies: `npm install`
 3.  Start the development server: `npm run dev`
     (The website will be available at `http://localhost:3000`)
+
+---
+
+## 🤖 Zaloga AI Stylist Setup
+
+The AI stylist ("Zaloga") lives at `POST /api/ai/zaloga`. To make it work end-to-end:
+
+1. **Add an OpenAI key** — set `OPENAI_API_KEY` in `backend/.env` (get one at https://platform.openai.com/api-keys).
+   Without it, the stylist runs in DEV MODE: it returns text-search matches from the catalog but no real AI-generated replies.
+2. **Seed the catalog** — `cd backend && npm run seed` (inserts sample Darinda products).
+3. **Generate embeddings** — `cd backend && npm run embed` (creates 1536-dim vectors for vector search).
+4. **Create the vector index** — `cd backend && npm run create-index` (creates the Atlas Vector Search index `product_embedding_index`).
+
+With a valid key + embeddings + index, the stylist returns AI-generated replies with semantically relevant product suggestions.
 
 ---
 

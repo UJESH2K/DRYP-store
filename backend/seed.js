@@ -1,6 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Product = require('./src/models/Product'); // Adjust this path if your models folder is elsewhere
+const Product = require('./src/models/Product');
+const { generateEmbeddings } = require('./embed');
 
 // The User ID of the vendor (extracted from the 'owner' field you provided)
 const VENDOR_USER_ID = "69d511c49d3f5ecfb115378a"; 
@@ -203,9 +204,21 @@ const runSeed = async () => {
     console.log(`🗑️ Cleared ${deleteResult.deletedCount} old items.\n`);
 
     console.log("Seeding new dossier into the archive...");
-    const insertedProducts = await Product.insertMany(seedProducts);
+    // Product model has a unique sparse index on { vendor, externalId }; seed items lack externalId, so assign unique ones to avoid null-collision.
+    const productsToInsert = seedProducts.map((p, i) => ({
+      ...p,
+      externalId: p.externalId || `seed-${i + 1}`,
+    }));
+    const insertedProducts = await Product.insertMany(productsToInsert);
     
     console.log(`✅ Successfully curated ${insertedProducts.length} new items into Darinda's Studio!`);
+    
+    console.log('\n🔮 Generating embeddings for vector search...');
+    try {
+      await generateEmbeddings();
+    } catch (e) {
+      console.log('⚠️ Embedding generation failed (seed continues):', e.message);
+    }
     
     process.exit(0);
   } catch (error) {

@@ -262,5 +262,6 @@ router.put('/reset-password/:token', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.mergeGuestData = mergeGuestData;
 
 

@@ -43,7 +43,7 @@ const UserSchema = new mongoose.Schema(
         return this.authProvider === "local";
       },
     },
-    authProvider: { type: String, enum: ["local", "shopify", "invited"], default: "local" },
+    authProvider: { type: String, enum: ["local", "shopify", "google", "invited"], default: "local" },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },

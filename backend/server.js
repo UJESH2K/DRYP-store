@@ -8,6 +8,7 @@ const connectDatabase = require("./src/config/database");
 // Route imports
 const authRoutes = require("./src/routes/auth");
 const shopifyAuthRoutes = require("./src/routes/shopifyAuth");
+const googleAuthRoutes = require("./src/routes/googleAuth");
 const productRoutes = require("./src/routes/products");
 const vendorRoutes = require("./src/routes/vendors");
 const orderRoutes = require("./src/routes/orders");
@@ -56,7 +57,12 @@ const shopifyAuthLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Express app
 const app = express();
+const http = require("http");
+
+// Create HTTP server with increased header size to handle proxied cookies from Next.js
+const server = http.createServer({ maxHeaderSize: 32768 }, app);
 
 // Trust proxy (needed for rate limiting behind nginx reverse proxy)
 app.set('trust proxy', 1);
@@ -98,8 +104,10 @@ app.use("/api/auth/register", authLimiter);
 app.use("/api/vendors/register", vendorSignupLimiter);
 app.use("/api/vendors/apply", vendorApplyLimiter);
 app.use("/api/auth/shopify", shopifyAuthLimiter);
+app.use("/api/auth/google", shopifyAuthLimiter);
 
 app.use("/api/auth/shopify", shopifyAuthRoutes);
+app.use("/api/auth/google", googleAuthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/vendors", vendorRoutes);
@@ -134,7 +142,7 @@ const PORT = process.env.PORT || 8080; // Backend runs on port 8080
     require("./src/jobs/shopifyImport")(agenda);
     await agenda.start();
 
-    app.listen(PORT, "0.0.0.0", () =>
+    server.listen(PORT, "0.0.0.0", () =>
     console.log(
         `Server running on port ${PORT} and accessible from all interfaces`,
       ),

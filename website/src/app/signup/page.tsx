@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { normalizeShopDomain } from "@/lib/shopify";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -25,9 +24,6 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState("");
-  const [showShopifyInput, setShowShopifyInput] = useState(false);
-  const [shopDomain, setShopDomain] = useState("");
-  const [shopifyError, setShopifyError] = useState("");
 
   const [fieldErrors, setFieldErrors] = useState({
     name: "",
@@ -36,7 +32,6 @@ export default function SignupPage() {
 
   const { login } = useAuth();
 
-  // Real-time password requirement checks
   const passwordRules = {
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
@@ -79,7 +74,6 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      // Point to the Vendor registration route
       const res = await fetch(`${API_BASE_URL}/api/vendors/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,14 +93,8 @@ export default function SignupPage() {
     }
   };
 
-  const handleShopifyConnect = (e: React.FormEvent) => {
-    e.preventDefault();
-    const domain = normalizeShopDomain(shopDomain);
-    if (!domain) {
-      setShopifyError("Enter a valid Shopify domain, e.g. your-store.myshopify.com");
-      return;
-    }
-    window.location.href = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=web`;
+  const handleGoogleSignup = () => {
+    window.location.href = "/api/auth/google";
   };
 
   const renderServerError = () => {
@@ -227,7 +215,6 @@ export default function SignupPage() {
 
             <form className="space-y-8" onSubmit={handleSubmit}>
               <div className="space-y-8">
-                {/* Name Input */}
                 <div className="relative">
                   <input
                     id="name"
@@ -255,7 +242,6 @@ export default function SignupPage() {
                   )}
                 </div>
 
-                {/* Email Input */}
                 <div className="relative">
                   <input
                     id="email-address"
@@ -283,7 +269,6 @@ export default function SignupPage() {
                   )}
                 </div>
 
-                {/* Password Input */}
                 <div className="relative">
                   <input
                     id="password"
@@ -353,44 +338,15 @@ export default function SignupPage() {
             </div>
 
             <div className="mt-6">
-              {!showShopifyInput ? (
-                <button
-                  type="button"
-                  onClick={() => setShowShopifyInput(true)}
-                  className="w-full border border-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-black transition-colors hover:bg-black hover:text-white"
-                >
-                  Continue with Shopify
-                </button>
-              ) : (
-                <form onSubmit={handleShopifyConnect} className="space-y-3">
-                  <input
-                    type="text"
-                    value={shopDomain}
-                    onChange={(e) => {
-                      setShopDomain(e.target.value);
-                      setShopifyError("");
-                    }}
-                    placeholder="your-store.myshopify.com"
-                    autoFocus
-                    className={`w-full border-b bg-transparent pb-2 pt-1 text-base text-black placeholder-gray-300 transition-all focus:outline-none ${
-                      shopifyError ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-black"
-                    }`}
-                  />
-                  {shopifyError && (
-                    <p className="text-[10px] text-red-500 uppercase tracking-widest">{shopifyError}</p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={!shopDomain.trim()}
-                    className="w-full bg-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-white transition-colors hover:bg-zinc-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                  >
-                    Connect Store
-                  </button>
-                </form>
-              )}
+              <button
+                type="button"
+                onClick={handleGoogleSignup}
+                className="w-full border border-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-black transition-colors hover:bg-black hover:text-white"
+              >
+                Continue with Google
+              </button>
             </div>
 
-            {/* NEW GATEKEEPER LINKS */}
             <div className="mt-10 pt-6 border-t border-gray-200 text-center space-y-5">
               <Link
                 href="/apply"
@@ -398,7 +354,7 @@ export default function SignupPage() {
               >
                 New Studio? Submit an application first
               </Link>
-              
+
               <Link
                 href="/login"
                 className="block font-sans text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
@@ -406,7 +362,7 @@ export default function SignupPage() {
                 Already Curated? Log In
               </Link>
             </div>
-            
+
           </div>
         </div>
       </div>

@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+const apiUrl = new URL(apiBaseUrl);
+
 const s3PublicUrl =
   process.env.NEXT_PUBLIC_S3_PUBLIC_URL ||
   "https://casa-app-s3.s3.ap-southeast-2.amazonaws.com";
@@ -15,9 +19,9 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "http",
-        hostname: "localhost",
-        port: "5000",
+        protocol: apiUrl.protocol.replace(":", "") as "http" | "https",
+        hostname: apiUrl.hostname,
+        port: apiUrl.port,
         pathname: "/**",
       },
       {
@@ -31,7 +35,7 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
       {
-        protocol: s3RemoteUrl.protocol.replace(":", ""),
+        protocol: s3RemoteUrl.protocol.replace(":", "") as "http" | "https",
         hostname: s3RemoteUrl.hostname,
         pathname: "/**",
       },
@@ -42,9 +46,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: process.env.NODE_ENV === "production"
-          ? process.env.NEXT_PUBLIC_API_BASE_URL + "/api/:path*"
-          : "http://localhost:5000/api/:path*",
+        destination: `${apiBaseUrl}/api/:path*`,
       },
     ];
   },

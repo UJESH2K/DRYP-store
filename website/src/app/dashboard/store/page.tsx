@@ -107,7 +107,7 @@ const StoreProfilePage = () => {
       setShopifyError("Enter a valid Shopify domain, e.g. your-store.myshopify.com");
       return;
     }
-    window.location.href = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=web&token=${encodeURIComponent(token)}`;
+    window.location.href = `/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=web&token=${encodeURIComponent(token)}`;
   };
 
   const fetchVendorProfile = async () => {

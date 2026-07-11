@@ -8,16 +8,15 @@ import { useAuth } from "@/contexts/AuthContext";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  invalid_shop: "That doesn't look like a valid Shopify domain. Use the format your-store.myshopify.com.",
-  invalid_platform: "Something went wrong — please try again from the website.",
-  account_exists:
-    "An account with this Shopify store's email already exists. Please log in first, then connect Shopify from your dashboard.",
-  no_vendor_profile: "We couldn't find a studio profile linked to your account.",
-  invalid_session: "Your session expired before Shopify could finish authenticating. Please try again.",
-  oauth_failed: "Something went wrong connecting your Shopify store. Please try again.",
+  google_denied: "Google login was cancelled.",
+  no_code: "No authorization code was returned by Google.",
+  invalid_state: "Your session expired. Please try again.",
+  token_exchange_failed: "Failed to exchange Google credentials. Please try again.",
+  no_email: "Your Google account does not have an email address associated with it.",
+  oauth_failed: "Something went wrong signing in with Google. Please try again.",
 };
 
-function ShopifyCallbackContent() {
+function GoogleCallbackContent() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [status, setStatus] = useState<"loading" | "error">("loading");
@@ -29,13 +28,13 @@ function ShopifyCallbackContent() {
 
     if (error) {
       setStatus("error");
-      setMessage(ERROR_MESSAGES[error] || "Shopify connection failed.");
+      setMessage(ERROR_MESSAGES[error] || "Google sign-in failed.");
       return;
     }
 
     if (!token) {
       setStatus("error");
-      setMessage("No authentication token was returned by Shopify.");
+      setMessage("No authentication token was returned by Google.");
       return;
     }
 
@@ -57,7 +56,7 @@ function ShopifyCallbackContent() {
         login({ ...user, vendor }, token);
       } catch (err) {
         setStatus("error");
-        setMessage(err instanceof Error ? err.message : "Failed to complete Shopify login.");
+        setMessage(err instanceof Error ? err.message : "Failed to complete Google login.");
       }
     })();
   }, [searchParams, login]);
@@ -67,11 +66,11 @@ function ShopifyCallbackContent() {
       <div className="max-w-sm w-full px-8 text-center">
         {status === "loading" ? (
           <p className="font-editorial text-xl italic text-gray-500">
-            Connecting your Shopify store…
+            Signing in with Google…
           </p>
         ) : (
           <>
-            <p className="font-editorial text-xl italic text-black mb-4">Connection Failed</p>
+            <p className="font-editorial text-xl italic text-black mb-4">Sign In Failed</p>
             <p className="text-sm text-gray-500 mb-8">{message}</p>
             <Link
               href="/login"
@@ -86,10 +85,10 @@ function ShopifyCallbackContent() {
   );
 }
 
-export default function ShopifyCallbackPage() {
+export default function GoogleCallbackPage() {
   return (
     <Suspense fallback={null}>
-      <ShopifyCallbackContent />
+      <GoogleCallbackContent />
     </Suspense>
   );
 }

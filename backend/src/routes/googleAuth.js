@@ -8,7 +8,7 @@ const { mergeGuestData } = require('./auth');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = `${process.env.SHOPIFY_APP_URL || 'http://localhost:8080'}/api/auth/google/callback`;
+const REDIRECT_URI = `${process.env.SHOPIFY_APP_URL || 'http://localhost:8081'}/api/auth/google/callback`;
 
 const buildFrontendRedirect = (params) => {
   const base = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
@@ -108,14 +108,13 @@ router.get('/callback', async (req, res, next) => {
     } else {
       // Create new user
       isNewUser = true;
-      const createdUsers = await User.create({
+      user = await User.create({
         name: name || email.split('@')[0],
         email,
         authProvider: 'google',
         avatar: picture,
         role: 'vendor',
       });
-      user = createdUsers[0];
 
       // Create a vendor profile for new users
       await Vendor.create({

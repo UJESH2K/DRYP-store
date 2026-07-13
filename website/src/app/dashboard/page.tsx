@@ -5,8 +5,52 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 
+const OPTIONS = [
+  {
+    title: "Manual",
+    subtitle: "Curate Archive",
+    description: "Add products one by one with full control over every detail — images, variants, pricing, and metadata.",
+    href: "/dashboard/products",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="12" y1="12" x2="12" y2="18" />
+        <line x1="9" y1="15" x2="15" y2="15" />
+      </svg>
+    ),
+  },
+  {
+    title: "Excel",
+    subtitle: "Import Catalog",
+    description: "Upload a spreadsheet (.xlsx or .csv) to bulk-import your entire catalog. We auto-group variants.",
+    href: "/dashboard/catalog-import",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+    ),
+  },
+  {
+    title: "Shopify",
+    subtitle: "Link Scraper",
+    description: "Paste a Shopify product URL and we'll automatically extract all product data, images, and pricing.",
+    href: "/dashboard/shopify-scrape",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+      </svg>
+    ),
+  },
+];
+
 export default function DashboardPage() {
-  const { isAuthenticated, loading, logout } = useAuth();
+  const { isAuthenticated, loading, logout, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,25 +80,23 @@ export default function DashboardPage() {
       `,
         }}
       />
-      
+
       <div className="min-h-screen bg-[#FCFCFA] px-6 py-12 md:px-16 lg:px-24 selection:bg-black selection:text-white">
-        {/* Minimalist Header & Logout */}
+        {/* Minimalist Header */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-8 mb-16 gap-6">
           <div>
-            {/* Clickable Brand Logo added here */}
             <Link href="/" className="mb-8 block w-max">
               <span className="font-editorial text-2xl italic tracking-[0.2em] text-black hover:opacity-70 transition-opacity cursor-pointer">
                 DRYP
               </span>
             </Link>
-
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-3">
               Secure Session
             </p>
             <h1 className="font-editorial text-5xl md:text-6xl font-light tracking-tight text-black">
-              The{" "}
+              Welcome,{" "}
               <span className="font-cursive text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
-                atelier
+                {user?.name || "vendor"}
               </span>
             </h1>
           </div>
@@ -70,60 +112,45 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Editorial Dashboard Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
-          {/* Abstract Welcome Message */}
-          <div className="lg:col-span-7 flex flex-col justify-center">
-            <h2 className="font-editorial text-4xl leading-snug tracking-tight text-black mb-6">
-              Welcome to the Syndicate. <br />
-              Your creative sanctuary awaits.
-            </h2>
-            <p className="font-sans text-[11px] font-light leading-relaxed tracking-[0.15em] text-gray-500 uppercase max-w-lg mb-10">
-              Navigate through the portal using the left menu. Curate your
-              archive, monitor global acquisitions, and manage your designer
-              dossier with absolute precision.
-            </p>
+        {/* Onboarding Prompt */}
+        <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.4em] text-gray-400 mb-12">
+          Choose how to add products to your studio
+        </p>
 
-            <div className="flex gap-6">
-              <Link
-                href="/dashboard/products"
-                className="border-b border-black pb-1 font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 hover:border-gray-500 transition-colors"
-              >
-                Curate Archive
-              </Link>
-              <Link
-                href="/dashboard/store"
-                className="border-b border-gray-300 pb-1 font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-black hover:border-black transition-colors"
-              >
-                Update Profile
-              </Link>
-              <Link
-                href="/dashboard/catalog-import"
-                className="border-b border-gray-300 pb-1 font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-black hover:border-black transition-colors"
-              >
-                Import Catalog
-              </Link>
-            </div>
-          </div>
-
-          {/* Conceptual Data Widget */}
-          <div className="lg:col-span-5 bg-zinc-50 p-12 border border-gray-200 flex flex-col justify-between aspect-square lg:aspect-auto min-h-[400px] shadow-sm">
-            <div>
-              <p className="font-sans text-[9px] uppercase tracking-[0.4em] text-gray-400 mb-8">
-                Current Status
+        {/* Three Option Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {OPTIONS.map((option) => (
+            <Link
+              key={option.href}
+              href={option.href}
+              className="group block bg-white border border-gray-200 p-10 transition-all duration-500 hover:border-black hover:shadow-lg hover:-translate-y-1"
+            >
+              <div className="text-gray-300 group-hover:text-black transition-colors duration-500 mb-8">
+                {option.icon}
+              </div>
+              <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.35em] text-gray-400 mb-3">
+                {option.subtitle}
               </p>
-              <h3 className="font-editorial text-3xl italic text-gray-300">
-                Awaiting <br /> Data Initialization
+              <h3 className="font-editorial text-3xl mb-4 group-hover:tracking-tight transition-all duration-500">
+                {option.title}
               </h3>
-            </div>
+              <p className="font-sans text-[11px] font-light leading-relaxed tracking-[0.05em] text-gray-500">
+                {option.description}
+              </p>
+              <div className="mt-8 flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.3em] text-gray-400 group-hover:text-black transition-colors duration-500">
+                <span>Enter Studio</span>
+                <span className="inline-block transition-transform duration-500 group-hover:translate-x-1">→</span>
+              </div>
+            </Link>
+          ))}
+        </div>
 
-            <div className="flex items-center gap-4 text-gray-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-black animate-pulse" />
-              <span className="font-sans text-[9px] uppercase tracking-[0.3em]">
-                System Online
-              </span>
-            </div>
-          </div>
+        {/* Editorial Footer */}
+        <div className="mt-20 pt-8 border-t border-gray-200 flex items-center gap-4 text-gray-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+          <span className="font-sans text-[9px] uppercase tracking-[0.3em]">
+            Studio Online
+          </span>
         </div>
       </div>
     </>

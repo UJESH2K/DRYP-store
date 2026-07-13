@@ -4,7 +4,7 @@ Supplemental guidance for OpenCode agents. See `CLAUDE.md` for project overview,
 
 ## Port & URL pitfalls
 
-- Backend runs on **8080** (`server.js` line `const PORT = process.env.PORT || 8080`). The test script (`tests/api.test.js`) and README both incorrectly say 5000 — do not trust them.
+- Backend port is set by `PORT` in `backend/.env` (currently **8081**). Apache's `PEMHTTPD-x64` service holds port 8080, so the backend uses 8081.
 - `frontend/src/lib/api.ts` hardcodes a fallback `http://192.168.1.9:5000`. The real env var is `EXPO_PUBLIC_API_BASE_URL`. Set it to `http://<lan-ip>:8080` for physical devices.
 - Website `next.config.ts` rewrites `/api/*` using `NEXT_PUBLIC_API_BASE_URL` (both dev and prod). The image `remotePattern` also reads from this env var. Change one env var to bump the backend port; no hardcoded port in config anymore.
 
@@ -49,15 +49,55 @@ Supplemental guidance for OpenCode agents. See `CLAUDE.md` for project overview,
 
 - **Google OAuth added**: Backend route at `GET /api/auth/google` (consent redirect) and `GET /api/auth/google/callback` (token exchange). Callback page at `/oauth/google/callback` in the website.
 - **User model updated** (`backend/src/models/User.js`): `authProvider` enum now includes `"google"`. Google-authed users get `role: 'vendor'` and a Vendor profile created automatically.
-- **Google Client ID/Secret** are in `backend/.env` (and `.env.local`, `.env.production`). The redirect URI is `{SHOPIFY_APP_URL}/api/auth/google/callback` — on dev this resolves to `http://localhost:8080/api/auth/google/callback`.
+- **Google Client ID/Secret** are in `backend/.env` (and `.env.local`, `.env.production`). The redirect URI is `{SHOPIFY_APP_URL}/api/auth/google/callback` — on dev this resolves to `http://localhost:8081/api/auth/google/callback`.
 - **Website signup/login buttons**: Both replaced "Continue with Shopify" with "Continue with Google". Shopify connection is only available post-auth in the dashboard's store settings (`/dashboard/store`).
 
 ## Env files convention
 
 - Each package has two env templates: `.env.local` (dev) and `.env.production` (production). The active `.env` file is the one actually read by the app.
-- `website/.env` had port 5000 hardcoded — it's now fixed to **8080** (reads `NEXT_PUBLIC_API_BASE_URL`).
+- `website/.env` had port 5000 hardcoded — it's now fixed to **8081** (reads `NEXT_PUBLIC_API_BASE_URL`).
 - `website/next.config.ts` rewrites `/api/*` using `NEXT_PUBLIC_API_BASE_URL` (both dev and prod). The image `remotePattern` also reads from this env var. Change one env var to bump the backend port; no hardcoded port in config anymore.
 - Root `.env.local` is **tracked in git** (`.gitignore` has `.env*` at root but `.env.local` was committed before the rule was added). Be careful not to expose its contents.
+
+## AI Chatbot — MongoDB Vector Search
+
+- **New backend route**: `POST /api/ai/chat` at `backend/src/routes/ai.js`. Takes `{ messages: [...], vendorId?: string }`. Embeds the last user message with OpenAI `text-embedding-3-small`, runs `$vectorSearch` against the `product_embeddings` Atlas Search index, generates a GPT-4o-mini response.
+- **Embedding generation**: `backend/src/utils/embeddings.js` — `generateEmbedding(text)` and `generateProductEmbedding(product)`.
+- **Product model updated** (`backend/src/models/Product.js`): added `embedding: { type: [Number], default: undefined }`.
+- **Auto-embedding on product create/update**: `backend/src/routes/products.js` — after `Product.create()` and `Product.findByIdAndUpdate()`, a fire-and-forget `generateProductEmbedding()` call updates the product's embedding.
+- **Batch embedding**: `POST /api/ai/embed-products` (admin only) scans products without embeddings and generates them.
+- **Fallback text search**: If vector search returns 0 results, falls back to regex `$or` search across name, description, brand, category, tags.
+- **Mobile app chat UI**: `frontend/app/ai-chat.tsx` — full chat screen accessible from profile page (/ai-chat). Shows suggestion chips, message bubbles, and inline product cards that link to product detail.
+- **Entry point**: Profile screen (`frontend/app/(tabs)/profile.tsx`) — "AI Stylist" row in Support section using `sparkles-outline` icon.
+- **Lazy OpenAI client**: Both `embeddings.js` and `ai.js` create the OpenAI client lazily inside functions (not at module level), so the server starts without `OPENAI_API_KEY` being set.
+## Shopify Link Scraper
+
+- **New backend route**: `POST /api/products/shopify-scrape` and `POST /api/products/shopify-preview` at `backend/src/routes/products.js`. Takes `{ url }`, scrapes the Shopify product page, and creates a product entry.
+- **Scraper utility**: `backend/src/utils/shopifyScraper.js` — extracts data from JSON-LD (`application/ld+json`), Shopify `__INITIAL_STATE__`, or falls back to Open Graph meta tags.
+- **Website page**: `website/src/app/dashboard/shopify-scrape/page.tsx` — URL input, preview of scraped data, one-click import.
+- **Dashboard redesign**: `website/src/app/dashboard/page.tsx` — three prominent cards (Manual, Excel, Shopify) as the post-auth landing.
+- **Backend scraper**: Uses native `fetch` with realistic User-Agent headers. First tries JSON-LD structured data, then Shopify's `__INITIAL_STATE__` script, then basic OG meta tags as fallback.
+
+## Required Atlas Vector Search index
+  ```
+  Database: dryp-store (or your DB name)
+  Collection: products
+  Index name: product_embeddings
+  Type: vector
+  JSON definition:
+  {
+    "fields": [
+      {
+        "type": "vector",
+        "path": "embedding",
+        "numDimensions": 1536,
+        "similarity": "cosine"
+      }
+    ]
+  }
+  ```
+- **OpenAI API key**: Must be set in `backend/.env` as `OPENAI_API_KEY=sk-...`. Required for both embedding generation and chat responses.
+- **First-time setup**: After adding the API key + creating the Atlas index, hit `POST /api/ai/embed-products` with an admin token to batch-embed all existing products. After that, new/updated products auto-embed.
 
 ## Cross-cutting
 

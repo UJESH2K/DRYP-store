@@ -7,6 +7,7 @@ const WishlistItem = require('../models/WishlistItem');
 const Like = require('../models/Like'); 
 const { protect } = require('../middleware/auth');
 const { signProductImages, normalizeImageKeys } = require('../utils/imageUrls');
+const { generateProductEmbedding } = require('../utils/embeddings');
 const router = express.Router();
 
 // @route   POST /api/products
@@ -29,6 +30,9 @@ router.post('/', protect, async (req, res, next) => {
         : req.body.variants,
     };
     const product = await Product.create(productData);
+    generateProductEmbedding(product).then(embedding => {
+      Product.updateOne({ _id: product._id }, { $set: { embedding } }).catch(() => {});
+    }).catch(() => {});
     res.status(201).json(await signProductImages(product));
   } catch (error) {
     if (error.name === 'ValidationError') res.status(400).json({ message: error.message });
@@ -195,6 +199,10 @@ router.put('/:id', protect, async (req, res, next) => {
       { new: true, runValidators: true }
     );
 
+    generateProductEmbedding(updatedProduct).then(embedding => {
+      Product.updateOne({ _id: updatedProduct._id }, { $set: { embedding } }).catch(() => {});
+    }).catch(() => {});
+
     res.json(await signProductImages(updatedProduct));
   } catch (error) {
     if (error.name === 'ValidationError') res.status(400).json({ message: error.message });
@@ -247,6 +255,82 @@ router.get('/:id', async (req, res, next) => {
     res.json(await signProductImages(product));
   } catch (error) {
     next(error);
+  }
+});
+
+const { scrapeShopifyProduct } = require('../utils/shopifyScraper');
+
+// @route   POST /api/products/shopify-scrape
+// @desc    Scrape a Shopify product page and create a product
+// @access  Private (Vendor only)
+router.post('/shopify-scrape', protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'vendor') {
+      return res.status(403).json({ message: 'Forbidden: Only vendors can create products' });
+    }
+
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ message: 'Product URL is required' });
+    }
+
+    const scrapedData = await scrapeShopifyProduct(url);
+
+    const productData = {
+      name: scrapedData.name,
+      description: scrapedData.description,
+      brand: scrapedData.brand || req.user.name || 'Unknown Brand',
+      category: scrapedData.category || 'Uncategorized',
+      basePrice: scrapedData.basePrice,
+      images: normalizeImageKeys(scrapedData.images),
+      tags: scrapedData.tags,
+      source: 'shopify',
+      externalId: scrapedData.externalId || url,
+      vendor: req.user._id,
+      variants: scrapedData.variants.map(v => ({
+        ...v,
+        images: normalizeImageKeys(v.images),
+      })),
+    };
+
+    const product = await Product.create(productData);
+
+    generateProductEmbedding(product).then(embedding => {
+      Product.updateOne({ _id: product._id }, { $set: { embedding } }).catch(() => {});
+    }).catch(() => {});
+
+    res.status(201).json(await signProductImages(product));
+  } catch (error) {
+    console.error('Shopify scrape error:', error);
+    if (error.message.includes('Failed to fetch URL')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to scrape product. Check the URL and try again.' });
+  }
+});
+
+// @route   POST /api/products/shopify-preview
+// @desc    Preview scraped data without saving
+// @access  Private (Vendor only)
+router.post('/shopify-preview', protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'vendor') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ message: 'Product URL is required' });
+    }
+
+    const scrapedData = await scrapeShopifyProduct(url);
+    res.json(scrapedData);
+  } catch (error) {
+    console.error('Shopify preview error:', error);
+    if (error.message.includes('Failed to fetch URL')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Failed to scrape product.' });
   }
 });
 

@@ -11,6 +11,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const VendorApplication = require("../models/VendorApplication");
 const ShopifyImport = require("../models/ShopifyImport");
+const CatalogImport = require("../models/CatalogImport");
 const sendEmail = require("../utils/sendEmail");
 const {
   parseCatalogFile,
@@ -18,7 +19,9 @@ const {
   buildProductBulkOps,
 } = require("../utils/catalogImport");
 
-const MAX_CATALOG_FILE_SIZE_MB = 20;
+const MAX_CATALOG_FILE_SIZE_MB = 100;
+const BULK_BATCH_SIZE = 100;
+
 const catalogUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_CATALOG_FILE_SIZE_MB * 1024 * 1024 },
@@ -339,7 +342,7 @@ router.put("/me", protect, async (req, res, next) => {
 });
 
 // @route   POST /api/vendors/me/catalog-preview
-// @desc    Vendor: Parse an uploaded spreadsheet into draft products for review (no DB writes)
+// @desc    Vendor: Parse an uploaded spreadsheet into draft products for review
 // @access  Private (Vendor only)
 router.post(
   "/me/catalog-preview",
@@ -358,9 +361,25 @@ router.post(
           .json({ message: "No file uploaded (expected field name 'file')." });
       }
 
+      const vendor = await Vendor.findOne({ owner: req.user._id });
+      if (!vendor) {
+        return res.status(404).json({ message: "Vendor profile not found" });
+      }
+
       const rows = await parseCatalogFile(req.file.buffer, req.file.originalname);
       const { products, skippedRows } = groupRowsIntoProducts(rows);
-      res.json({ products, skippedRows });
+
+      const catalogImport = await CatalogImport.create({
+        vendor: vendor._id,
+        status: "previewed",
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        totalRows: products.reduce((sum, p) => sum + (p.variants?.length || 1), 0),
+        skippedRows,
+        products,
+      });
+
+      res.json({ importId: catalogImport._id, products, skippedRows });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);
@@ -386,14 +405,90 @@ router.post("/me/catalog-import", protect, async (req, res, next) => {
         .json({ message: "Vendor profile not found for this user" });
     }
 
-    const { products } = req.body;
+    let products;
+    let catalogImportId = null;
+
+    if (req.body.importId) {
+      const catalogImport = await CatalogImport.findOne({
+        _id: req.body.importId,
+        vendor: vendor._id,
+        status: "previewed",
+      });
+      if (!catalogImport) {
+        return res.status(400).json({ message: "Import session not found. Please re-upload the file." });
+      }
+      products = catalogImport.products;
+      catalogImportId = catalogImport._id;
+    } else {
+      products = req.body.products;
+    }
+
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ message: "No products to import." });
     }
 
     const ops = buildProductBulkOps(vendor, products);
-    await Product.bulkWrite(ops);
-    res.json({ imported: ops.length });
+
+    if (catalogImportId) {
+      await CatalogImport.findByIdAndUpdate(catalogImportId, {
+        $set: {
+          status: "importing",
+          batchProgress: { current: 0, total: Math.ceil(ops.length / BULK_BATCH_SIZE) },
+        },
+      });
+    }
+
+    let imported = 0;
+    for (let i = 0; i < ops.length; i += BULK_BATCH_SIZE) {
+      const batch = ops.slice(i, i + BULK_BATCH_SIZE);
+      await Product.bulkWrite(batch);
+      imported += batch.length;
+
+      if (catalogImportId) {
+        await CatalogImport.findByIdAndUpdate(catalogImportId, {
+          $set: { "batchProgress.current": Math.ceil(imported / BULK_BATCH_SIZE) },
+        });
+      }
+    }
+
+    if (catalogImportId) {
+      await CatalogImport.findByIdAndUpdate(catalogImportId, {
+        $set: {
+          status: "completed",
+          importedCount: imported,
+          completedAt: new Date(),
+          batchProgress: { current: Math.ceil(ops.length / BULK_BATCH_SIZE), total: Math.ceil(ops.length / BULK_BATCH_SIZE) },
+        },
+      });
+    }
+
+    res.json({ imported });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   GET /api/vendors/me/catalog-imports
+// @desc    Vendor: Get import history
+// @access  Private (Vendor only)
+router.get("/me/catalog-imports", protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== "vendor") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const vendor = await Vendor.findOne({ owner: req.user._id });
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor profile not found" });
+    }
+
+    const imports = await CatalogImport.find({ vendor: vendor._id })
+      .select("status fileName fileSize totalRows importedCount skippedRows error batchProgress createdAt completedAt")
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    res.json(imports);
   } catch (error) {
     next(error);
   }
@@ -529,7 +624,7 @@ router.post("/admin/onboard", protect, async (req, res, next) => {
 });
 
 // @route   POST /api/vendors/admin/catalog-preview
-// @desc    Admin: Parse an uploaded spreadsheet into draft products for review (no DB writes)
+// @desc    Admin: Parse an uploaded spreadsheet into draft products for review
 // @access  Private (Admin Only)
 router.post(
   "/admin/catalog-preview",
@@ -548,7 +643,7 @@ router.post(
 
       const rows = await parseCatalogFile(req.file.buffer, req.file.originalname);
       const { products, skippedRows } = groupRowsIntoProducts(rows);
-      res.json({ products, skippedRows });
+      res.json({ importId: null, products, skippedRows });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);
@@ -567,14 +662,29 @@ router.post("/admin/:vendorId/catalog-import", protect, async (req, res, next) =
     const vendor = await Vendor.findById(req.params.vendorId);
     if (!vendor) return res.status(404).json({ message: "Vendor not found" });
 
-    const { products } = req.body;
+    let products;
+    if (req.body.importId) {
+      const catalogImport = await CatalogImport.findById(req.body.importId);
+      if (!catalogImport) {
+        return res.status(400).json({ message: "Import session not found." });
+      }
+      products = catalogImport.products;
+    } else {
+      products = req.body.products;
+    }
+
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ message: "No products to import." });
     }
 
     const ops = buildProductBulkOps(vendor, products);
-    await Product.bulkWrite(ops);
-    res.json({ imported: ops.length });
+    let imported = 0;
+    for (let i = 0; i < ops.length; i += BULK_BATCH_SIZE) {
+      const batch = ops.slice(i, i + BULK_BATCH_SIZE);
+      await Product.bulkWrite(batch);
+      imported += batch.length;
+    }
+    res.json({ imported });
   } catch (error) {
     next(error);
   }

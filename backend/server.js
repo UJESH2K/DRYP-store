@@ -21,6 +21,7 @@ const mediaRoutes = require("./src/routes/media");
 const analyticsRoutes = require("./src/routes/analytics"); // Import analytics routes
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
+const aiRoutes = require("./src/routes/ai");
 const rateLimit = require('express-rate-limit');
 
 const authLimiter = rateLimit({
@@ -121,6 +122,8 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/vendors", express.json({ limit: "50mb" })); // Higher limit for catalog imports
+app.use("/api/ai", aiRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars
@@ -131,7 +134,7 @@ app.use((err, _req, res, _next) => {
     .json({ message: err.message || "Server error" });
 });
 
-const PORT = process.env.PORT || 8080; // Backend runs on port 8080
+const PORT = process.env.PORT || 8080; // Backend runs on port from .env (currently 8081)
 
 // Start server
 (async () => {

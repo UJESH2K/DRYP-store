@@ -23,7 +23,8 @@
     "mongoose": "^7.5.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^8.0.5",
+    "openai": "^6.46.0"
   },
   "devDependencies": {
     "eslint": "^8.44.0",

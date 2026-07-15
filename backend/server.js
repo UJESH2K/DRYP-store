@@ -21,24 +21,58 @@ const mediaRoutes = require("./src/routes/media");
 const analyticsRoutes = require("./src/routes/analytics"); // Import analytics routes
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
-const stylistRoutes = require("./src/routes/stylist");
+const aiRoutes = require("./src/routes/ai");
 const rateLimit = require('express-rate-limit');
 
-const isProduction = process.env.NODE_ENV === "production";
-
-const limiter = (max, message) => rateLimit({
+const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max,
-  message: { message },
+  max: 10, 
+  message: { message: "Too many login attempts from this IP, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-const authLimiter = limiter(10, "Too many login attempts from this IP, please try again after 15 minutes");
-const vendorSignupLimiter = limiter(isProduction ? 5 : 50, "Too many signup attempts from this IP. Please wait 1 minute and try again.");
-const vendorApplyLimiter = limiter(isProduction ? 5 : 20, "Too many studio applications from this IP. Please wait 1 minute and try again.");
-const shopifyAuthLimiter = limiter(isProduction ? 10 : 50, "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again.");
-const stylistLimiter = limiter(20, "Too many requests to the AI stylist. Please wait a moment.");
+const isProduction = process.env.NODE_ENV === "production";
+
+const vendorSignupLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 5 : 50,
+  message: { message: "Too many signup attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const vendorApplyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 5 : 20,
+  message: { message: "Too many studio applications from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const googleRegistrationDraftLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many draft creation attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const googleAuthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many Google authentication attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const shopifyAuthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Express app
 const app = express();
@@ -86,8 +120,9 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/vendors/register", vendorSignupLimiter);
 app.use("/api/vendors/apply", vendorApplyLimiter);
+app.use("/api/vendors/google-registration-drafts", googleRegistrationDraftLimiter);
 app.use("/api/auth/shopify", shopifyAuthLimiter);
-app.use("/api/auth/google", shopifyAuthLimiter);
+app.use("/api/auth/google", googleAuthLimiter);
 
 app.use("/api/auth/shopify", shopifyAuthRoutes);
 app.use("/api/auth/google", googleAuthRoutes);
@@ -104,8 +139,8 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartRoutes);
-app.use("/api/ai/zaloga", stylistLimiter);
-app.use("/api/ai/zaloga", stylistRoutes);
+app.use("/api/vendors", express.json({ limit: "50mb" })); // Higher limit for catalog imports
+app.use("/api/ai", aiRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars
@@ -116,7 +151,7 @@ app.use((err, _req, res, _next) => {
     .json({ message: err.message || "Server error" });
 });
 
-const PORT = process.env.PORT || 8080; // Backend runs on port 8080
+const PORT = process.env.PORT || 8081; // Backend runs on port from .env (currently 8081)
 
 // Start server
 (async () => {

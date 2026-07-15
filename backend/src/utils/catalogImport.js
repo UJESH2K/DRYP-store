@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
 const { Readable } = require('stream');
+const { normalizeImageKeys } = require('./imageUrls');
 
 const HEADER_ALIASES = {
   'product name': 'productName',
@@ -190,7 +191,7 @@ const buildProductBulkOps = (vendor, products) => {
       name: p.name,
       category: p.category || 'Uncategorized',
       basePrice: p.basePrice,
-      images: p.images || [],
+      images: normalizeImageKeys(p.images || []),
       brand: vendor.name,
       vendor: vendor.owner,
       source: 'manual_import',
@@ -198,7 +199,12 @@ const buildProductBulkOps = (vendor, products) => {
     if (p.description) doc.description = p.description;
     if (Array.isArray(p.tags)) doc.tags = p.tags;
     if (Array.isArray(p.options)) doc.options = p.options;
-    if (Array.isArray(p.variants)) doc.variants = p.variants;
+    if (Array.isArray(p.variants)) {
+      doc.variants = p.variants.map((variant) => ({
+        ...variant,
+        images: normalizeImageKeys(variant.images || []),
+      }));
+    }
     if (p.sku) doc.sku = p.sku;
     if (p.stock !== undefined) doc.stock = p.stock;
 

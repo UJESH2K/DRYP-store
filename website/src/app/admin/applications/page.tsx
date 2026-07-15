@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { getPrimaryProductImage, getRenderableImageUrl } from "@/lib/imageUrls";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const ADMIN_REFRESH_INTERVAL_MS = 15_000;
 
 interface Application {
   _id: string;
   studioName: string;
   email: string;
+  googleEmail?: string;
   websiteOrPortfolio: string;
   status: "pending" | "approved" | "rejected";
   createdAt: string;
@@ -68,7 +69,10 @@ const AdminApplicationsPage = () => {
   
   // Loading & Processing States
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const latestRequest = useRef(0);
 
   // Custom Modal State
   const [modalConfig, setModalConfig] = useState<ModalConfig>({
@@ -77,14 +81,6 @@ const AdminApplicationsPage = () => {
     title: "",
     message: "",
   });
-
-  useEffect(() => {
-    if (token) {
-      if (activeTab === "queue") fetchApplications();
-      if (activeTab === "directory") fetchDirectory();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, activeTab]);
 
   // --- MODAL HELPERS ---
   const showAlert = (title: string, message: string) => {
@@ -100,38 +96,89 @@ const AdminApplicationsPage = () => {
   };
 
   // --- API CALLS ---
-  const fetchApplications = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/vendors/applications`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) setApplications(await response.json());
-    } catch (error) {
-      console.error("Failed to fetch applications:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAdminData = useCallback(async (
+    tab: "queue" | "directory",
+    options: { background?: boolean; signal?: AbortSignal } = {},
+  ) => {
+    if (!token) return;
 
-  const fetchDirectory = async () => {
-    setLoading(true);
+    const requestId = ++latestRequest.current;
+    if (options.background) setRefreshing(true);
+    else setLoading(true);
+    setLoadError("");
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/vendors/admin/directory`, {
+      const endpoint = tab === "queue"
+        ? "/api/vendors/applications"
+        : "/api/vendors/admin/directory";
+      const response = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: options.signal,
       });
-      if (response.ok) setDirectory(await response.json());
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const fallback = response.status === 401
+          ? "Your admin session has expired. Sign in again."
+          : `Unable to load admin data (${response.status}).`;
+        throw new Error(body.message || fallback);
+      }
+
+      const data = await response.json();
+      if (!options.signal?.aborted && requestId === latestRequest.current) {
+        if (tab === "queue") setApplications(data);
+        else setDirectory(data);
+      }
     } catch (error) {
-      console.error("Failed to fetch directory:", error);
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      const message = error instanceof Error
+        ? error.message
+        : "Unable to connect to the admin service.";
+      console.error("Failed to fetch admin data:", error);
+      if (!options.signal?.aborted && requestId === latestRequest.current) {
+        setLoadError(message);
+      }
     } finally {
-      setLoading(false);
+      if (!options.signal?.aborted && requestId === latestRequest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const controller = new AbortController();
+    const initialLoad = window.setTimeout(() => {
+      void fetchAdminData(activeTab, { signal: controller.signal });
+    }, 0);
+
+    const refreshVisibleData = () => {
+      if (document.visibilityState !== "visible") return;
+      void fetchAdminData(activeTab, {
+        background: true,
+        signal: controller.signal,
+      });
+    };
+
+    const interval = window.setInterval(refreshVisibleData, ADMIN_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", refreshVisibleData);
+    document.addEventListener("visibilitychange", refreshVisibleData);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(initialLoad);
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleData);
+      document.removeEventListener("visibilitychange", refreshVisibleData);
+    };
+  }, [activeTab, fetchAdminData, token]);
 
   const handleUpdateApplication = async (id: string, status: "approved" | "rejected") => {
     setProcessingId(id);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/vendors/applications/${id}`, {
+      const response = await fetch(`/api/vendors/applications/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -163,7 +210,7 @@ const AdminApplicationsPage = () => {
       async () => {
         setProcessingId(vendorId);
         try {
-          const response = await fetch(`${API_BASE_URL}/api/vendors/admin/suspend/${vendorId}`, {
+          const response = await fetch(`/api/vendors/admin/suspend/${vendorId}`, {
             method: "PUT",
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -199,7 +246,7 @@ const AdminApplicationsPage = () => {
     setSelectedVendor(vendor);
     setLoadingProducts(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products?vendor=${vendor.owner._id}&limit=100`);
+      const response = await fetch(`/api/products?vendor=${vendor.owner._id}&limit=100`);
       if (response.ok) {
         setVendorProducts(await response.json());
       }
@@ -436,7 +483,7 @@ const AdminApplicationsPage = () => {
             </h1>
           </div>
           
-          <div className="flex gap-6 mb-2">
+          <div className="flex flex-wrap gap-x-6 gap-y-3 mb-2">
             <button 
               onClick={() => setActiveTab("queue")} 
               className={`border-b pb-1 font-sans text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
@@ -463,8 +510,37 @@ const AdminApplicationsPage = () => {
             >
               Onboard Studio
             </Link>
+            <button
+              type="button"
+              onClick={() => void fetchAdminData(activeTab, { background: true })}
+              disabled={refreshing}
+              className="border-b border-gray-300 pb-1 font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-black hover:border-black transition-colors disabled:opacity-50"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
           </div>
         </header>
+
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-8 border-l-2 border-red-600 bg-red-50 p-6"
+          >
+            <p className="mb-2 font-sans text-[9px] font-bold uppercase tracking-[0.2em] text-red-600">
+              Admin data unavailable
+            </p>
+            <p className="font-sans text-[11px] tracking-wide text-red-700">
+              {loadError}
+            </p>
+            <button
+              type="button"
+              onClick={() => void fetchAdminData(activeTab)}
+              className="mt-4 border-b border-red-600 pb-1 font-sans text-[9px] font-bold uppercase tracking-[0.2em] text-red-600 hover:text-red-800"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-32">
@@ -481,15 +557,16 @@ const AdminApplicationsPage = () => {
                   <tr className="border-b border-black">
                     <th className="py-4 font-sans text-[9px] uppercase tracking-[0.3em] text-black font-medium">Date Received</th>
                     <th className="py-4 font-sans text-[9px] uppercase tracking-[0.3em] text-black font-medium">Studio Name</th>
+                    <th className="py-4 font-sans text-[9px] uppercase tracking-[0.3em] text-black font-medium">Emails</th>
                     <th className="py-4 font-sans text-[9px] uppercase tracking-[0.3em] text-black font-medium">Digital Footprint</th>
                     <th className="py-4 font-sans text-[9px] uppercase tracking-[0.3em] text-black font-medium text-center">Status</th>
                     <th className="py-4 font-sans text-[9px] uppercase tracking-[0.3em] text-black font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {applications.length === 0 && (
+                  {applications.length === 0 && !loadError && (
                     <tr>
-                      <td colSpan={5} className="py-32 text-center font-editorial italic text-gray-400 text-2xl">
+                      <td colSpan={6} className="py-32 text-center font-editorial italic text-gray-400 text-2xl">
                         The queue is currently empty.
                       </td>
                     </tr>
@@ -501,6 +578,18 @@ const AdminApplicationsPage = () => {
                       </td>
                       <td className="py-8 font-editorial text-2xl text-black">
                         {app.studioName}
+                      </td>
+                      <td className="py-8">
+                        <div className="space-y-1">
+                          <p className="font-sans text-[10px] tracking-wide text-black">
+                            {app.email}
+                          </p>
+                          {app.googleEmail && app.googleEmail !== app.email && (
+                            <p className="font-sans text-[9px] tracking-wide text-gray-500">
+                              Google: {app.googleEmail}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="py-8">
                         <a 
@@ -566,7 +655,7 @@ const AdminApplicationsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {directory.length === 0 && (
+                  {directory.length === 0 && !loadError && (
                     <tr>
                       <td colSpan={5} className="py-32 text-center font-editorial italic text-gray-400 text-2xl">
                         No studios registered yet.
@@ -580,7 +669,9 @@ const AdminApplicationsPage = () => {
                       className="border-b border-gray-200 group hover:bg-white transition-colors cursor-pointer"
                     >
                       <td className="py-8 font-sans text-[10px] tracking-widest text-gray-500">
-                        {new Date(vendor.owner?.createdAt || Date.now()).toLocaleDateString()}
+                        {vendor.owner?.createdAt
+                          ? new Date(vendor.owner.createdAt).toLocaleDateString()
+                          : "N/A"}
                       </td>
                       <td className="py-8 font-editorial text-2xl text-black group-hover:text-gray-500 transition-colors">
                         {vendor.name || 'Unnamed Studio'}

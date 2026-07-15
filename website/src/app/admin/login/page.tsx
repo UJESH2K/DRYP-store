@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -19,7 +16,6 @@ export default function AdminLoginPage() {
   });
 
   const { login } = useAuth();
-  const router = useRouter();
 
   const validateForm = () => {
     let isValid = true;
@@ -43,7 +39,7 @@ export default function AdminLoginPage() {
     return isValid;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setServerError("");
 
@@ -53,7 +49,7 @@ export default function AdminLoginPage() {
 
     try {
       // CRITICAL: Notice this hits the GENERIC auth route, bypassing the Vendor bouncer!
-      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -69,13 +65,16 @@ export default function AdminLoginPage() {
           return;
         }
 
-        login(data.user, data.token);
-        router.push("/admin/applications");
+        login(data.user, data.token, "/admin/applications");
       } else {
         throw new Error(data.message || "Invalid credentials");
       }
     } catch (error) {
-      setServerError(error.message || "Network error. The server may be unreachable.");
+      setServerError(
+        error instanceof Error
+          ? error.message
+          : "Network error. The server may be unreachable.",
+      );
     } finally {
       setIsLoading(false);
     }

@@ -1,15 +1,12 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
+// import { apiCall } from '../lib/api'; // REMOVED to break cycle
 import { useToastStore } from './toast';
-import { useWishlistStore } from './wishlist';
-import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
-import { API_BASE_URL } from '../lib/config';
+import { useWishlistStore } from './wishlist'; // Import the wishlist store
 
+// This should match the User model from the backend
 export interface User {
   _id: string;
-  supabaseId: string;
   email: string;
   name: string;
   role: 'user' | 'vendor' | 'admin';
@@ -24,208 +21,202 @@ export interface User {
 
 interface AuthState {
   user: User | null;
-  session: any | null;
+  token: string | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
+  guestId: string | null;
   isLoading: boolean;
+  // Actions
+  initGuestUser: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<User | null>;
   login: (email: string, password: string) => Promise<User | null>;
   loginWithToken: (token: string) => Promise<User | null>;
-  signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (user: User) => Promise<void>;
 }
 
-async function fetchMongoUser(token: string): Promise<User | null> {
-  const res = await fetch(`${API_BASE_URL}/api/users/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.user || null;
-}
+const generateGuestId = () => `guest_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 
-export const useAuthStore = create<AuthState>((set, get) => {
-  // Listen for Supabase session changes
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_OUT') {
-      set({ user: null, session: null, isAuthenticated: false });
-      await AsyncStorage.multiRemove(['user_token', 'user_data']);
-      useWishlistStore.getState().setWishlist([]);
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isGuest: false,
+  guestId: null,
+  isLoading: false,
+
+  initGuestUser: async () => {
+    try {
+      let guestId = await AsyncStorage.getItem('guest_id');
+      if (!guestId) {
+        guestId = generateGuestId();
+        await AsyncStorage.setItem('guest_id', guestId);
+      }
+      set({ isGuest: true, guestId, isAuthenticated: false, user: null, token: null });
+    } catch (error) {
+      console.error('Error initializing guest user:', error);
     }
-  });
+  },
 
-  return {
-    user: null,
-    session: null,
-    isAuthenticated: false,
-    isLoading: false,
+  register: async (name, email, password) => {
+    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+    set({ isLoading: true });
+    try {
+      const guestId = get().guestId;
+      const response = await apiCall('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password, guestId }),
+      });
 
-    register: async (name, email, password) => {
-      set({ isLoading: true });
-      try {
-        const { data: sbData, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { name } },
-        });
-        if (error || !sbData.session) {
-          useToastStore.getState().showToast(error?.message || 'Registration failed', 'error');
-          return null;
-        }
-        const token = sbData.session.access_token;
-        const mongoUser = await fetchMongoUser(token);
-        if (mongoUser) {
-          set({ user: mongoUser, session: sbData.session, isAuthenticated: true });
-          await AsyncStorage.setItem('user_token', token);
-          await AsyncStorage.setItem('user_data', JSON.stringify(mongoUser));
-          useWishlistStore.getState().setWishlist([]);
-          useToastStore.getState().showToast('Registered successfully!');
-          return mongoUser;
-        }
-        useToastStore.getState().showToast('Failed to load profile.', 'error');
-        return null;
-      } catch (e) {
-        useToastStore.getState().showToast('An unexpected error occurred.', 'error');
-        return null;
-      } finally {
-        set({ isLoading: false });
-      }
-    },
-
-    loginWithToken: async (token) => {
-      set({ isLoading: true });
-      try {
-        const mongoUser = await fetchMongoUser(token);
-        if (mongoUser) {
-          const { data: { session } } = await supabase.auth.getSession();
-          set({ user: mongoUser, session, isAuthenticated: true });
-          await AsyncStorage.setItem('user_token', token);
-          await AsyncStorage.setItem('user_data', JSON.stringify(mongoUser));
-          useWishlistStore.getState().setWishlist([]);
-          useToastStore.getState().showToast('Logged in successfully!');
-          return mongoUser;
-        }
-        useToastStore.getState().showToast('Failed to load profile.', 'error');
-        return null;
-      } catch (e) {
-        useToastStore.getState().showToast('An unexpected error occurred.', 'error');
-        return null;
-      } finally {
-        set({ isLoading: false });
-      }
-    },
-
-    login: async (email, password) => {
-      set({ isLoading: true });
-      try {
-        const { data: sbData, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error || !sbData.session) {
-          useToastStore.getState().showToast(error?.message || 'Invalid credentials.', 'error');
-          return null;
-        }
-        const token = sbData.session.access_token;
-        const mongoUser = await fetchMongoUser(token);
-        if (mongoUser) {
-          set({ user: mongoUser, session: sbData.session, isAuthenticated: true });
-          await AsyncStorage.setItem('user_token', token);
-          await AsyncStorage.setItem('user_data', JSON.stringify(mongoUser));
-          useWishlistStore.getState().setWishlist([]);
-          useToastStore.getState().showToast('Logged in successfully!');
-          return mongoUser;
-        }
-        useToastStore.getState().showToast('Failed to load profile.', 'error');
-        return null;
-      } catch (e) {
-        useToastStore.getState().showToast('An unexpected error occurred.', 'error');
-        return null;
-      } finally {
-        set({ isLoading: false });
-      }
-    },
-
-    signInWithGoogle: async () => {
-      set({ isLoading: true });
-      try {
-        const redirectTo = makeRedirectUri({ scheme: 'dryp' });
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo },
-        });
-        if (error || !data?.url) {
-          useToastStore.getState().showToast(error?.message || 'Failed to start Google sign-in.', 'error');
-          set({ isLoading: false });
-          return;
-        }
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        if (result.type !== 'success') {
-          set({ isLoading: false });
-          return;
-        }
-        const urlParams = new URL(result.url).searchParams;
-        const code = urlParams.get('code');
-        if (code) {
-          const { data: { session }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError || !session) {
-            useToastStore.getState().showToast(exchangeError?.message || 'Failed to complete sign-in.', 'error');
-            set({ isLoading: false });
-            return;
-          }
-          const token = session.access_token;
-          const mongoUser = await fetchMongoUser(token);
-          if (mongoUser) {
-            set({ user: mongoUser, session, isAuthenticated: true });
-            await AsyncStorage.setItem('user_token', token);
-            await AsyncStorage.setItem('user_data', JSON.stringify(mongoUser));
-            useWishlistStore.getState().setWishlist([]);
-            useToastStore.getState().showToast('Logged in successfully!');
-          }
-        } else {
-          useToastStore.getState().showToast('No code returned from sign-in.', 'error');
-        }
-      } catch (e) {
-        useToastStore.getState().showToast('Google sign-in failed.', 'error');
-      } finally {
-        set({ isLoading: false });
-      }
-    },
-
-    logout: async () => {
-      set({ isLoading: true });
-      try {
-        await supabase.auth.signOut();
-        await AsyncStorage.multiRemove(['user_token', 'user_data']);
+      if (response && response.token) {
+        const { token, user } = response;
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        await AsyncStorage.setItem('user_token', token);
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await AsyncStorage.removeItem('guest_id');
+        
         useWishlistStore.getState().setWishlist([]);
-        set({ user: null, session: null, isAuthenticated: false });
-      } catch (error) {
-        console.error('Error logging out:', error);
-      } finally {
-        set({ isLoading: false });
+        useToastStore.getState().showToast('Registered successfully!');
+        return user;
+      } else {
+        useToastStore.getState().showToast(response?.message || 'An unknown error occurred.', 'error');
+        return null;
       }
-    },
+    } catch (error) {
+      console.error('Error registering:', error);
+      useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
+      return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
-    loadUser: async () => {
-      set({ isLoading: true });
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          const mongoUser = await fetchMongoUser(session.access_token);
-          if (mongoUser) {
-            set({ user: mongoUser, session, isAuthenticated: true });
-            await AsyncStorage.setItem('user_token', session.access_token);
-            await AsyncStorage.setItem('user_data', JSON.stringify(mongoUser));
-          }
+  login: async (email, password) => {
+    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+    set({ isLoading: true });
+    try {
+      const guestId = get().guestId;
+      const response = await apiCall('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, guestId }),
+      });
+
+      if (response && response.token) {
+        const { token, user } = response;
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        await AsyncStorage.setItem('user_token', token);
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await AsyncStorage.removeItem('guest_id');
+
+        const wishlistItems = await apiCall('/api/wishlist');
+        if (Array.isArray(wishlistItems)) {
+          const validWishlistProducts = wishlistItems
+            .filter(item => item && item.product)
+            .map(item => item.product);
+          useWishlistStore.getState().setWishlist(validWishlistProducts);
         }
-      } catch (error) {
-        console.error('Error loading user:', error);
-      } finally {
-        set({ isLoading: false });
+        
+        useToastStore.getState().showToast('Logged in successfully!');
+        return user;
+      } else {
+        useToastStore.getState().showToast(response?.message || 'Invalid credentials.', 'error');
+        return null;
       }
-    },
+    } catch (error) {
+      console.error('Error logging in:', error);
+      useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
+      return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  
+  // Hydrates the auth store from a DRYP JWT minted by a backend OAuth redirect
+  // (e.g. after the Shopify OAuth callback), which only carries a token.
+  loginWithToken: async (token: string) => {
+    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+    set({ isLoading: true, token });
+    try {
+      const response = await apiCall('/api/auth/me');
 
-    updateUser: async (user: User) => {
-      set({ user });
-      await AsyncStorage.setItem('user_data', JSON.stringify(user));
-    },
-  };
-});
+      if (response && response.user) {
+        const { user } = response;
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        await AsyncStorage.setItem('user_token', token);
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await AsyncStorage.removeItem('guest_id');
+
+        const wishlistItems = await apiCall('/api/wishlist');
+        if (Array.isArray(wishlistItems)) {
+          const validWishlistProducts = wishlistItems
+            .filter(item => item && item.product)
+            .map(item => item.product);
+          useWishlistStore.getState().setWishlist(validWishlistProducts);
+        }
+
+        useToastStore.getState().showToast('Logged in successfully!');
+        return user;
+      } else {
+        set({ token: null });
+        useToastStore.getState().showToast('Failed to complete login.', 'error');
+        return null;
+      }
+    } catch (error) {
+      set({ token: null });
+      console.error('Error completing token login:', error);
+      useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
+      return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  logout: async () => {
+    set({ isLoading: true });
+    try {
+      await AsyncStorage.removeItem('user_token');
+      await AsyncStorage.removeItem('user_data');
+      useWishlistStore.getState().setWishlist([]);
+      // Instead of clearing everything, initialize a new guest session
+      await get().initGuestUser();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  loadUser: async () => {
+    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+    set({ isLoading: true });
+    try {
+      const token = await AsyncStorage.getItem('user_token');
+      const userData = await AsyncStorage.getItem('user_data');
+      if (token && userData) {
+        const user = JSON.parse(userData);
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+        
+        const wishlistItems = await apiCall('/api/wishlist');
+        if (Array.isArray(wishlistItems)) {
+          const validWishlistProducts = wishlistItems
+            .filter(item => item && item.product)
+            .map(item => item.product);
+          useWishlistStore.getState().setWishlist(validWishlistProducts);
+        }
+      } else {
+        await get().initGuestUser();
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+      await get().initGuestUser(); // Fallback to guest session on error
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateUser: async (user: User) => {
+    set({ user });
+    await AsyncStorage.setItem('user_data', JSON.stringify(user));
+  },
+}));

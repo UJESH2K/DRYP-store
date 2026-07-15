@@ -1,4 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { normalizeShopDomain } from '@/lib/shopify';
+import { normalizeShopifyDomain } from '@/lib/shopify';
 import {
   View,
   Text,
@@ -9,13 +11,15 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
 import { FontAwesome } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../src/state/auth';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
 
 export default function LoginScreen() {
   const router = useCustomRouter();
@@ -23,20 +27,11 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showShopifyInput, setShowShopifyInput] = useState(false);
+  const [shopDomain, setShopDomain] = useState('');
+  const [shopifyError, setShopifyError] = useState('');
 
-  const { login, register, signInWithGoogle, isLoading } = useAuthStore();
-
-  const googleScale = useRef(new Animated.Value(1)).current;
-  const appleScale = useRef(new Animated.Value(1)).current;
-
-  const animatePress = (animValue: Animated.Value, toValue: number) => {
-    Animated.spring(animValue, {
-      toValue,
-      useNativeDriver: true,
-      friction: 4,
-      tension: 200,
-    }).start();
-  };
+  const { login, register, loginWithToken, isLoading, guestId } = useAuthStore();
 
   const handleAuthAction = async () => {
     if (!email || !password) {
@@ -47,11 +42,72 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Name is required for registration.');
       return;
     }
-    await (mode === 'login' ? login(email, password) : register(name, email, password));
+
+    let user = null;
+    if (mode === 'login') {
+      user = await login(email, password);
+    } else {
+      user = await register(name, email, password);
+    }
+
+    if (user) {
+      // The redirection is now handled in the root layout
+    } else {
+      // The auth store will show a more specific error
+    }
   };
 
-  const handleGoogleSignIn = async () => {
-    await signInWithGoogle();
+  const handleGoogleLogin = async () => {
+    const guestQuery = guestId ? `&guestId=${encodeURIComponent(guestId)}` : '';
+    const startUrl = `${API_BASE_URL}/api/auth/google?platform=mobile${guestQuery}`;
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
+      if (result.type !== 'success' || !result.url) {
+        return;
+      }
+      const url = new URL(result.url);
+      const token = url.searchParams.get('token');
+      const oauthError = url.searchParams.get('error');
+      if (oauthError) {
+        Alert.alert('Google Sign-In', 'Google login was cancelled or failed. Please try again.');
+        return;
+      }
+      if (!token) {
+        Alert.alert('Google Sign-In', 'No authentication token was returned.');
+        return;
+      }
+      const user = await loginWithToken(token);
+      if (!user) {
+        Alert.alert('Google Sign-In', 'Failed to complete Google login.');
+      }
+    } catch (err) {
+      console.error('Google login error:', err);
+      Alert.alert('Google Sign-In', 'Something went wrong. Please try again.');
+    }
+  };
+
+  const handleSocialLogin = (provider: string) => {
+    if (provider === 'Google') {
+      handleGoogleLogin();
+      return;
+    }
+    Alert.alert('Coming Soon', `Login with ${provider} is not available yet.`);
+  };
+
+  const handleShopifyConnect = async () => {
+    const domain = normalizeShopDomain(shopDomain);
+    if (!domain) {
+      setShopifyError('Enter a valid Shopify domain, e.g. your-store.myshopify.com');
+      return;
+    }
+    const startUrl = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=mobile`;
+    // Opens Shopify's authorize page; the OS intercepts the final redirect to
+    // dryp://oauth-callback, which app/oauth-callback.tsx handles.
+    await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
+  };
+
+  const handleSkip = () => {
+    router.replace('/(tabs)/home');
   };
 
   const toggleMode = () => {
@@ -131,33 +187,45 @@ export default function LoginScreen() {
             <Text style={styles.separatorText}>OR</Text>
           </View>
           <View style={styles.socialIconsContainer}>
-            <Animated.View style={{ transform: [{ scale: googleScale }] }}>
-              <Pressable
-                style={styles.socialButton}
-                onPressIn={() => animatePress(googleScale, 0.85)}
-                onPressOut={() => {
-                  animatePress(googleScale, 1);
-                  handleGoogleSignIn();
-                }}
-                disabled={isLoading}
-              >
-                <FontAwesome name="google" size={24} color="#1a1a1a" />
-              </Pressable>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: appleScale }] }}>
-              <Pressable
-                style={styles.socialButton}
-                onPressIn={() => animatePress(appleScale, 0.85)}
-                onPressOut={() => {
-                  animatePress(appleScale, 1);
-                  Alert.alert('Coming Soon', 'Apple Sign-In coming soon.');
-                }}
-                disabled={isLoading}
-              >
-                <FontAwesome name="apple" size={24} color="#1a1a1a" />
-              </Pressable>
-            </Animated.View>
+            <Pressable style={styles.socialButton} onPress={() => handleSocialLogin('Google')}>
+              <FontAwesome name="google" size={24} color="black" />
+            </Pressable>
+            <Pressable style={styles.socialButton} onPress={() => handleSocialLogin('Apple')}>
+              <FontAwesome name="apple" size={24} color="black" />
+            </Pressable>
           </View>
+
+          {showShopifyInput ? (
+            <>
+              <View style={styles.shopifyInputRow}>
+                <TextInput
+                  style={[styles.input, styles.shopifyInput]}
+                  placeholder="your-store.myshopify.com"
+                  value={shopDomain}
+                  onChangeText={(text) => {
+                    setShopDomain(text);
+                    setShopifyError('');
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  style={styles.primaryButton}
+                  onPress={handleShopifyConnect}
+                  disabled={!shopDomain.trim()}
+                >
+                  <Text style={styles.primaryButtonText}>Connect Shopify Store</Text>
+                </Pressable>
+              </View>
+              {shopifyError ? (
+                <Text style={styles.errorText}>{shopifyError}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Pressable style={styles.toggleButton} onPress={() => setShowShopifyInput(true)}>
+              <Text style={styles.toggleButtonText}>Continue with Shopify</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.footer}>
@@ -171,6 +239,10 @@ export default function LoginScreen() {
             <Text style={styles.toggleButtonText}>
               Become a Vendor
             </Text>
+          </Pressable>
+          
+          <Pressable onPress={handleSkip} style={styles.skipButton}>
+            <Text style={styles.skipButtonText}>Continue as Guest</Text>
           </Pressable>
           
           <Text style={styles.terms}>
@@ -277,6 +349,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 10,
   },
+  shopifyInputRow: {
+    marginTop: 15,
+  },
+  shopifyInput: {
+    marginBottom: 8,
+  },
   footer: {
     paddingBottom: 20,
   },
@@ -288,6 +366,24 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontSize: 16,
     fontFamily: 'Zaloga',
+  },
+  skipButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 15,
+  },
+  skipButtonText: {
+    color: '#666666',
+    fontSize: 16,
+    fontFamily: 'Zaloga',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontFamily: 'Zaloga',
+    marginTop: -4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   terms: {
     fontSize: 12,

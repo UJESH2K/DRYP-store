@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-
 const parseApiResponse = async (res: Response) => {
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
@@ -74,7 +72,7 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/vendors/register`, {
+      const res = await fetch(`/api/vendors/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
@@ -86,15 +84,11 @@ export default function SignupPage() {
       }
 
       login(data.user, data.token);
-    } catch (error: any) {
-      setServerError(error.message);
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : "Failed to set password");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleSignup = () => {
-    window.location.href = "/api/auth/google";
   };
 
   const renderServerError = () => {
@@ -127,7 +121,7 @@ export default function SignupPage() {
             This email is not yet approved for studio access. Submit an
             application first{" "}
             <Link
-              href="/apply"
+              href="/register"
               className="font-normal text-black underline underline-offset-4 hover:text-gray-400 transition-colors"
             >
               here
@@ -204,10 +198,14 @@ export default function SignupPage() {
           <div className="max-w-[380px] w-full mx-auto lg:mx-0">
             <div className="mb-10 space-y-2">
               <h3 className="font-editorial text-5xl font-normal tracking-tight text-black">
-                Join the Studio
+                Set password
               </h3>
               <p className="font-cursive text-4xl text-gray-500">
-                Establish your presence
+                After admin approval
+              </p>
+              <p className="font-sans text-[10px] uppercase tracking-[0.2em] text-gray-400 pt-2 leading-relaxed">
+                Only for approved brands that need email + password login.
+                Prefer Google? Use Studio Login instead.
               </p>
             </div>
 
@@ -315,51 +313,32 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={
                     isLoading || (password.length > 0 && !isPasswordValid)
                   }
-                  className="group relative w-full overflow-hidden bg-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-white transition-all duration-500 hover:tracking-[0.4em] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:tracking-[0.3em]"
+                  className="w-full border border-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-black transition-colors hover:bg-black hover:text-white disabled:border-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
-                  <div className="absolute inset-0 h-full w-full -translate-x-full bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0 group-disabled:hidden" />
-                  <span className="relative z-10 transition-colors duration-500">
-                    {isLoading ? "Authenticating..." : "Enter the Studio"}
-                  </span>
+                  {isLoading ? "Creating..." : "Set password & enter"}
                 </button>
               </div>
             </form>
 
-            <div className="mt-8 flex items-center gap-4">
-              <span className="h-px flex-1 bg-gray-200" />
-              <span className="text-[9px] uppercase tracking-[0.2em] text-gray-400">Or</span>
-              <span className="h-px flex-1 bg-gray-200" />
-            </div>
-
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={handleGoogleSignup}
-                className="w-full border border-black py-4 text-xs font-medium uppercase tracking-[0.3em] text-black transition-colors hover:bg-black hover:text-white"
-              >
-                Continue with Google
-              </button>
-            </div>
-
             <div className="mt-10 pt-6 border-t border-gray-200 text-center space-y-5">
               <Link
-                href="/apply"
+                href="/register"
                 className="block font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-black hover:text-gray-500 transition-colors"
               >
-                New Studio? Submit an application first
+                New brand? Register first
               </Link>
 
               <Link
                 href="/login"
                 className="block font-sans text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
               >
-                Already Curated? Log In
+                Already approved? Studio login
               </Link>
             </div>
 

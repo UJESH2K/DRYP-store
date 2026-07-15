@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DashboardLayout({
   children,
@@ -10,13 +11,43 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, loading, router]);
 
   const navLinks = [
     { name: "Studio Home", path: "/dashboard" },
-    { name: "The Archive", path: "/dashboard/products" },
+    { name: "Manual", path: "/dashboard/products" },
+    { name: "Excel Import", path: "/dashboard/catalog-import" },
+    { name: "Shopify Scrape", path: "/dashboard/shopify-scrape" },
     { name: "Analytics", path: "/dashboard/analytics" },
     { name: "Store Profile", path: "/dashboard/store" },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FCFCFA]">
+        <p className="font-sans text-[10px] uppercase tracking-[0.4em] text-gray-400 animate-pulse">
+          Initializing Studio...
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FCFCFA]">
+        <p className="font-sans text-[10px] uppercase tracking-[0.4em] text-gray-400 animate-pulse">
+          Redirecting to login...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -31,11 +62,9 @@ export default function DashboardLayout({
       />
 
       <div className="flex min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white">
-        {/* --- THE ANCHOR SIDEBAR (Deep Black) --- */}
         <aside className="hidden md:flex w-64 flex-col justify-between bg-[#050505] border-r border-white/10 fixed h-screen z-20 shadow-2xl shadow-black/50">
           <div>
             <div className="p-10 pb-16">
-              {/* Clickable Brand Logo added here */}
               <Link href="/" className="inline-block w-max">
                 <h2 className="font-editorial text-3xl italic tracking-[0.2em] text-[#FCFCFA] hover:text-white hover:opacity-80 transition-opacity cursor-pointer">
                   DRYP
@@ -79,7 +108,6 @@ export default function DashboardLayout({
           </div>
         </aside>
 
-        {/* --- THE CANVAS (Main Content Area) --- */}
         <main className="flex-1 md:ml-64 bg-[#FCFCFA] min-h-screen relative">
           {children}
         </main>

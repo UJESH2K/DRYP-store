@@ -4,9 +4,9 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const router = express.Router();
-const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const { protect } = require('../middleware/auth');
+const { createPasswordToken, hashPasswordToken } = require('../utils/passwordTokens');
 
 const isValidPassword = (password) => {
   const rules = [
@@ -76,16 +76,16 @@ router.post('/forgot-password', async (req, res, next) => {
     }
 
     // 1. Generate a raw 20-character crypto token
-    const resetToken = crypto.randomBytes(20).toString('hex');
+    const resetToken = createPasswordToken(10 * 60 * 1000);
 
     // 2. Hash it and set expiration to 10 minutes from now, then save to DB
-    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; 
+    user.resetPasswordToken = resetToken.hashedToken;
+    user.resetPasswordExpire = resetToken.expiresAt;
     await user.save();
 
     // 3. Create the reset URL pointing to your NEXT.JS FRONTEND
     // Ensure NEXT_PUBLIC_FRONTEND_URL is in your .env (e.g., http://localhost:3000)
-    const resetUrl = `${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken.rawToken}`;
 
     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. \n\nPlease make a PUT request to: \n\n ${resetUrl}`;
 
@@ -166,7 +166,7 @@ router.post('/forgot-password', async (req, res, next) => {
         html: emailHTML
       });
 
-      res.status(200).json({ message: 'Email sent' });
+      res.status(200).json({ message: 'If an account exists, a reset email has been sent.' });
     } catch (err) {
       console.error(err);
       // If email fails, wipe the token from the DB so they can try again
@@ -184,7 +184,7 @@ router.post('/forgot-password', async (req, res, next) => {
 router.put('/reset-password/:token', async (req, res, next) => {
   try {
     // 1. Re-hash the token from the URL to match what is saved in the DB
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    const resetPasswordToken = hashPasswordToken(req.params.token);
 
     // 2. Find user by token AND ensure the token hasn't expired
     const user = await User.findOne({
@@ -247,5 +247,4 @@ router.post('/google', async (req, res, next) => {
 
 module.exports = router;
 module.exports.mergeGuestData = mergeGuestData;
-
-
+module.exports.isValidPassword = isValidPassword;

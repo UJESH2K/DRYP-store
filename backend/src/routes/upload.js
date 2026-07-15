@@ -4,17 +4,10 @@ const crypto = require("crypto");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const rateLimit = require("express-rate-limit");
-const { identifyUser } = require("../middleware/auth");
+const { protect } = require("../middleware/auth");
+const { validateUploadPayload } = require("../utils/uploadValidation");
 
 const router = express.Router();
-
-const ALLOWED_EXTENSIONS = /jpeg|jpg|png|gif|webp/;
-const ALLOWED_CONTENT_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-]);
 
 const bucketName =
   process.env.AWS_BUCKET_NAME || process.env.AWS_S3_BUCKET;
@@ -63,43 +56,19 @@ function assertS3Configured() {
   }
 }
 
-function validateUploadPayload({ fileName, contentType, fileSize }) {
-  if (!fileName || typeof fileName !== "string") {
-    return "fileName is required";
-  }
-  if (!contentType || !ALLOWED_CONTENT_TYPES.has(contentType)) {
-    return "contentType must be one of image/jpeg, image/png, image/gif, image/webp";
-  }
-  if (!ALLOWED_EXTENSIONS.test(path.extname(fileName).toLowerCase())) {
-    return "fileName must have a .jpg, .jpeg, .png, .gif, or .webp extension";
-  }
-  const maxBytes = 10 * 1024 * 1024;
-  if (fileSize !== undefined && fileSize !== null) {
-    const size = Number(fileSize);
-    if (!Number.isFinite(size) || size <= 0) {
-      return "fileSize must be a positive number";
-    }
-    if (size > maxBytes) {
-      return `fileSize must be <= ${maxBytes} bytes`;
-    }
-  }
-  return null;
-}
-
 // POST /api/upload/presign
 // Body: { fileName: string, contentType: string, fileSize?: number }
 // Returns: { url: string, key: string, publicUrl: string, expiresIn: number }
 router.post(
   "/presign",
-  identifyUser,
+  protect,
   uploadPresignLimiter,
   async (req, res, next) => {
     try {
-      // Allow any identified user (including guests via x-guest-id) for stylist image uploads etc.
-      // Vendors/admins for product images.
-      const canUpload = req.user || req.guestId;
-      if (!canUpload) {
-        return res.status(403).json({ message: "Authentication or guest ID required for uploads." });
+      if (req.user.role !== "vendor") {
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Only vendors can upload images." });
       }
 
       try {

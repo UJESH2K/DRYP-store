@@ -3,17 +3,15 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ✅ Define proper type
 type AuthContextType = {
   user: any;
   token: string | null;
-  login: (userData: any, userToken: string) => void;
+  login: (userData: any, userToken: string, redirectTo?: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
 };
 
-// ✅ Context can be undefined initially
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -26,20 +24,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+    if (storedToken && storedToken !== 'null' && storedToken !== 'undefined' && storedUser) {
+      try {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     }
 
     setLoading(false);
   }, []);
 
-  const login = (userData: any, userToken: string) => {
+  const login = (userData: any, userToken: string, redirectTo = '/dashboard') => {
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', userToken);
     setUser(userData);
     setToken(userToken);
-    router.push('/dashboard');
+    router.push(redirectTo);
   };
 
   const logout = () => {
@@ -55,8 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token,
     login,
     logout,
-    isAuthenticated: !!token,
-    loading
+    isAuthenticated: Boolean(token && user),
+    loading,
   };
 
   return (
@@ -66,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ✅ Safe hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
 

@@ -10,6 +10,7 @@ const { protect } = require("../middleware/auth");
 const router = express.Router();
 const mongoose = require("mongoose");
 const VendorApplication = require("../models/VendorApplication");
+const GoogleRegistrationDraft = require("../models/GoogleRegistrationDraft");
 const ShopifyImport = require("../models/ShopifyImport");
 const CatalogImport = require("../models/CatalogImport");
 const sendEmail = require("../utils/sendEmail");
@@ -18,6 +19,9 @@ const {
   groupRowsIntoProducts,
   buildProductBulkOps,
 } = require("../utils/catalogImport");
+const { signProductImages } = require("../utils/imageUrls");
+const { isValidPassword } = require("./auth");
+const { createPasswordToken } = require("../utils/passwordTokens");
 
 const MAX_CATALOG_FILE_SIZE_MB = 100;
 const BULK_BATCH_SIZE = 100;
@@ -52,19 +56,39 @@ const catalogUploadSingle = (req, res, next) => {
 router.post("/apply", async (req, res, next) => {
   try {
     const { studioName, email, websiteOrPortfolio } = req.body;
+    const contactEmail = String(email || "").toLowerCase().trim();
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser)
+    if (!studioName || !contactEmail || !websiteOrPortfolio) {
+      return res.status(400).json({
+        message: "Studio name, contact email, and portfolio URL are required.",
+      });
+    }
+
+    const existingUser = await User.findOne({ email: contactEmail });
+    if (existingUser && existingUser.isActive === false) {
+      return res.status(403).json({ message: "This account is suspended." });
+    }
+    if (existingUser && ["vendor", "admin"].includes(existingUser.role))
       return res.status(400).json({ message: "Email is already registered." });
 
-    const existingApp = await VendorApplication.findOne({ email });
+    const existingApp = await VendorApplication.findOne({
+      $or: [
+        { email: contactEmail },
+        { googleEmail: contactEmail },
+        { verifiedGoogleEmail: contactEmail },
+      ],
+    });
     if (existingApp) {
       return res.status(400).json({
         message: `Your application is currently ${existingApp.status}.`,
       });
     }
 
-    await VendorApplication.create({ studioName, email, websiteOrPortfolio });
+    await VendorApplication.create({
+      studioName,
+      email: contactEmail,
+      websiteOrPortfolio,
+    });
 
     res
       .status(201)
@@ -72,6 +96,51 @@ router.post("/apply", async (req, res, next) => {
         message:
           "Application submitted successfully. We will review your dossier.",
       });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "An application with this email already exists.",
+      });
+    }
+    next(error);
+  }
+});
+
+// @route   POST /api/vendors/google-registration-drafts
+// @desc    Create a pre-OAuth registration draft for Google vendor registration
+// @access  Public
+router.post("/google-registration-drafts", async (req, res, next) => {
+  try {
+    const { studioName, websiteOrPortfolio } = req.body;
+
+    if (!studioName || !studioName.trim()) {
+      return res.status(400).json({ message: "Studio name is required." });
+    }
+    if (!websiteOrPortfolio || !websiteOrPortfolio.trim()) {
+      return res.status(400).json({ message: "Portfolio URL is required." });
+    }
+
+    let portfolioUrl;
+    try {
+      portfolioUrl = new URL(websiteOrPortfolio.trim());
+    } catch {
+      portfolioUrl = null;
+    }
+    if (!portfolioUrl || !["http:", "https:"].includes(portfolioUrl.protocol)) {
+      return res.status(400).json({ message: "Portfolio must be a valid http(s) URL." });
+    }
+
+    const draftId = crypto.randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes TTL
+
+    await GoogleRegistrationDraft.create({
+      draftId,
+      studioName: studioName.trim(),
+      websiteOrPortfolio: websiteOrPortfolio.trim(),
+      expiresAt,
+    });
+
+    res.status(201).json({ draftId });
   } catch (error) {
     next(error);
   }
@@ -104,10 +173,41 @@ router.put("/applications/:id", protect, async (req, res, next) => {
       process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
 
     if (status === "approved") {
+      const claimToken = createPasswordToken(7 * 24 * 60 * 60 * 1000);
+      let user = await User.findOne({ email: application.email });
+
+      if (!user) {
+        user = await User.create({
+          name: application.studioName,
+          email: application.email,
+          authProvider: "invited",
+          role: "vendor",
+          resetPasswordToken: claimToken.hashedToken,
+          resetPasswordExpire: claimToken.expiresAt,
+        });
+      } else {
+        if (user.role === "user") user.role = "vendor";
+        user.resetPasswordToken = claimToken.hashedToken;
+        user.resetPasswordExpire = claimToken.expiresAt;
+        await user.save();
+      }
+
+      if (user.role === "vendor") {
+        const existingVendor = await Vendor.findOne({ owner: user._id });
+        if (!existingVendor) {
+          await Vendor.create({
+            name: application.studioName,
+            email: application.email,
+            owner: user._id,
+          });
+        }
+      }
+
+      const passwordUrl = `${frontendUrl}/reset-password/${claimToken.rawToken}`;
       await sendEmail({
         email: application.email,
         subject: "DRYP: Studio Approved",
-        message: `Your application has been accepted. You may now create your account at: ${frontendUrl}/signup`,
+        message: `Your application has been accepted.\n\nSet your password securely here: ${passwordUrl}\n\nOr log in with Google after approval: ${frontendUrl}/login\n\nThis password link expires in 7 days. After login you can upload products via Manual, Excel, or Shopify link.`,
       });
     } else {
       await sendEmail({
@@ -146,13 +246,13 @@ router.get("/applications", protect, async (req, res, next) => {
 // @access  Public
 router.post("/register", async (req, res, next) => {
   const { name, email, password } = req.body;
+  const normalizedEmail = String(email || "").toLowerCase().trim();
 
   try {
     const application = await VendorApplication.findOne({
-      email,
+      $or: [{ email: normalizedEmail }, { googleEmail: normalizedEmail }],
       status: "approved",
     });
-    console.log(application);
     if (!application) {
       return res.status(403).json({
         message:
@@ -160,11 +260,10 @@ router.post("/register", async (req, res, next) => {
       });
     }
 
-    let user = await User.findOne({ email });
-    if (user) {
-      return res
-        .status(400)
-        .json({ message: "User with this email already exists" });
+    if (!password || !isValidPassword(password)) {
+      return res.status(400).json({
+        message: "Password must be 8+ characters with uppercase, lowercase, and numbers.",
+      });
     }
 
     const session = await mongoose.startSession();
@@ -172,31 +271,46 @@ router.post("/register", async (req, res, next) => {
 
     try {
       const passwordHash = await bcrypt.hash(password, 10);
+      let user = await User.findOne({ email: application.email }).session(session);
 
-      const createdUsers = await User.create(
-        [
-          {
-            name: name,
-            email,
-            passwordHash,
-            role: "vendor",
-          },
-        ],
-        { session },
-      );
+      if (user) {
+        user.name = user.name || name || application.studioName;
+        user.passwordHash = passwordHash;
+        user.authProvider = "local";
+        if (user.role === "user") user.role = "vendor";
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+        await user.save({ session });
+      } else {
+        const createdUsers = await User.create(
+          [
+            {
+              name: name || application.studioName,
+              email: application.email,
+              passwordHash,
+              authProvider: "local",
+              role: "vendor",
+            },
+          ],
+          { session },
+        );
+        user = createdUsers[0];
+      }
 
-      user = createdUsers[0];
-
-      const vendor = await Vendor.create(
-        [
-          {
-            name: `${name}'s Studio`,
-            email,
-            owner: user._id,
-          },
-        ],
-        { session },
-      );
+      let vendor = await Vendor.findOne({ owner: user._id }).session(session);
+      if (!vendor) {
+        const createdVendors = await Vendor.create(
+          [
+            {
+              name: `${name || application.studioName}'s Studio`,
+              email: application.email,
+              owner: user._id,
+            },
+          ],
+          { session },
+        );
+        vendor = createdVendors[0];
+      }
 
       await session.commitTransaction();
       session.endSession();
@@ -208,7 +322,7 @@ router.post("/register", async (req, res, next) => {
       const userObj = user.toObject();
       delete userObj.passwordHash;
 
-      res.status(201).json({ token, user: userObj, vendor: vendor[0] });
+      res.status(201).json({ token, user: userObj, vendor });
     } catch (transactionError) {
       await session.abortTransaction();
       session.endSession();
@@ -234,6 +348,12 @@ router.post("/login", async (req, res, next) => {
       return res.status(403).json({
         message:
           "Access denied. This portal is for registered studios only. Please use the mobile app.",
+      });
+    }
+
+    if (!user.passwordHash) {
+      return res.status(403).json({
+        message: "Set your studio password from the approval email before using email login.",
       });
     }
 
@@ -284,8 +404,8 @@ router.get("/me/products", protect, async (req, res, next) => {
         .json({ message: "Vendor profile not found for this user" });
     }
 
-    const products = await Product.find({ vendor: vendor._id });
-    res.json(products);
+    const products = await Product.find({ vendor: req.user._id });
+    res.json(await Promise.all(products.map((product) => signProductImages(product))));
   } catch (error) {
     next(error);
   }
@@ -539,11 +659,15 @@ router.get("/:id", async (req, res, next) => {
 // GET /api/vendors/:id/products
 router.get("/:id/products", async (req, res, next) => {
   try {
+    const vendor = await Vendor.findById(req.params.id).select("owner");
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
     const products = await Product.find({
-      vendor: req.params.id,
+      vendor: vendor.owner,
       isActive: true,
     });
-    res.json(products);
+    res.json(await Promise.all(products.map((product) => signProductImages(product))));
   } catch (error) {
     next(error);
   }

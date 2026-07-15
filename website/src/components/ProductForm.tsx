@@ -9,13 +9,12 @@ import { getRenderableImageUrl, getS3StorageImages } from "@/lib/imageUrls";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
+// Empty base = browser-relative /api/* via Next rewrites (next.config.ts).
+// Absolute NEXT_PUBLIC_API_BASE_URL only needed for SSR or non-rewrite deploys.
 const resolveApiBaseUrl = () => {
   if (typeof window !== "undefined") {
-    if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
-      return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-    }
+    return "";
   }
-
   return process.env.NEXT_PUBLIC_API_BASE_URL || "";
 };
 

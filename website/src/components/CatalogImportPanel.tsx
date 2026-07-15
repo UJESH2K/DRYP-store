@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+// Relative /api/* — Next rewrites to backend (avoids port mismatch).
+const API_BASE_URL = "";
 const DEFAULT_PAGE_SIZE = 10;
 
 interface ProductDraft {

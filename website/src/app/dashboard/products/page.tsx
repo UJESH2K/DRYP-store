@@ -7,8 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import ProductModal from "@/components/ProductModal";
 import { getPrimaryProductImage } from "@/lib/imageUrls";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-
 const ProductsPage = () => {
   const { user, token } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,12 +23,9 @@ const ProductsPage = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/products?vendor=${user._id}`,
-      );
-      
+      const response = await fetch(`/api/products?vendor=${user._id}`);
       const data = await response.json();
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : data.products || []);
     } catch (error) {
       console.error("Failed to fetch products:", error);
     } finally {
@@ -51,15 +46,12 @@ const ProductsPage = () => {
     
     setIsDeleting(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/products/${confirmDeleteId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`/api/products/${confirmDeleteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       if (response.ok) {
         await fetchProducts();
       } else {

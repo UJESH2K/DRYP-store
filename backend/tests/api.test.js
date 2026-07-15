@@ -2,7 +2,7 @@
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = `http://localhost:${process.env.PORT || 8081}`;
 
 async function runTests() {
   console.log('🚀 Starting API tests...\n');

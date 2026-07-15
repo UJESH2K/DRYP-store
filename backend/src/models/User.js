@@ -44,6 +44,7 @@ const UserSchema = new mongoose.Schema(
       },
     },
     authProvider: { type: String, enum: ["local", "shopify", "google", "invited"], default: "local" },
+    googleId: { type: String, index: true, sparse: true },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },

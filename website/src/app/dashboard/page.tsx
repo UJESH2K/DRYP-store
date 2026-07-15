@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 
@@ -50,24 +48,8 @@ const OPTIONS = [
 ];
 
 export default function DashboardPage() {
-  const { isAuthenticated, loading, logout, user } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, loading, router]);
-
-  if (loading || !isAuthenticated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FCFCFA]">
-        <p className="font-sans text-[10px] uppercase tracking-[0.4em] text-gray-400 animate-pulse">
-          Initializing Studio...
-        </p>
-      </div>
-    );
-  }
+  // Auth gate is enforced by dashboard/layout.tsx — only authenticated vendors reach here.
+  const { logout, user } = useAuth();
 
   return (
     <>

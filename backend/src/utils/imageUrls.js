@@ -22,6 +22,35 @@ function isAmazonS3Url(url) {
   }
 }
 
+function normalizeImageRef(input) {
+  if (typeof input !== "string" || !input.trim()) return null;
+  const value = input.trim();
+
+  if (value.startsWith("/api/media?")) {
+    try {
+      const parsed = new URL(value, "http://localhost");
+      const key = parsed.searchParams.get("key");
+      return key ? decodeURIComponent(key) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    if (isAmazonS3Url(value)) {
+      try {
+        const parsed = new URL(value);
+        return decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+      } catch {
+        return null;
+      }
+    }
+    return value;
+  }
+
+  return value.replace(/^\//, "");
+}
+
 function extractS3Key(input) {
   if (typeof input !== "string" || !input.trim()) return null;
 
@@ -53,7 +82,7 @@ function normalizeImageKeys(images = []) {
   return Array.from(
     new Set(
       (Array.isArray(images) ? images : [])
-        .map((image) => extractS3Key(image))
+        .map((image) => normalizeImageRef(image))
         .filter(Boolean),
     ),
   );
@@ -79,7 +108,8 @@ function normalizeProductImages(product) {
 
 async function signImageKey(key, expiresIn = 60 * 15) {
   if (!key || typeof key !== "string") return key;
-  if (!s3Client || key.startsWith("http://") || key.startsWith("https://")) return key;
+  if (key.startsWith("http://") || key.startsWith("https://")) return key;
+  if (!s3Client) return key;
 
   const command = new GetObjectCommand({
     Bucket: bucketName,
@@ -118,6 +148,7 @@ async function signProductImages(product, expiresIn = 60 * 15) {
 module.exports = {
   extractS3Key,
   isAmazonS3Url,
+  normalizeImageRef,
   normalizeProductImages,
   normalizeImageKeys,
   signProductImages,

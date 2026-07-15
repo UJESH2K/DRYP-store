@@ -197,14 +197,14 @@ export default function LandingPage() {
 
             <div className="mt-10 animate-fade-up delay-500">
               <Link
-                href="/signup"
+                href="/register"
                 className="group relative inline-flex items-center gap-6 overflow-hidden border border-gray-300 bg-white/40 backdrop-blur-md px-8 py-4 transition-all duration-700 hover:border-black shadow-lg shadow-black/5"
                 onMouseEnter={() => setIsHovering(true)}
                 onMouseLeave={() => setIsHovering(false)}
               >
                 <div className="absolute inset-0 w-0 bg-black transition-all duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:w-full" />
                 <span className="relative z-10 text-[10px] font-medium uppercase tracking-[0.3em] text-black transition-colors duration-500 group-hover:text-white">
-                  Begin Discovery
+                  Register your brand
                 </span>
               </Link>
             </div>
@@ -506,14 +506,14 @@ export default function LandingPage() {
           </p>
           
           <Link
-            href="/signup"
+            href="/register"
             className="group relative z-10 inline-flex items-center justify-center px-14 py-6 text-[10px] font-bold uppercase tracking-[0.3em] text-white bg-black overflow-hidden shadow-2xl shadow-black/10 hover:shadow-black/20 transition-all duration-500 hover:-translate-y-1"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
             <div className="absolute inset-0 h-full w-full translate-y-full bg-gray-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-y-0" />
             <span className="relative z-10 transition-colors duration-500">
-              Enter The Feed
+              Register your brand
             </span>
           </Link>
         </section>

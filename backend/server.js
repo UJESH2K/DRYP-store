@@ -35,7 +35,7 @@ const authLimiter = rateLimit({
 const isProduction = process.env.NODE_ENV === "production";
 
 const vendorSignupLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, 
+  windowMs: 1 * 60 * 1000,
   max: isProduction ? 5 : 50,
   message: { message: "Too many signup attempts from this IP. Please wait 1 minute and try again." },
   standardHeaders: true,
@@ -46,6 +46,22 @@ const vendorApplyLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: isProduction ? 5 : 20,
   message: { message: "Too many studio applications from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const googleRegistrationDraftLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many draft creation attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const googleAuthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many Google authentication attempts from this IP. Please wait 1 minute and try again." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -104,8 +120,9 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/vendors/register", vendorSignupLimiter);
 app.use("/api/vendors/apply", vendorApplyLimiter);
+app.use("/api/vendors/google-registration-drafts", googleRegistrationDraftLimiter);
 app.use("/api/auth/shopify", shopifyAuthLimiter);
-app.use("/api/auth/google", shopifyAuthLimiter);
+app.use("/api/auth/google", googleAuthLimiter);
 
 app.use("/api/auth/shopify", shopifyAuthRoutes);
 app.use("/api/auth/google", googleAuthRoutes);
@@ -134,7 +151,7 @@ app.use((err, _req, res, _next) => {
     .json({ message: err.message || "Server error" });
 });
 
-const PORT = process.env.PORT || 8080; // Backend runs on port from .env (currently 8081)
+const PORT = process.env.PORT || 8081; // Backend runs on port from .env (currently 8081)
 
 // Start server
 (async () => {

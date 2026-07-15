@@ -14,8 +14,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   account_exists:
     "An account with this Shopify store's email already exists. Please log in first, then connect Shopify from your vendor dashboard.",
   no_vendor_profile: "We couldn't find a studio profile linked to your account.",
-  invalid_session: 'Your session expired before Shopify could finish authenticating. Please try again.',
-  oauth_failed: 'Something went wrong connecting your Shopify store. Please try again.',
+  invalid_session: 'Your session expired before authentication could finish. Please try again.',
+  oauth_failed: 'Something went wrong completing sign-in. Please try again.',
+  google_denied: 'Google login was cancelled.',
+  no_code: 'No authorization code was returned. Please try again.',
+  invalid_state: 'Your session expired. Please try again.',
+  token_exchange_failed: 'Failed to exchange Google credentials. Please try again.',
+  no_email: 'Your Google account does not have an email address associated with it.',
 };
 
 export default function OAuthCallbackScreen() {
@@ -26,13 +31,13 @@ export default function OAuthCallbackScreen() {
   useEffect(() => {
     (async () => {
       if (params.error) {
-        Alert.alert('Connection Failed', ERROR_MESSAGES[params.error] || 'Shopify connection failed.');
+        Alert.alert('Sign-In Failed', ERROR_MESSAGES[params.error] || 'Sign-in failed.');
         router.replace('/login');
         return;
       }
 
       if (!params.token) {
-        Alert.alert('Connection Failed', 'No authentication token was returned by Shopify.');
+        Alert.alert('Sign-In Failed', 'No authentication token was returned.');
         router.replace('/login');
         return;
       }
@@ -50,7 +55,7 @@ export default function OAuthCallbackScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ActivityIndicator size="large" color="#1a1a1a" />
-      <Text style={styles.text}>Connecting your Shopify store…</Text>
+      <Text style={styles.text}>Completing sign-in…</Text>
     </SafeAreaView>
   );
 }

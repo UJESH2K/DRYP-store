@@ -2,6 +2,25 @@
 
 Supplemental guidance for OpenCode agents. See `CLAUDE.md` for project overview, dev commands, and architecture. This file adds what `CLAUDE.md` leaves out.
 
+## Vendor Google OAuth (website studio)
+
+**Product gate (OpenSpec: `vendor-google-auth-approval`):** Google login succeeds only if:
+1. Email has `VendorApplication.status === 'approved'`, **or**
+2. User already exists as active `vendor` / `admin`.
+
+Otherwise callback redirects with `error=no_application|application_pending|application_rejected|account_suspended` (no JWT).
+
+**Env (backend):**
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- `SHOPIFY_APP_URL` = public API base for Google **redirect_uri**
+  - local: `http://localhost:8081` → `…/api/auth/google/callback`
+  - prod example: `https://api.dryp.store`
+- `NEXT_PUBLIC_FRONTEND_URL` = website after OAuth (`http://localhost:3000` or `https://www.dryp.store`)
+
+**Google Cloud Console** must list exact redirect URI(s) for local and prod.
+
+**Flow:** `/apply` → admin approve → email → `/login` Google → dashboard (Manual / Excel / Shopify).
+
 ## Port & URL pitfalls
 
 - Backend port is set by `PORT` in `backend/.env` (currently **8081**). Apache's `PEMHTTPD-x64` service holds port 8080, so the backend uses 8081.

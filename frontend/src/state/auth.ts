@@ -159,12 +159,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return user;
       } else {
         set({ token: null });
-        useToastStore.getState().showToast('Failed to complete Shopify login.', 'error');
+        useToastStore.getState().showToast('Failed to complete login.', 'error');
         return null;
       }
     } catch (error) {
       set({ token: null });
-      console.error('Error completing Shopify login:', error);
+      console.error('Error completing token login:', error);
       useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
       return null;
     } finally {

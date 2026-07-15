@@ -9,7 +9,10 @@
     "seed": "node seed.js",
     "embed": "node embed.js",
     "lint": "eslint .",
-    "test": "node tests/api.test.js",
+    "test": "node tests/studioAccess.test.js && node tests/uploadValidation.test.js && node tests/shipWebsiteStudio.test.js && node tests/googleRegistrationDraft.test.js",
+    "test:integration:google-registration": "node tests/googleRegistrationDraft.integration.test.js",
+    "audit:vendor-google-identities": "node auditVendorGoogleIdentities.js",
+    "test:live": "node tests/api.test.js",
     "create-index": "node createSearchIndex.js"
   },
   "dependencies": {

@@ -31,7 +31,7 @@ export default function LoginScreen() {
   const [shopDomain, setShopDomain] = useState('');
   const [shopifyError, setShopifyError] = useState('');
 
-  const { login, register, isLoading } = useAuthStore();
+  const { login, register, loginWithToken, isLoading, guestId } = useAuthStore();
 
   const handleAuthAction = async () => {
     if (!email || !password) {
@@ -57,7 +57,40 @@ export default function LoginScreen() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    const guestQuery = guestId ? `&guestId=${encodeURIComponent(guestId)}` : '';
+    const startUrl = `${API_BASE_URL}/api/auth/google?platform=mobile${guestQuery}`;
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
+      if (result.type !== 'success' || !result.url) {
+        return;
+      }
+      const url = new URL(result.url);
+      const token = url.searchParams.get('token');
+      const oauthError = url.searchParams.get('error');
+      if (oauthError) {
+        Alert.alert('Google Sign-In', 'Google login was cancelled or failed. Please try again.');
+        return;
+      }
+      if (!token) {
+        Alert.alert('Google Sign-In', 'No authentication token was returned.');
+        return;
+      }
+      const user = await loginWithToken(token);
+      if (!user) {
+        Alert.alert('Google Sign-In', 'Failed to complete Google login.');
+      }
+    } catch (err) {
+      console.error('Google login error:', err);
+      Alert.alert('Google Sign-In', 'Something went wrong. Please try again.');
+    }
+  };
+
   const handleSocialLogin = (provider: string) => {
+    if (provider === 'Google') {
+      handleGoogleLogin();
+      return;
+    }
     Alert.alert('Coming Soon', `Login with ${provider} is not available yet.`);
   };
 
@@ -163,29 +196,31 @@ export default function LoginScreen() {
           </View>
 
           {showShopifyInput ? (
-            <View style={styles.shopifyInputRow}>
-              <TextInput
-                style={[styles.input, styles.shopifyInput]}
-                placeholder="your-store.myshopify.com"
-                value={shopDomain}
-                onChangeText={(text) => {
-                  setShopDomain(text);
-                  setShopifyError('');
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Pressable
-                style={styles.primaryButton}
-                onPress={handleShopifyConnect}
-                disabled={!shopDomain.trim()}
-              >
-                <Text style={styles.primaryButtonText}>Connect Shopify Store</Text>
-              </Pressable>
-            </View>
-            {shopifyError ? (
-              <Text style={styles.errorText}>{shopifyError}</Text>
-            ) : null}
+            <>
+              <View style={styles.shopifyInputRow}>
+                <TextInput
+                  style={[styles.input, styles.shopifyInput]}
+                  placeholder="your-store.myshopify.com"
+                  value={shopDomain}
+                  onChangeText={(text) => {
+                    setShopDomain(text);
+                    setShopifyError('');
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  style={styles.primaryButton}
+                  onPress={handleShopifyConnect}
+                  disabled={!shopDomain.trim()}
+                >
+                  <Text style={styles.primaryButtonText}>Connect Shopify Store</Text>
+                </Pressable>
+              </View>
+              {shopifyError ? (
+                <Text style={styles.errorText}>{shopifyError}</Text>
+              ) : null}
+            </>
           ) : (
             <Pressable style={styles.toggleButton} onPress={() => setShowShopifyInput(true)}>
               <Text style={styles.toggleButtonText}>Continue with Shopify</Text>

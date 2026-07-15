@@ -3,9 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 interface ScrapedProduct {
   name: string;
@@ -18,8 +15,7 @@ interface ScrapedProduct {
 }
 
 export default function ShopifyScrapePage() {
-  const { token, user } = useAuth();
-  const router = useRouter();
+  const { token } = useAuth();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ScrapedProduct | null>(null);
@@ -37,7 +33,7 @@ export default function ShopifyScrapePage() {
     setSuccess(false);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/products/shopify-preview`, {
+      const res = await fetch("/api/products/shopify-preview", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -66,7 +62,7 @@ export default function ShopifyScrapePage() {
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/products/shopify-scrape`, {
+      const res = await fetch("/api/products/shopify-scrape", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -18,6 +18,14 @@ const zaloga = localFont({
 export const metadata: Metadata = {
   title: "DRYP Vendor Hub",
   description: "Manage your products and sales.",
+  icons: {
+    icon: [
+      { url: "/icon.svg?v=3", type: "image/svg+xml" },
+      { url: "/favicon.ico?v=3", sizes: "any" },
+      { url: "/icon.png?v=3", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-icon.png?v=3", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

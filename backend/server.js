@@ -29,15 +29,15 @@ const cartRoutes = require("./src/routes/cart");
 const aiRoutes = require("./src/routes/ai");
 const rateLimit = require('express-rate-limit');
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 10, 
-  message: { message: "Too many login attempts from this IP, please try again after 15 minutes" },
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many authentication attempts from this IP. Please wait 1 minute and try again." },
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-const isProduction = process.env.NODE_ENV === "production";
 
 const vendorSignupLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
@@ -75,14 +75,6 @@ const shopifyAuthLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: isProduction ? 10 : 50,
   message: { message: "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: isProduction ? 10 : 50,
-  message: { message: "Too many authentication attempts from this IP. Please wait 1 minute and try again." },
   standardHeaders: true,
   legacyHeaders: false,
 });

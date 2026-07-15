@@ -67,6 +67,7 @@ export default function ProfileScreen() {
   ];
 
   const supportItems = [
+    { id: 'ai-chat', title: 'AI Stylist', icon: <Ionicons name="sparkles-outline" size={22} color="#333" />, onPress: () => router.push('/ai-chat') },
     { id: 'help', title: 'Help & Support', icon: <Ionicons name="help-buoy-outline" size={22} color="#333" />, onPress: () => router.push('/account/help') },
     { id: 'about', title: 'About Us', icon: <Ionicons name="information-circle-outline" size={22} color="#333" />, onPress: () => router.push('/account/about') },
   ];

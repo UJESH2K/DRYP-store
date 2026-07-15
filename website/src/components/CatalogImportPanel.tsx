@@ -30,9 +30,9 @@ interface SkippedRow {
 
 interface CatalogImportPanelProps {
   token: string;
-  previewEndpoint: string; // e.g. /api/vendors/admin/catalog-preview or /api/vendors/me/catalog-preview
-  importEndpoint: string; // e.g. /api/vendors/admin/{vendorId}/catalog-import or /api/vendors/me/catalog-import
-  disabled?: boolean; // e.g. admin hasn't picked a target vendor yet
+  previewEndpoint: string;
+  importEndpoint: string;
+  disabled?: boolean;
   onImported?: (count: number) => void;
 }
 
@@ -47,6 +47,7 @@ export default function CatalogImportPanel({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [products, setProducts] = useState<ProductDraft[] | null>(null);
+  const [importId, setImportId] = useState<string | null>(null);
   const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
   const [error, setError] = useState("");
   const [importedCount, setImportedCount] = useState<number | null>(null);
@@ -56,6 +57,7 @@ export default function CatalogImportPanel({
 
   const resetPreview = () => {
     setProducts(null);
+    setImportId(null);
     setSkippedRows([]);
     setImportedCount(null);
     setError("");
@@ -90,6 +92,7 @@ export default function CatalogImportPanel({
       if (!res.ok) throw new Error(data.message || "Failed to parse the file.");
 
       setProducts(data.products);
+      setImportId(data.importId || null);
       setSkippedRows(data.skippedRows || []);
       setCurrentPage(1);
     } catch (err) {
@@ -104,13 +107,14 @@ export default function CatalogImportPanel({
     setError("");
     setIsImporting(true);
     try {
+      const body = importId ? { importId } : { products };
       const res = await fetch(`${API_BASE_URL}${importEndpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ products }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();

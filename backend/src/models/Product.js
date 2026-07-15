@@ -49,6 +49,9 @@ const ProductSchema = new mongoose.Schema({
   // Provenance (for products imported from external sources like Shopify)
   externalId: { type: String, index: true },
   source: { type: String, enum: ['dryp', 'shopify', 'manual_import'], default: 'dryp' },
+
+  // AI / Vector Search
+  embedding: { type: [Number], default: undefined },
 }, { timestamps: true });
 
 // Re-importing from the same external source should update, not duplicate, a product.

@@ -10,7 +10,6 @@ const router = express.Router();
 const sendEmail = require('../utils/sendEmail');
 const { protect } = require('../middleware/auth');
 const { createPasswordToken, hashPasswordToken } = require('../utils/passwordTokens');
-
 const mergeGuestData = async (userId, guestId) => {
   if (!guestId) return;
   try {

@@ -8,6 +8,7 @@ export interface User {
   email: string;
   name: string;
   role: 'user' | 'vendor' | 'admin';
+  authProvider?: 'local' | 'shopify' | 'google' | 'invited';
   createdAt: string;
   preferences: {
     currency: string;

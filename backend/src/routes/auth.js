@@ -255,38 +255,6 @@ router.put('/reset-password/:token', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-// @route   POST /api/auth/google
-// @desc    Verify a Google ID token and log in or create a user
-router.post('/google', async (req, res, next) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) return res.status(400).json({ message: 'Missing idToken' });
-
-    // Verify the token with Google's tokeninfo endpoint (no extra library needed)
-    const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
-    if (!verifyRes.ok) return res.status(401).json({ message: 'Invalid Google token' });
-
-    const payload = await verifyRes.json();
-    if (!payload.email) return res.status(400).json({ message: 'Google account has no email' });
-
-    let user = await User.findOne({ email: payload.email });
-    if (!user) {
-      user = await User.create({
-        name: payload.name || payload.email.split('@')[0],
-        email: payload.email,
-        authProvider: 'google',
-      });
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
-    const userObj = user.toObject();
-    delete userObj.passwordHash;
-
-    res.json({ token, user: userObj });
-  } catch (error) { next(error); }
-});
-
 module.exports = router;
 module.exports.mergeGuestData = mergeGuestData;
 module.exports.isValidPassword = isValidPassword;

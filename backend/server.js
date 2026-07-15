@@ -1,4 +1,9 @@
 require("dotenv").config();
+
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET must be set in .env");
+  process.exit(1);
+}
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -70,6 +75,14 @@ const shopifyAuthLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: isProduction ? 10 : 50,
   message: { message: "Too many Shopify authentication attempts from this IP. Please wait 1 minute and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: isProduction ? 10 : 50,
+  message: { message: "Too many authentication attempts from this IP. Please wait 1 minute and try again." },
   standardHeaders: true,
   legacyHeaders: false,
 });

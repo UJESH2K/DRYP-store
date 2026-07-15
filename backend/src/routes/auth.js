@@ -17,29 +17,25 @@ const mergeGuestData = async (userId, guestId) => {
     const userLikes = await Like.find({ user: userId });
     const userLikedProductIds = new Set(userLikes.map(l => l.product.toString()));
 
-    for (const like of guestLikes) {
-      if (!userLikedProductIds.has(like.product.toString())) {
-        like.user = userId;
-        like.guestId = null;
-        await like.save();
-      } else {
-        await Like.findByIdAndDelete(like._id);
+    const likeOps = guestLikes.map(like => {
+      if (userLikedProductIds.has(like.product.toString())) {
+        return { deleteOne: { filter: { _id: like._id } } };
       }
-    }
+      return { updateOne: { filter: { _id: like._id }, update: { $set: { user: userId, guestId: null } } } };
+    });
+    if (likeOps.length) await Like.bulkWrite(likeOps);
 
     const guestWishlistItems = await WishlistItem.find({ guestId });
     const userWishlistItems = await WishlistItem.find({ user: userId });
-    const userWishlistProductIds = new Set(userWishlistItems.map(i => i.product.toString()));
+    const userWishlistedProductIds = new Set(userWishlistItems.map(i => i.product.toString()));
 
-    for (const item of guestWishlistItems) {
-      if (!userWishlistProductIds.has(item.product.toString())) {
-        item.user = userId;
-        item.guestId = null;
-        await item.save();
-      } else {
-        await WishlistItem.findByIdAndDelete(item._id);
+    const wishlistOps = guestWishlistItems.map(item => {
+      if (userWishlistedProductIds.has(item.product.toString())) {
+        return { deleteOne: { filter: { _id: item._id } } };
       }
-    }
+      return { updateOne: { filter: { _id: item._id }, update: { $set: { user: userId, guestId: null } } } };
+    });
+    if (wishlistOps.length) await WishlistItem.bulkWrite(wishlistOps);
 
     await Order.updateMany({ guestId, status: 'cart' }, { user: userId, guestId: null });
   } catch (error) {
@@ -74,7 +70,7 @@ router.post('/register', async (req, res, next) => {
     
     await mergeGuestData(user._id, guestId);
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     const userObj = user.toObject();
     delete userObj.passwordHash;
@@ -87,16 +83,19 @@ router.post('/register', async (req, res, next) => {
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password, guestId } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+passwordHash');
     if (!user || !user.passwordHash) return res.status(401).json({ message: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
     
     await mergeGuestData(user._id, guestId);
     
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
-    
-    res.json({ token, user });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    const userObj = user.toObject();
+    delete userObj.passwordHash;
+
+    res.json({ token, user: userObj });
   } catch (error) { next(error); }
 });
 
@@ -279,7 +278,7 @@ router.post('/google', async (req, res, next) => {
       });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     const userObj = user.toObject();
     delete userObj.passwordHash;

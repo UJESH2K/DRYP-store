@@ -7,6 +7,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "seed": "node seed.js",
+    "seed:admin": "node scripts/seed-admin.js",
     "embed": "node embed.js",
     "lint": "eslint .",
     "test": "node tests/studioAccess.test.js && node tests/uploadValidation.test.js && node tests/shipWebsiteStudio.test.js && node tests/googleRegistrationDraft.test.js",

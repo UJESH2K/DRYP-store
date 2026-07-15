@@ -1,10 +1,8 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { apiCall } from '../lib/api'; // REMOVED to break cycle
 import { useToastStore } from './toast';
-import { useWishlistStore } from './wishlist'; // Import the wishlist store
+import { useWishlistStore } from './wishlist';
 
-// This should match the User model from the backend
 export interface User {
   _id: string;
   email: string;
@@ -22,11 +20,11 @@ export interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
+  session: any | null;
   isAuthenticated: boolean;
   isGuest: boolean;
   guestId: string | null;
   isLoading: boolean;
-  // Actions
   initGuestUser: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<User | null>;
   login: (email: string, password: string) => Promise<User | null>;
@@ -36,11 +34,14 @@ interface AuthState {
   updateUser: (user: User) => Promise<void>;
 }
 
-const generateGuestId = () => `guest_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+function generateGuestId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
+  session: null,
   isAuthenticated: false,
   isGuest: false,
   guestId: null,
@@ -75,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await AsyncStorage.setItem('user_token', token);
         await AsyncStorage.setItem('user_data', JSON.stringify(user));
         await AsyncStorage.removeItem('guest_id');
-        
+
         useWishlistStore.getState().setWishlist([]);
         useToastStore.getState().showToast('Registered successfully!');
         return user;
@@ -116,7 +117,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             .map(item => item.product);
           useWishlistStore.getState().setWishlist(validWishlistProducts);
         }
-        
+
         useToastStore.getState().showToast('Logged in successfully!');
         return user;
       } else {
@@ -131,7 +132,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false });
     }
   },
-  
+
   // Hydrates the auth store from a DRYP JWT minted by a backend OAuth redirect
   // (e.g. after the Shopify OAuth callback), which only carries a token.
   loginWithToken: async (token: string) => {
@@ -178,44 +179,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.removeItem('user_token');
       await AsyncStorage.removeItem('user_data');
       useWishlistStore.getState().setWishlist([]);
-      // Instead of clearing everything, initialize a new guest session
-      await get().initGuestUser();
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false });
     } catch (error) {
       console.error('Error logging out:', error);
-    } finally {
       set({ isLoading: false });
     }
   },
 
   loadUser: async () => {
-    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
-    set({ isLoading: true });
-    try {
-      const token = await AsyncStorage.getItem('user_token');
-      const userData = await AsyncStorage.getItem('user_data');
-      if (token && userData) {
-        const user = JSON.parse(userData);
-        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
-        
-        const wishlistItems = await apiCall('/api/wishlist');
-        if (Array.isArray(wishlistItems)) {
-          const validWishlistProducts = wishlistItems
-            .filter(item => item && item.product)
-            .map(item => item.product);
-          useWishlistStore.getState().setWishlist(validWishlistProducts);
-        }
-      } else {
-        await get().initGuestUser();
-      }
-    } catch (error) {
-      console.error('Error loading user:', error);
-      await get().initGuestUser(); // Fallback to guest session on error
-    } finally {
-      set({ isLoading: false });
-    }
+    // ponytail: mobile hydrates via loginWithToken after OAuth redirect
   },
 
-  updateUser: async (user: User) => {
+  updateUser: async (user) => {
     set({ user });
     await AsyncStorage.setItem('user_data', JSON.stringify(user));
   },

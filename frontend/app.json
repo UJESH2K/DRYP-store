@@ -20,6 +20,8 @@
     ],
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.dryp.store",
+      "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "DRYP needs access to your photos so you can share style inspiration and save your favorite looks.",
         "NSCameraUsageDescription": "DRYP uses the camera to let you capture outfit photos and discover similar styles.",
@@ -29,8 +31,12 @@
     },
     "android": {
       "backgroundColor": "#000000",
-      "package": "com.dryp.app",
-      "versionCode": 1
+      "package": "com.dryp.store",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
     },
     "plugins": [
       "expo-font",

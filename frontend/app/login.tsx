@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { normalizeShopDomain } from '@/lib/shopify';
-import { normalizeShopifyDomain } from '@/lib/shopify';
 import {
   View,
   Text,
@@ -19,7 +18,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../src/state/auth';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.9:5000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.dryp.store';
 
 export default function LoginScreen() {
   const router = useCustomRouter();

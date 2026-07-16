@@ -188,7 +188,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loadUser: async () => {
-    // ponytail: mobile hydrates via loginWithToken after OAuth redirect
+    const token = await AsyncStorage.getItem('user_token');
+    const userData = await AsyncStorage.getItem('user_data');
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
+      } catch {
+        await initGuestUser();
+      }
+    } else {
+      await initGuestUser();
+    }
   },
 
   updateUser: async (user) => {

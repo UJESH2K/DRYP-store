@@ -12,6 +12,7 @@ import {
 import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
 import { useAuthStore } from '../src/state/auth';
 import Toast from '../src/components/Toast';
+import ErrorBoundary from '../src/components/common/ErrorBoundary';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
 
 SplashScreen.preventAutoHideAsync();
@@ -79,7 +80,8 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
+      <ErrorBoundary>
+        <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen 
           name="liked-items" 
           options={{ 
@@ -112,7 +114,8 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }} 
         />
-      </Stack>
+        </Stack>
+      </ErrorBoundary>
       <Toast />
     </SafeAreaProvider>
   );

@@ -100,7 +100,7 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.profileHeader} onPress={() => router.push('/account/profile-details')}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.name?.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{(user?.name?.[0] ?? '?').toUpperCase()}</Text>
           </View>
           <View>
             <Text style={styles.profileName}>{user?.name}</Text>

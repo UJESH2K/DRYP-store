@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AboutScreen() {
@@ -80,10 +81,10 @@ export default function AboutScreen() {
 
         <View style={styles.copyright}>
           <Text style={styles.copyrightText}>
-            © 2024 DRYP. All rights reserved.
+            © {new Date().getFullYear()} DRYP. All rights reserved.
           </Text>
           <Text style={styles.copyrightText}>
-            Version 1.0.0
+            Version {Constants.expoConfig?.version || '1.0.0'}
           </Text>
         </View>
         

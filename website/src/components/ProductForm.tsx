@@ -247,12 +247,19 @@ const ProductForm = React.forwardRef(
         );
       }
 
+      const formData = new FormData();
+      if (presignData.fields && typeof presignData.fields === "object") {
+        Object.entries(presignData.fields as Record<string, string>).forEach(
+          ([field, value]) => {
+            formData.append(field, value);
+          },
+        );
+      }
+      formData.append("file", imageFile);
+
       const uploadResponse = await fetch(presignData.url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": imageFile.type,
-        },
-        body: imageFile,
+        method: "POST",
+        body: formData,
       });
 
       if (!uploadResponse.ok) {
@@ -267,7 +274,12 @@ const ProductForm = React.forwardRef(
         );
       }
 
-      return presignData.viewUrl || presignData.publicUrl || presignData.url.split("?")[0];
+      return (
+        presignData.key ||
+        presignData.viewUrl ||
+        presignData.publicUrl ||
+        presignData.url.split("?")[0]
+      );
     };
 
     const handleImageSelect = async (variantIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {

@@ -10,6 +10,7 @@ import { EmptyState } from '../../src/components/home/EmptyState';
 import { Card } from '../../src/components/home/Card';
 import ProductDetailModal from '../../src/components/ProductDetailModal';
 import AIStylistSheet from '../../src/components/AIStylistSheet';
+import ZalogaFAB from '../../src/components/stylist/ZalogaFAB';
 import { Item } from '../../src/types';
 
 export default function HomeScreen() {
@@ -145,6 +146,11 @@ export default function HomeScreen() {
           onClose={hideDetailsWithAnimation}
         />
       )}
+
+      <ZalogaFAB
+        visible={true}
+        onPress={() => setShowStylist(true)}
+      />
 
       <AIStylistSheet
         visible={showStylist}

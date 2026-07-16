@@ -146,7 +146,7 @@ const formatPrice = React.useCallback((price: number) =>
                                 setIsModalVisible(true);
                               }}>
                                 <View style={styles.itemCard}>
-                                  <Image source={{ uri: `${API_BASE_URL}${item.image}` }} style={styles.itemImage} />
+                                  <Image source={{ uri: item.image.startsWith('http') ? item.image : `${API_BASE_URL}/${item.image.replace(/^\//, '')}` }} style={styles.itemImage} />
                                   <View style={styles.itemContent}>
                                     <View style={styles.itemHeader}>
                       <View style={styles.itemInfo}>

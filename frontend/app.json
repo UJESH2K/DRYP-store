@@ -19,7 +19,13 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "DRYP needs access to your photos so you can share style inspiration and save your favorite looks.",
+        "NSCameraUsageDescription": "DRYP uses the camera to let you capture outfit photos and discover similar styles.",
+        "NSPhotoLibraryAddUsageDescription": "DRYP can save outfit photos and screenshots to your photo library.",
+        "NSMicrophoneUsageDescription": "DRYP may use the microphone for video-based style recommendations in the future."
+      }
     },
     "android": {
       "backgroundColor": "#000000",

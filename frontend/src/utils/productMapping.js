@@ -54,7 +54,7 @@ export const mapProductToItem = (product) => {
     id: product._id,
     title: product.name,
     subtitle: product.description.substring(0, 50) + '...',
-    image: product.images[0].startsWith('http') ? product.images[0] : `${API_BASE_URL}${product.images[0]}`,
+    image: product.images[0].startsWith('http') ? product.images[0] : product.images[0],
     tags: product.tags || [],
     category: product.category,
     priceTier: getPriceTier(product.basePrice),

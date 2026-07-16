@@ -43,8 +43,7 @@ const cellText = (value) => {
   return String(value).trim();
 };
 
-// Reads a .xlsx or .csv buffer into raw row objects keyed by normalized header name.
-const parseCatalogFile = async (buffer, filename) => {
+async function parseCatalogFile(buffer, filename) {
   const ext = (String(filename || '').match(/\.[^.]+$/) || [''])[0].toLowerCase();
   if (!ALLOWED_EXTENSIONS.has(ext)) {
     const error = new Error(
@@ -69,9 +68,15 @@ const parseCatalogFile = async (buffer, filename) => {
   }
 
   const columnKeys = {};
+  const unknownHeaders = [];
   worksheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const key = normalizeHeader(cell.value);
-    if (key) columnKeys[colNumber] = key;
+    const raw = cell.value;
+    const key = normalizeHeader(raw);
+    if (key) {
+      columnKeys[colNumber] = key;
+    } else if (raw) {
+      unknownHeaders.push(String(raw).trim());
+    }
   });
 
   const rows = [];
@@ -88,8 +93,8 @@ const parseCatalogFile = async (buffer, filename) => {
     }
   });
 
-  return rows;
-};
+  return { rows, unknownHeaders };
+}
 
 // Groups flat rows (one row per Colour/Size combo) into DRYP product drafts.
 // Does not set `vendor`/`brand`/`source` — the caller fills those in once the
@@ -148,14 +153,19 @@ const groupRowsIntoProducts = (rows) => {
     p.variants.forEach((v) => Object.keys(v.options).forEach((k) => optionNames.add(k)));
     const prices = p.variants.map((v) => v.price);
 
+    if (prices.length === 0 || prices.every((p) => !Number.isFinite(p))) {
+      return null;
+    }
+
+    const validPrices = prices.filter(Number.isFinite);
     const doc = {
       name: p.name,
       category: p.category,
-      basePrice: Math.min(...prices),
+      basePrice: Math.min(...validPrices),
       images: p.images,
       preview: {
         variantCount: p.variants.length,
-        priceRange: [Math.min(...prices), Math.max(...prices)],
+        priceRange: [Math.min(...validPrices), Math.max(...validPrices)],
         compareAtPrice: p.variants.find((v) => v.compareAtPrice)?.compareAtPrice,
         productUrl: p.variants.find((v) => v.productUrl)?.productUrl,
       },
@@ -179,7 +189,7 @@ const groupRowsIntoProducts = (rows) => {
     return doc;
   });
 
-  return { products: result, skippedRows };
+  return { products: result, skippedRows, droppedColumns };
 };
 
 // Turns reviewed product drafts (from groupRowsIntoProducts, possibly edited by

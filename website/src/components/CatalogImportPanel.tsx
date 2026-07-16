@@ -50,6 +50,7 @@ export default function CatalogImportPanel({
   const [products, setProducts] = useState<ProductDraft[] | null>(null);
   const [importId, setImportId] = useState<string | null>(null);
   const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
+  const [droppedColumns, setDroppedColumns] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -60,6 +61,7 @@ export default function CatalogImportPanel({
     setProducts(null);
     setImportId(null);
     setSkippedRows([]);
+    setDroppedColumns([]);
     setImportedCount(null);
     setError("");
     setCurrentPage(1);
@@ -95,6 +97,7 @@ export default function CatalogImportPanel({
       setProducts(data.products);
       setImportId(data.importId || null);
       setSkippedRows(data.skippedRows || []);
+      setDroppedColumns(data.droppedColumns || []);
       setCurrentPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse the file.");
@@ -181,6 +184,16 @@ export default function CatalogImportPanel({
                   {i < skippedRows.length - 1 ? ", " : ""}
                 </span>
               ))}
+            </div>
+          )}
+
+          {droppedColumns.length > 0 && (
+            <div className="border-l border-amber-400 bg-amber-50 p-4 text-xs text-amber-700">
+              {droppedColumns.length} unrecognized column{droppedColumns.length === 1 ? "" : "s"} ignored:{" "}
+              {droppedColumns.map((h, i) => (
+                <code key={i} className="bg-amber-100 px-1 rounded">{h}</code>
+              ))}
+              {" "}— these headers did not match any known field.
             </div>
           )}
 

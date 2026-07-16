@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '../../src/lib/api';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
-import { API_BASE_URL } from '../../src/lib/config';
+import { resolveImageUri } from '../../src/utils/imageUri';
 const { width: screenWidth } = Dimensions.get('window');
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -167,9 +167,12 @@ export default function ProductDetailScreen() {
     const renderProductContent = () => (
         <>
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.imageCarousel}>
-                {product.images.map((img, index) => (
-                    <Image key={index} source={{ uri: `${API_BASE_URL}${img}` }} style={styles.productImage} />
-                ))}
+                {product.images.map((img, index) => {
+                  const uri = resolveImageUri(img);
+                  return uri ? (
+                    <Image key={index} source={{ uri }} style={styles.productImage} />
+                  ) : null;
+                })}
             </ScrollView>
             
             <View style={styles.detailsContainer}>

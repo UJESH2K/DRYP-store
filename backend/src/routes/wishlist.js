@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { identifyUser } = require('../middleware/auth');
 const WishlistItem = require('../models/WishlistItem');
 const Product = require('../models/Product');
+const { signProductImages } = require('../utils/imageUrls');
 
 // @route   GET /api/wishlist
 // @desc    Get all products in the current user's or guest's wishlist
@@ -15,7 +16,8 @@ router.get('/', identifyUser, async (req, res, next) => {
       return res.json([]);
     }
     const wishlistItems = await WishlistItem.find(query).populate('product');
-    res.json(wishlistItems.map(item => item.product));
+    const signed = wishlistItems.map(item => signProductImages(item.product)).filter(Boolean);
+    res.json(signed);
   } catch (error) { 
     next(error); 
   }

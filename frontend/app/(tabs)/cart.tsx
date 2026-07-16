@@ -11,6 +11,7 @@ import ProductDetailModal from '../../src/components/ProductDetailModal';
 import AnimatedLoadingScreen from '../../src/components/common/AnimatedLoadingScreen';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { API_BASE_URL } from '../../src/lib/config';
+import { resolveImageUri } from '../../src/utils/imageUri';
 
 export default function CartScreen() {
   const router = useCustomRouter();
@@ -146,7 +147,7 @@ const formatPrice = React.useCallback((price: number) =>
                                 setIsModalVisible(true);
                               }}>
                                 <View style={styles.itemCard}>
-                                  <Image source={{ uri: item.image.startsWith('http') ? item.image : `${API_BASE_URL}/${item.image.replace(/^\//, '')}` }} style={styles.itemImage} />
+                                  <Image source={{ uri: resolveImageUri(item.image) }} style={styles.itemImage} />
                                   <View style={styles.itemContent}>
                                     <View style={styles.itemHeader}>
                       <View style={styles.itemInfo}>

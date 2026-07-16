@@ -15,7 +15,7 @@ import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { useFocusEffect } from 'expo-router';
 import { apiCall } from '../../src/lib/api';
 import { useAuthStore } from '../../src/state/auth';
-import { API_BASE_URL } from '../../src/lib/config';
+import { resolveImageUri } from '../../src/utils/imageUri';
 
 export default function OrdersScreen() {
   const router = useCustomRouter();
@@ -97,7 +97,7 @@ export default function OrdersScreen() {
             return (
               <View key={product._id} style={styles.productItem}>
                 <Image 
-                  source={{ uri: `${API_BASE_URL}${product.images[0]}` }} 
+                  source={{ uri: product.images[0] ? resolveImageUri(product.images[0]) : undefined }} 
                   style={styles.productImage} 
                 />
                 <View style={styles.productInfo}>

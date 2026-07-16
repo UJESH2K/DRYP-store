@@ -21,7 +21,7 @@ import AnimatedLoadingScreen from './common/AnimatedLoadingScreen';
 import CustomAlert from './common/CustomAlert';
 import { Product, ProductOption, ProductVariant } from '../types';
 import { useCustomRouter } from '../hooks/useCustomRouter';
-import { API_BASE_URL } from '../lib/config';
+import { resolveImageUri } from '../utils/imageUri';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
@@ -287,7 +287,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         <View style={styles.imageWrapper}>
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onScroll={onImageScroll} scrollEventThrottle={16} style={styles.detailsImageCarousel} nestedScrollEnabled={true} directionalLockEnabled={true}>
             {displayImages.map((img: string, index: number) => (
-              <Image key={img || index} source={{ uri: `${API_BASE_URL}${img}` }} style={styles.detailsImage} resizeMode="cover" accessible accessibilityLabel={`Product image ${index + 1}`} />
+              <Image key={img || index} source={{ uri: resolveImageUri(img) }} style={styles.detailsImage} resizeMode="cover" accessible accessibilityLabel={`Product image ${index + 1}`} />
             ))}
           </ScrollView>
           {displayImages.length > 1 && renderImageIndicators()}

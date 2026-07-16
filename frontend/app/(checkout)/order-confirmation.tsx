@@ -5,6 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '../../src/lib/api';
 import { API_BASE_URL } from '../../src/lib/config';
+import { resolveImageUri } from '../../src/utils/imageUri';
 
 export default function OrderConfirmationScreen() {
   const router = useCustomRouter();
@@ -33,9 +34,9 @@ export default function OrderConfirmationScreen() {
 
   const renderOrderItem = ({ item }: { item: any }) => (
     <View style={styles.itemContainer}>
-      <Image 
-        source={{ uri: `${API_BASE_URL}${item.product.images[0]}` }} 
-        style={styles.itemImage} 
+      <Image
+        source={{ uri: item.product?.images?.[0] ? resolveImageUri(item.product.images[0]) : undefined }}
+        style={styles.itemImage}
       />
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle} numberOfLines={1}>{item.product.name}</Text>

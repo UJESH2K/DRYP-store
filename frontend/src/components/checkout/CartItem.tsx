@@ -1,17 +1,16 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { CartItem as CartItemType } from '../../state/cart';
+import { resolveImageUri } from '../../utils/imageUri';
 
 interface CartItemProps {
   item: CartItemType;
 }
- 
-import { API_BASE_URL } from '../../lib/config';
 
 const CartItem: React.FC<CartItemProps> = ({ item }) => {
   return (
     <View style={styles.cartItemContainer}>
-      <Image source={{ uri: `${API_BASE_URL}${item.image}` }} style={styles.cartItemImage} />
+      <Image source={{ uri: resolveImageUri(item.image) }} style={styles.cartItemImage} />
       <View style={styles.itemDetails}>
         <Text style={styles.itemTitle}>{item.title}</Text>
         <Text style={styles.itemBrand}>{item.brand}</Text>

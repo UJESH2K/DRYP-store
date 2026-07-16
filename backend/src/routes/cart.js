@@ -3,6 +3,7 @@ const router = express.Router();
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { identifyUser } = require("../middleware/auth");
+const { signProductImages } = require("../utils/imageUrls");
 
 const generateCartId = (productId, options) =>
   productId.toString() + (options ? '_' + Object.entries(options).filter(([k]) => k !== '_id' && k !== 'id').sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k + '-' + v).join('_') : '');
@@ -33,6 +34,11 @@ router.get("/", identifyUser, async (req, res) => {
       return res.json([]);
     }
     await cart.populate("items.product");
+    for (const item of cart.items) {
+      if (item.product) {
+        item.product = signProductImages(item.product);
+      }
+    }
     res.json(cart.items);
   } catch (error) {
     console.error("Error getting cart:", error.message);
@@ -93,6 +99,11 @@ router.post("/", identifyUser, async (req, res) => {
     await cart.save();
 
     await cart.populate("items.product");
+    for (const item of cart.items) {
+      if (item.product) {
+        item.product = signProductImages(item.product);
+      }
+    }
     res.json(cart.items);
   } catch (error) {
     console.error("Error adding to cart:", error.message);
@@ -119,6 +130,11 @@ router.delete("/:cartItemId", identifyUser, async (req, res) => {
     await cart.save();
 
     await cart.populate("items.product");
+    for (const item of cart.items) {
+      if (item.product) {
+        item.product = signProductImages(item.product);
+      }
+    }
     res.json(cart.items);
   } catch (error) {
     console.error("Error removing from cart:", error.message);
@@ -156,6 +172,11 @@ router.put("/:cartItemId", identifyUser, async (req, res) => {
     await cart.save();
 
     await cart.populate("items.product");
+    for (const item of cart.items) {
+      if (item.product) {
+        item.product = signProductImages(item.product);
+      }
+    }
     res.json(cart.items);
   } catch (error) {
     console.error("Error updating cart item:", error.message);

@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
@@ -244,9 +245,16 @@ export default function LoginScreen() {
             <Text style={styles.skipButtonText}>Continue as Guest</Text>
           </Pressable>
           
-          <Text style={styles.terms}>
-            By continuing, you agree to our Terms of Service and Privacy Policy
-          </Text>
+          <View style={styles.termsContainer}>
+            <Text style={styles.terms}>By continuing, you agree to our </Text>
+            <Pressable onPress={() => Linking.openURL('https://www.dryp.store/legal/terms')}>
+              <Text style={styles.termsLink}>Terms of Service</Text>
+            </Pressable>
+            <Text style={styles.terms}> and </Text>
+            <Pressable onPress={() => Linking.openURL('https://www.dryp.store/legal/privacy')}>
+              <Text style={styles.termsLink}>Privacy Policy</Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -389,6 +397,18 @@ const styles = StyleSheet.create({
     color: '#999999',
     textAlign: 'center',
     lineHeight: 18,
+    fontFamily: 'Zaloga',
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  termsLink: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    textDecorationLine: 'underline',
     fontFamily: 'Zaloga',
   },
 

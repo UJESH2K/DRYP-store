@@ -22,10 +22,14 @@ export default function AboutScreen() {
   ];
 
   const legalLinks = [
-    { title: 'Privacy Policy', action: () => Alert.alert('Privacy Policy', 'Opening privacy policy...') },
-    { title: 'Terms of Service', action: () => Alert.alert('Terms of Service', 'Opening terms of service...') },
-    { title: 'Cookie Policy', action: () => Alert.alert('Cookie Policy', 'Opening cookie policy...') },
+    { title: 'Privacy Policy', url: 'https://www.dryp.store/legal/privacy' },
+    { title: 'Terms of Service', url: 'https://www.dryp.store/legal/terms' },
+    { title: 'Cookie Policy', url: 'https://www.dryp.store/legal/privacy#cookies' },
   ];
+
+  const openLegalLink = (url: string) => {
+    Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open link'));
+  };
 
   const openSocialLink = (url: string) => {
     Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open link'));
@@ -70,7 +74,7 @@ export default function AboutScreen() {
               <Pressable
                 key={index}
                 style={styles.legalButton}
-                onPress={link.action}
+                onPress={() => openLegalLink(link.url)}
               >
                 <Text style={styles.legalText}>{link.title}</Text>
                 <Ionicons name="chevron-forward" size={20} color="#cccccc" />

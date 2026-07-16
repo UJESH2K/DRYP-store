@@ -45,7 +45,7 @@ router.post('/', protect, async (req, res, next) => {
 // @access  Public
 router.get('/', async (req, res, next) => {
   try {
-    const { brand, category, color, search, vendor, minPrice, maxPrice } = req.query;
+    const { brand, category, color, search, vendor, minPrice, maxPrice, source } = req.query;
     const filter = { isActive: true };
     
     if (brand) filter.brand = { $in: brand.split(',') };
@@ -54,6 +54,7 @@ router.get('/', async (req, res, next) => {
 
     if (search) filter.name = new RegExp(search, 'i');
     if (vendor) filter.vendor = vendor;
+    if (source) filter.source = source;
     if (minPrice || maxPrice) {
       filter.basePrice = {};
       if (minPrice) filter.basePrice.$gte = Number(minPrice);

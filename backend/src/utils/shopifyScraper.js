@@ -100,7 +100,7 @@ function parseShopifyProductState(data) {
     images,
     tags: product.tags ? product.tags.split(',').map(t => t.trim()) : [],
     source: 'shopify',
-    externalId: product.handle || '',
+    externalId: product.handle || url,
     variants,
   };
 }

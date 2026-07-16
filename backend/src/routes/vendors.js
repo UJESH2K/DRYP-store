@@ -444,9 +444,29 @@ router.put("/me", protect, async (req, res, next) => {
         .status(403)
         .json({ message: "Forbidden: Only vendors can access this route" });
     }
+    const allowed = [
+      "name",
+      "description",
+      "phone",
+      "website",
+      "logo",
+      "address",
+    ];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    if (updates.address && typeof updates.address === "object") {
+      const addrKeys = ["street", "city", "state", "zipCode", "country"];
+      const address = {};
+      for (const k of addrKeys) {
+        if (updates.address[k] !== undefined) address[k] = updates.address[k];
+      }
+      updates.address = address;
+    }
     const vendor = await Vendor.findOneAndUpdate(
       { owner: req.user._id },
-      { $set: req.body },
+      { $set: updates },
       { new: true, runValidators: true },
     );
     if (!vendor) {

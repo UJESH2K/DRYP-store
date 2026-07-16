@@ -256,7 +256,15 @@ const ProductForm = React.forwardRef(
       });
 
       if (!uploadResponse.ok) {
-        throw new Error("S3 rejected the image upload");
+        let detail = "";
+        try {
+          detail = (await uploadResponse.text()).slice(0, 200);
+        } catch {
+          detail = "";
+        }
+        throw new Error(
+          `S3 upload failed (${uploadResponse.status}${detail ? `: ${detail}` : ""})`,
+        );
       }
 
       return presignData.viewUrl || presignData.publicUrl || presignData.url.split("?")[0];
@@ -366,6 +374,19 @@ const ProductForm = React.forwardRef(
       if (e) e.preventDefault();
       setFormStatus({ type: null, message: "" });
 
+      const parsedBasePrice = parseFloat(formData.basePrice);
+      if (!formData.name?.trim()) {
+        setFormStatus({ type: "error", message: "Piece name is required." });
+        return;
+      }
+      if (!Number.isFinite(parsedBasePrice) || parsedBasePrice < 0) {
+        setFormStatus({
+          type: "error",
+          message: "Enter a valid base price before saving.",
+        });
+        return;
+      }
+
       setIsSubmitting(true);
 
       try {
@@ -377,8 +398,8 @@ const ProductForm = React.forwardRef(
 
         const productData = {
           ...formData,
-          basePrice: parseFloat(formData.basePrice),
-          tags: formData.tags.split(",").map((t) => t.trim()),
+          basePrice: parsedBasePrice,
+          tags: formData.tags.split(",").map((t) => t.trim()).filter(Boolean),
           images: getS3StorageImages(allVariantImages),
           options: [],
           variants: [],
@@ -412,7 +433,9 @@ const ProductForm = React.forwardRef(
             productData.variants.push({
               options: { Color: variant.color, Size: size },
               stock: parseInt(variant.stock[size] || "0", 10),
-            price: parseFloat(variant.price || formData.basePrice),
+            price: Number.isFinite(parseFloat(variant.price))
+                  ? parseFloat(variant.price)
+                  : parsedBasePrice,
               images: getS3StorageImages(variant.images),
             });
           });
@@ -714,10 +737,24 @@ const ProductForm = React.forwardRef(
                             className="group relative w-24 h-32 md:w-32 md:h-40 bg-gray-100 overflow-hidden border border-gray-200"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                             <img
                               src={normalizeRenderableUrl(imgUrl)}
                               alt="Variant preview"
                               className="absolute inset-0 h-full w-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                const parent = img.parentElement;
+                                if (parent) {
+                                  img.style.display = "none";
+                                  const placeholder = document.createElement("div");
+                                  placeholder.className = "absolute inset-0 flex items-center justify-center bg-gray-100";
+                                  const span = document.createElement("span");
+                                  span.className = "font-sans text-[8px] uppercase tracking-widest text-gray-400";
+                                  span.textContent = "No image";
+                                  placeholder.appendChild(span);
+                                  parent.appendChild(placeholder);
+                                }
+                              }}
                             />
 
                             {(!isSubmitting && formStatus.type !== 'success') && (
@@ -745,6 +782,20 @@ const ProductForm = React.forwardRef(
                               src={draft.previewUrl}
                               alt="Pending upload preview"
                               className="absolute inset-0 h-full w-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                const parent = img.parentElement;
+                                if (parent) {
+                                  img.style.display = "none";
+                                  const placeholder = document.createElement("div");
+                                  placeholder.className = "absolute inset-0 flex items-center justify-center bg-gray-100";
+                                  const span = document.createElement("span");
+                                  span.className = "font-sans text-[8px] uppercase tracking-widest text-gray-400";
+                                  span.textContent = "Preview unavailable";
+                                  placeholder.appendChild(span);
+                                  parent.appendChild(placeholder);
+                                }
+                              }}
                             />
                             <div className="absolute left-2 top-2 bg-black/75 px-2 py-1 text-[8px] uppercase tracking-[0.25em] text-white">
                               Local preview

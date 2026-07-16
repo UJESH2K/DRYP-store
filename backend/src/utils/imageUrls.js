@@ -1,4 +1,8 @@
-const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const {
+  S3Client,
+  GetObjectCommand,
+  HeadObjectCommand,
+} = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const bucketName =
@@ -111,9 +115,18 @@ async function signImageKey(key, expiresIn = 60 * 15) {
   if (key.startsWith("http://") || key.startsWith("https://")) return key;
   if (!s3Client) return key;
 
+  const cleanKey = key.replace(/^\//, "");
+  try {
+    await s3Client.send(
+      new HeadObjectCommand({ Bucket: bucketName, Key: cleanKey }),
+    );
+  } catch {
+    return null;
+  }
+
   const command = new GetObjectCommand({
     Bucket: bucketName,
-    Key: key.replace(/^\//, ""),
+    Key: cleanKey,
   });
 
   return getSignedUrl(s3Client, command, { expiresIn });
@@ -129,15 +142,17 @@ async function signProductImages(product, expiresIn = 60 * 15) {
     normalizeImageKeys(plainProduct.images).map((key) =>
       signImageKey(key, expiresIn),
     ),
-  );
+  ).filter(Boolean);
 
   if (Array.isArray(plainProduct.variants)) {
     plainProduct.variants = await Promise.all(
       plainProduct.variants.map(async (variant) => ({
         ...variant,
         images: await Promise.all(
-          normalizeImageKeys(variant.images).map((key) => signImageKey(key, expiresIn)),
-        ),
+          normalizeImageKeys(variant.images).map((key) =>
+            signImageKey(key, expiresIn),
+          ),
+        ).filter(Boolean),
       })),
     );
   }

@@ -344,6 +344,10 @@ const StoreProfilePage = () => {
                           src={getRenderableImageUrl(imgUrl)} 
                           alt={`Archive piece ${index + 1}`} 
                           className="w-full h-auto object-cover grayscale hover:grayscale-0 transition-all duration-700 ease-in-out hover:scale-105"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            img.style.display = "none";
+                          }}
                         />
                       </div>
                     ))}

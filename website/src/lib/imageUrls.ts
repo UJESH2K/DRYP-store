@@ -42,7 +42,7 @@ export const extractImageKey = (url?: string | null) => {
 const resolveApiBaseUrl = () => {
   if (typeof window !== "undefined") {
     if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
-      return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+       return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
     }
   }
 

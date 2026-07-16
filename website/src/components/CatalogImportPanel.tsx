@@ -1,5 +1,6 @@
 "use client";
 
+import { getRenderableImageUrl } from "@/lib/imageUrls";
 import React, { useState } from "react";
 
 // Relative /api/* — Next rewrites to backend (avoids port mismatch).
@@ -255,7 +256,21 @@ export default function CatalogImportPanel({
                           <td className="py-3 px-4">
                             {p.images?.[0] ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.images[0]} alt={p.name} className="w-12 h-12 object-cover bg-gray-100" />
+                              <img
+                                src={getRenderableImageUrl(p.images[0])}
+                                alt={p.name}
+                                className="w-12 h-12 object-cover bg-gray-100"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  const parent = img.parentElement;
+                                  if (parent) {
+                                    img.style.display = "none";
+                                    const placeholder = document.createElement("div");
+                                    placeholder.className = "w-12 h-12 bg-gray-100";
+                                    parent.appendChild(placeholder);
+                                  }
+                                }}
+                              />
                             ) : (
                               <div className="w-12 h-12 bg-gray-100" />
                             )}

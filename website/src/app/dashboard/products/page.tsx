@@ -196,6 +196,20 @@ const ProductsPage = () => {
                         src={getPrimaryProductImage(product)}
                         alt={product.name}
                         className="absolute inset-0 h-full w-full object-cover transition-transform duration-[15s] ease-out group-hover:scale-110"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          const parent = img.parentElement;
+                          if (parent) {
+                            img.style.display = "none";
+                            const placeholder = document.createElement("div");
+                            placeholder.className = "flex h-full w-full items-center justify-center";
+                            const span = document.createElement("span");
+                            span.className = "font-editorial italic text-gray-400";
+                            span.textContent = "No Imagery";
+                            placeholder.appendChild(span);
+                            parent.appendChild(placeholder);
+                          }
+                        }}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">

@@ -30,4 +30,4 @@ async function embedBatch(texts) {
   return res.data.map(d => d.embedding);
 }
 
-module.exports = { embed, embedBatch, EMBEDDING_MODEL, ensureVectorIndex };
+module.exports = { embed, embedBatch, EMBEDDING_MODEL };

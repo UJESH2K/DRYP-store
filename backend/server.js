@@ -27,6 +27,7 @@ const analyticsRoutes = require("./src/routes/analytics"); // Import analytics r
 const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
 const aiRoutes = require("./src/routes/ai");
+const stylistRoutes = require("./src/routes/stylist");
 const rateLimit = require('express-rate-limit');
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -144,8 +145,8 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/analytics", analyticsRoutes); // Use the analytics route
 app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartRoutes);
-app.use("/api/vendors", express.json({ limit: "50mb" })); // Higher limit for catalog imports
 app.use("/api/ai", aiRoutes);
+app.use("/api/stylist", stylistRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

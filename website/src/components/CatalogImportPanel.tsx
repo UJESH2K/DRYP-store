@@ -51,6 +51,7 @@ export default function CatalogImportPanel({
   const [importId, setImportId] = useState<string | null>(null);
   const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
   const [droppedColumns, setDroppedColumns] = useState<string[]>([]);
+  const [parseErrors, setParseErrors] = useState<{ row: number; column: string; raw: string; reason: string }[]>([]);
   const [error, setError] = useState("");
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -62,6 +63,7 @@ export default function CatalogImportPanel({
     setImportId(null);
     setSkippedRows([]);
     setDroppedColumns([]);
+    setParseErrors([]);
     setImportedCount(null);
     setError("");
     setCurrentPage(1);
@@ -98,6 +100,7 @@ export default function CatalogImportPanel({
       setImportId(data.importId || null);
       setSkippedRows(data.skippedRows || []);
       setDroppedColumns(data.droppedColumns || []);
+      setParseErrors(data.parseErrors || []);
       setCurrentPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse the file.");
@@ -194,6 +197,21 @@ export default function CatalogImportPanel({
                 <code key={i} className="bg-amber-100 px-1 rounded">{h}</code>
               ))}
               {" "}— these headers did not match any known field.
+            </div>
+          )}
+
+          {parseErrors.length > 0 && (
+            <div className="border-l border-red-400 bg-red-50 p-4 text-xs text-red-700 max-h-40 overflow-y-auto">
+              {parseErrors.length} parse error{parseErrors.length === 1 ? "" : "s"} (corrected where possible):
+              <ul className="mt-2 space-y-1 list-disc list-inside">
+                {parseErrors.slice(0, 50).map((e, i) => (
+                  <li key={i}>
+                    Row {e.row}{e.column ? `, col "${e.column}"` : ""}: {e.reason}
+                    {e.raw ? ` (raw: "${String(e.raw).slice(0, 40)}")` : ""}
+                  </li>
+                ))}
+                {parseErrors.length > 50 && <li>…and {parseErrors.length - 50} more</li>}
+              </ul>
             </div>
           )}
 

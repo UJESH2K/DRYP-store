@@ -1,4 +1,63 @@
+// ─── Shopify detection for arbitrary URLs ─────────────────────────
+// Returns { isShopify, method } where method is the signal that confirmed it.
+// Used when a vendor pastes a custom-domain URL (clothingbrand.com) so we
+// know whether to attempt a Shopify scrape at all.
+
+async function detectShopify(url) {
+  const domain = new URL(url).host;
+
+  // 1) Try /products.json — public on 90%+ Shopify stores, returns structured data
+  try {
+    const r = await fetch(`https://${domain}/products.json`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout,
+    });
+    if (r.ok) {
+      const data = await r.json();
+      if (Array.isArray(data.products)) return { isShopify: true, method: 'products.json' };
+    }
+  } catch {}
+
+  // 2) Try /meta.json — returns { "myshopify_domain": "..." } on all Shopify stores
+  try {
+    const r = await fetch(`https://${domain}/meta.json`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout,
+    });
+    if (r.ok) {
+      const data = await r.json();
+      if (data.myshopify_domain) return { isShopify: true, method: 'meta.json' };
+    }
+  } catch {}
+
+  // 3) HTML fingerprint — look for Shopify globals or CDN
+  try {
+    const r = await fetch(`https://${domain}/`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout,
+    });
+    if (r.ok) {
+      const html = await r.text();
+      if (/cdn\.shopify\.com/.test(html)) return { isShopify: true, method: 'cdn-fingerprint' };
+      if (/window\.Shopify/.test(html)) return { isShopify: true, method: 'shopify-global' };
+      if (/x-shopify-stage/.test(html)) return { isShopify: true, method: 'shopify-header' };
+    }
+  } catch {}
+
+  return { isShopify: false, method: null };
+}
+
 async function scrapeShopifyProduct(url) {
+  // If the URL is not a Shopify store, return early instead of silently
+  // returning garbage metadata from a non-Shopify HTML page.
+  const { isShopify } = await detectShopify(url);
+  if (!isShopify) {
+    throw new Error('URL does not appear to be a Shopify store');
+  }
+
   // Normalise: strip query string so we can derive the handle for the JSON endpoint.
   let handle;
   try {

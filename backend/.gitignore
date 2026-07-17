@@ -25,3 +25,8 @@ coverage/
 
 # OS-specific
 Thumbs.db
+
+# Env
+.env
+.env.local
+.env.production

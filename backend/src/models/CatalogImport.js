@@ -21,6 +21,7 @@ const CatalogImportSchema = new mongoose.Schema({
     total: { type: Number, default: 0 },
   },
   error: { type: String },
+  parseErrors: [{ row: { type: Number }, column: { type: String }, raw: { type: String }, reason: { type: String } }],
   completedAt: { type: Date },
 }, { timestamps: true });
 

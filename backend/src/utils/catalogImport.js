@@ -2,6 +2,8 @@ const ExcelJS = require('exceljs');
 const { Readable } = require('stream');
 const { normalizeImageKeys } = require('./imageUrls');
 
+// ─── Header mapping ────────────────────────────────────────────────
+
 const HEADER_ALIASES = {
   'product name': 'productName',
   'product title': 'productName',
@@ -46,38 +48,67 @@ const HEADER_ALIASES = {
   image: 'image0',
 };
 
+const CONTAINS_MAP = [
+  ['product name', 'productName'], ['product title', 'productName'], ['item name', 'productName'],
+  ['title', 'productName'],
+  ['department', 'category'], ['collection', 'category'],
+  ['sku', 'sku'], ['item code', 'sku'], ['product code', 'sku'],
+  ['selling price', 'price'], ['mrp', 'compareAt'],
+  ['compare at', 'compareAt'],
+  ['in stock', 'inStock'], ['available', 'inStock'], ['instock', 'inStock'],
+  ['quantity', 'quantity'], ['stock', 'quantity'], ['qty', 'quantity'],
+  ['product url', 'productUrl'], ['url', 'productUrl'], ['link', 'productUrl'],
+  ['description', 'description'], ['desc', 'description'], ['details', 'description'],
+  ['brand', 'brand'], ['vendor', 'brand'],
+  ['tags', 'tags'],
+];
+
 const ALLOWED_EXTENSIONS = new Set(['.xlsx', '.csv']);
+
+// ─── Type validation ───────────────────────────────────────────────
+
+const isUrl = (s) => /^https?:\/\//i.test(s);
 
 const coerceNumber = (raw) => {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-  const s = String(raw || '').replace(/[^0-9.\-]/g, '').trim();
-  const n = Number(s);
-  return Number.isFinite(n) ? n : NaN;
+  const s = String(raw || '').trim();
+  if (!s) return null; // ponytail: null = "absent", not "zero"
+  const cleaned = s.replace(/[^0-9.\-]/g, '');
+  if (!cleaned || cleaned === '.' || cleaned === '-') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 };
 
-const isFalsyStock = (s) => {
-  const v = String(s || '').trim().toLowerCase();
-  return ['', 'no', 'n', 'false', '0', 'none', 'out of stock'].includes(v);
+const coerceBoolean = (raw) => {
+  const v = String(raw || '').trim().toLowerCase();
+  if (['yes', 'y', 'true', '1', 'in stock', 'available'].includes(v)) return true;
+  if (['no', 'n', 'false', '0', 'out of stock', 'none', ''].includes(v)) return false;
+  return null; // ambiguous
 };
+
+const FALSY_STOCK = new Set(['no', 'n', 'false', '0', 'none', 'out of stock', '']);
+
+const isFalsyStock = (s) => FALSY_STOCK.has(String(s || '').trim().toLowerCase());
+
+// ─── Cell extraction ───────────────────────────────────────────────
+
+const cellText = (value) => {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().split('T')[0]; // date → YYYY-MM-DD
+  if (typeof value === 'object') {
+    if (value.text) return String(value.text).trim();
+    if (Array.isArray(value.richText)) return value.richText.map((r) => r.text).join('').trim();
+    if (value.hyperlink) return String(value.hyperlink).trim();
+  }
+  return String(value).trim();
+};
+
+// ─── Header normalization ──────────────────────────────────────────
 
 const normalizeHeader = (raw) => {
   const key = String(raw || '').trim().toLowerCase();
   if (HEADER_ALIASES[key]) return HEADER_ALIASES[key];
 
-  const CONTAINS_MAP = [
-    ['product name', 'productName'], ['product title', 'productName'], ['item name', 'productName'],
-    ['title', 'productName'],
-    ['department', 'category'], ['collection', 'category'],
-    ['sku', 'sku'], ['item code', 'sku'], ['product code', 'sku'],
-    ['selling price', 'price'], ['mrp', 'compareAt'],
-    ['compare at', 'compareAt'],
-    ['in stock', 'inStock'], ['available', 'inStock'], ['instock', 'inStock'],
-    ['quantity', 'quantity'], ['stock', 'quantity'], ['qty', 'quantity'],
-    ['product url', 'productUrl'], ['url', 'productUrl'], ['link', 'productUrl'],
-    ['description', 'description'], ['desc', 'description'], ['details', 'description'],
-    ['brand', 'brand'], ['vendor', 'brand'],
-    ['tags', 'tags'],
-  ];
   for (const [substr, canonical] of CONTAINS_MAP) {
     if (key.includes(substr)) return canonical;
   }
@@ -87,16 +118,60 @@ const normalizeHeader = (raw) => {
   return null;
 };
 
-const cellText = (value) => {
-  if (value === null || value === undefined) return '';
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object') {
-    if (value.text) return String(value.text).trim();
-    if (Array.isArray(value.richText)) return value.richText.map((r) => r.text).join('').trim();
-    if (value.hyperlink) return String(value.hyperlink).trim();
+// ─── Phase 1: Schema discovery ─────────────────────────────────────
+
+function discoverSchema(worksheet) {
+  const headerRow = worksheet.getRow(1);
+  const columns = {};
+
+  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+    const raw = cell.value;
+    const key = normalizeHeader(raw);
+    if (key) {
+      columns[colNumber] = {
+        key,
+        rawHeader: String(raw).trim(),
+        // Infer type from first 3 data rows
+        type: inferType(worksheet, colNumber),
+      };
+    }
+  });
+
+  return columns;
+}
+
+function inferType(worksheet, colNumber) {
+  const samples = [];
+  for (let rowNum = 2; rowNum <= Math.min(5, worksheet.rowCount); rowNum++) {
+    const cell = worksheet.getRow(rowNum).getCell(colNumber);
+    if (cell.value !== null && cell.value !== undefined) {
+      samples.push(cell.value);
+    }
+    if (samples.length >= 3) break;
   }
-  return String(value).trim();
-};
+
+  if (samples.length === 0) return 'text';
+
+  // Check if all numeric samples
+  const numericCount = samples.filter(v => {
+    const n = coerceNumber(v);
+    return n !== null && Number.isFinite(n);
+  }).length;
+
+  if (numericCount === samples.length) return 'number';
+
+  // Check if all URL-like
+  const urlCount = samples.filter(v => isUrl(cellText(v))).length;
+  if (urlCount === samples.length) return 'url';
+
+  // Check if all boolean-like
+  const boolCount = samples.filter(v => coerceBoolean(v) !== null).length;
+  if (boolCount === samples.length) return 'boolean';
+
+  return 'text';
+}
+
+// ─── Phase 2: Streaming parse ──────────────────────────────────────
 
 async function parseCatalogFile(buffer, filename) {
   const ext = (String(filename || '').match(/\.[^.]+$/) || [''])[0].toLowerCase();
@@ -122,41 +197,83 @@ async function parseCatalogFile(buffer, filename) {
     throw error;
   }
 
-  const columnKeys = {};
-  const unknownHeaders = [];
-  worksheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const raw = cell.value;
-    const key = normalizeHeader(raw);
-    if (key) {
-      columnKeys[colNumber] = key;
-    } else if (raw) {
-      unknownHeaders.push(String(raw).trim());
-    }
-  });
+  // Phase 1: Schema discovery
+  const columnMap = discoverSchema(worksheet);
 
+  // Phase 2: Streaming parse with per-cell validation
   const rows = [];
+  const errors = [];
+
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
+
     const rowData = {};
+    const rowErrors = [];
+
     row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-      const key = columnKeys[colNumber];
-      if (key) rowData[key] = cellText(cell.value);
+      const col = columnMap[colNumber];
+      if (!col) return;
+
+      const raw = cellText(cell.value);
+      const { key, type } = col;
+
+      // Validate by inferred type
+      let validated;
+      switch (type) {
+        case 'number': {
+          const n = coerceNumber(cell.value);
+          if (n === null && cell.value !== null && cell.value !== undefined && String(cell.value).trim() !== '') {
+            rowErrors.push({ row: rowNumber, column: col.rawHeader, raw: cellText(cell.value), reason: `Expected number, got "${cellText(cell.value)}"` });
+          }
+          validated = n;
+          break;
+        }
+        case 'url':
+          if (raw && !isUrl(raw)) {
+            rowErrors.push({ row: rowNumber, column: col.rawHeader, raw, reason: 'Expected URL starting with http(s)://' });
+          }
+          validated = isUrl(raw) ? raw : null;
+          break;
+        case 'boolean':
+          validated = coerceBoolean(cell.value);
+          break;
+        default:
+          validated = raw;
+      }
+
+      if (validated !== null && validated !== undefined && validated !== '') {
+        rowData[key] = validated;
+      }
     });
+
+    if (rowErrors.length > 0) {
+      errors.push(...rowErrors);
+    }
+
     if (Object.keys(rowData).length > 0) {
       rowData.__row = rowNumber;
       rows.push(rowData);
     }
   });
 
-  return { rows, unknownHeaders };
+  const unknownHeaders = [];
+  const headerRow = worksheet.getRow(1);
+  headerRow.eachCell({ includeEmpty: false }, (cell) => {
+    const key = normalizeHeader(cell.value);
+    if (!key && cell.value) {
+      unknownHeaders.push(String(cell.value).trim());
+    }
+  });
+
+  return { rows, errors, unknownHeaders };
 }
 
-// Groups flat rows (one row per Colour/Size combo) into DRYP product drafts.
-// Does not set `vendor`/`brand`/`source` — the caller fills those in once the
-// target vendor is known (preview happens before a vendor may be selected).
-const groupRowsIntoProducts = (rows) => {
+// ─── Phase 3: Product grouping ─────────────────────────────────────
+
+function groupRowsIntoProducts(rows, errors) {
   const products = new Map();
   const skippedRows = [];
+  const allErrors = Array.isArray(errors) ? [...errors] : [];
 
   rows.forEach((row) => {
     const rawName = row.productName;
@@ -167,31 +284,54 @@ const groupRowsIntoProducts = (rows) => {
     const name = rawName.trim();
     const price = coerceNumber(row.price);
 
-    if (!Number.isFinite(price) || price <= 0) {
-      skippedRows.push({ row: row.__row, reason: 'Missing or invalid Price' });
+    if (price === null || price <= 0) {
+      skippedRows.push({ row: row.__row, reason: `Missing or invalid Price (got: "${row.price}")` });
       return;
     }
 
-    // ponytail: case-insensitive dedup, preserve first-seen casing
+    // Case-insensitive dedup, preserve first-seen casing
     const nameKey = name.toLowerCase();
     if (!products.has(nameKey)) {
-      products.set(nameKey, { name, category: row.category || 'Uncategorized', images: [], variants: [] });
+      products.set(nameKey, {
+        name,
+        category: row.category || 'Uncategorized',
+        description: '',
+        images: [],
+        variants: [],
+        tags: [],
+        sourceRows: [row.__row],
+      });
+    } else {
+      const existing = products.get(nameKey);
+      if (!existing.sourceRows) existing.sourceRows = [];
+      existing.sourceRows.push(row.__row);
     }
     const product = products.get(nameKey);
 
+    // Description: longest wins (most detail)
+    const rowDesc = row.description || '';
+    if (rowDesc.length > product.description.length) {
+      product.description = rowDesc;
+    }
+
+    // Images: union, deduplicated
     const rowImages = Object.keys(row)
       .filter((k) => /^image\d+$/.test(k))
       .sort()
       .map((k) => row[k])
-      .filter(Boolean);
+      .filter((v) => isUrl(v));
     rowImages.forEach((img) => {
-      if (!product.images.includes(img)) product.images.push(img);
+      const normalized = img.trim();
+      if (!product.images.includes(normalized)) {
+        product.images.push(normalized);
+      }
     });
 
-    const stock = row.quantity !== undefined
-      ? coerceNumber(row.quantity) || 0
-      : isFalsyStock(row.inStock) ? 0 : 1;
+    // Stock logic: quantity overrides inStock
+    const qty = coerceNumber(row.quantity);
+    const stock = qty !== null ? qty : (isFalsyStock(row.inStock) ? 0 : 1);
 
+    // Variant options
     const options = {};
     if (row.color) options.Color = row.color;
     if (row.size) options.Size = row.size;
@@ -202,33 +342,59 @@ const groupRowsIntoProducts = (rows) => {
       stock,
       price,
       images: rowImages,
-      compareAtPrice: row.compareAt ? Number(row.compareAt) || undefined : undefined,
+      compareAtPrice: row.compareAt ? coerceNumber(row.compareAt) || undefined : undefined,
       productUrl: row.productUrl || undefined,
     });
+
+    // Tags: collect unique
+    if (Array.isArray(row.tags)) {
+      row.tags.forEach((t) => {
+        const tag = String(t).trim();
+        if (tag && !product.tags.includes(tag)) {
+          product.tags.push(tag);
+        }
+      });
+    } else if (typeof row.tags === 'string' && row.tags.trim()) {
+      const tag = row.tags.trim();
+      if (!product.tags.includes(tag)) product.tags.push(tag);
+    }
   });
 
+  // Phase 4: Validation
   const result = Array.from(products.values()).map((p) => {
-    const optionNames = new Set();
-    p.variants.forEach((v) => Object.keys(v.options).forEach((k) => optionNames.add(k)));
-    const prices = p.variants.map((v) => v.price);
+    const prices = p.variants.map((v) => v.price).filter((v) => Number.isFinite(v));
 
-    if (prices.length === 0 || prices.every((p) => !Number.isFinite(p))) {
+    if (prices.length === 0) {
       return null;
     }
 
     const validPrices = prices.filter(Number.isFinite);
+    const minPrice = Math.min(...validPrices);
+    const maxPrice = Math.max(...validPrices);
+
+    if (!Number.isFinite(minPrice) || minPrice <= 0) {
+      return null;
+    }
+
     const doc = {
       name: p.name,
       category: p.category,
-      basePrice: Math.min(...validPrices),
+      basePrice: minPrice,
       images: p.images,
+      sourceRows: p.sourceRows,
+      description: p.description || undefined,
+      tags: p.tags.length > 0 ? p.tags : undefined,
       preview: {
         variantCount: p.variants.length,
-        priceRange: [Math.min(...validPrices), Math.max(...validPrices)],
+        priceRange: [minPrice, maxPrice],
         compareAtPrice: p.variants.find((v) => v.compareAtPrice)?.compareAtPrice,
         productUrl: p.variants.find((v) => v.productUrl)?.productUrl,
       },
     };
+
+    // Build option definitions
+    const optionNames = new Set();
+    p.variants.forEach((v) => Object.keys(v.options).forEach((k) => optionNames.add(k)));
 
     if (optionNames.size > 0) {
       doc.options = Array.from(optionNames).map((optName) => ({
@@ -238,23 +404,25 @@ const groupRowsIntoProducts = (rows) => {
       doc.variants = p.variants.map((v) => {
         const variant = { options: v.options, stock: v.stock, price: v.price, images: v.images };
         if (v.sku) variant.sku = v.sku;
+        if (v.compareAtPrice) variant.compareAtPrice = v.compareAtPrice;
+        if (v.productUrl) variant.productUrl = v.productUrl;
         return variant;
       });
     } else if (p.variants.length === 1) {
-      if (p.variants[0].sku) doc.sku = p.variants[0].sku;
-      doc.stock = p.variants[0].stock;
+      const sole = p.variants[0];
+      if (sole.sku) doc.sku = sole.sku;
+      doc.stock = sole.stock;
     }
 
     return doc;
   });
 
-  return { products: result, skippedRows };
-};
+  return { products: result.filter(Boolean), skippedRows, errors: errors || [] };
+}
 
-// Turns reviewed product drafts (from groupRowsIntoProducts, possibly edited by
-// the admin/vendor in the UI) into Product.bulkWrite ops for a specific vendor.
-// Upserts on {vendor, name} so re-importing the same file updates in place.
-const buildProductBulkOps = (vendor, products) => {
+// ─── Phase 5: Bulk ops for DB ──────────────────────────────────────
+
+const buildProductBulkOps = (vendor, products, source = 'manual_import') => {
   return products.map((p) => {
     const doc = {
       name: p.name,
@@ -263,10 +431,10 @@ const buildProductBulkOps = (vendor, products) => {
       images: normalizeImageKeys(p.images || []),
       brand: vendor.name,
       vendor: vendor.owner,
-      source: 'manual_import',
+      source,
     };
     if (p.description) doc.description = p.description;
-    if (Array.isArray(p.tags)) doc.tags = p.tags;
+    if (Array.isArray(p.tags) && p.tags.length > 0) doc.tags = p.tags;
     if (Array.isArray(p.options)) doc.options = p.options;
     if (Array.isArray(p.variants)) {
       doc.variants = p.variants.map((variant) => ({
@@ -287,4 +455,10 @@ const buildProductBulkOps = (vendor, products) => {
   });
 };
 
-module.exports = { parseCatalogFile, groupRowsIntoProducts, buildProductBulkOps };
+// ─── Public API ────────────────────────────────────────────────────
+
+module.exports = {
+  parseCatalogFile,
+  groupRowsIntoProducts,
+  buildProductBulkOps,
+};

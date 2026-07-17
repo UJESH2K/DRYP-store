@@ -505,7 +505,7 @@ router.post(
         return res.status(404).json({ message: "Vendor profile not found" });
       }
 
-      const { rows, unknownHeaders } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { rows, errors, unknownHeaders } = await parseCatalogFile(req.file.buffer, req.file.originalname);
       const { products, skippedRows } = groupRowsIntoProducts(rows);
 
       const catalogImport = await CatalogImport.create({
@@ -516,10 +516,11 @@ router.post(
         totalRows: products.reduce((sum, p) => sum + (p.variants?.length || 1), 0),
         skippedRows,
         products,
+        parseErrors: errors,
         error: unknownHeaders.length > 0 ? `Unrecognized columns: ${unknownHeaders.join(', ')}` : undefined,
       });
 
-      res.json({ importId: catalogImport._id, products, skippedRows, droppedColumns: unknownHeaders });
+      res.json({ importId: catalogImport._id, products, skippedRows, parseErrors: errors, droppedColumns: unknownHeaders });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);
@@ -785,7 +786,7 @@ router.post(
           .json({ message: "No file uploaded (expected field name 'file')." });
       }
 
-      const { rows, unknownHeaders } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { rows, errors, unknownHeaders } = await parseCatalogFile(req.file.buffer, req.file.originalname);
       const { products, skippedRows } = groupRowsIntoProducts(rows);
       res.json({ importId: null, products, skippedRows, droppedColumns: unknownHeaders });
     } catch (error) {

@@ -136,23 +136,22 @@ async function signProductImages(product, expiresIn = 60 * 15) {
   if (!product) return product;
 
   const plainProduct =
-    product && typeof product.toObject === "function" ? product.toObject() : { ...product };
+    product && typeof product.toObject === "function"
+      ? product.toObject()
+      : { ...product };
 
-  plainProduct.images = await Promise.all(
-    normalizeImageKeys(plainProduct.images).map((key) =>
-      signImageKey(key, expiresIn),
-    ),
-  ).filter(Boolean);
+  const images = Array.isArray(plainProduct.images) ? plainProduct.images : [];
+  plainProduct.images = (await Promise.all(
+    images.map((key) => signImageKey(key, expiresIn)),
+  )).filter(Boolean);
 
   if (Array.isArray(plainProduct.variants)) {
     plainProduct.variants = await Promise.all(
       plainProduct.variants.map(async (variant) => ({
         ...variant,
-        images: await Promise.all(
-          normalizeImageKeys(variant.images).map((key) =>
-            signImageKey(key, expiresIn),
-          ),
-        ).filter(Boolean),
+        images: (await Promise.all(
+          (variant.images || []).map((key) => signImageKey(key, expiresIn)),
+        )).filter(Boolean),
       })),
     );
   }

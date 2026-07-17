@@ -1,8 +1,9 @@
 const crypto = require('crypto');
 
-const SHOP_DOMAIN_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
+// Accepts both .myshopify.com and .shopify.com (custom domain mapping).
+// Shopify's OAuth server validates the domain — we just need a sane shape.
+const SHOP_DOMAIN_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9-]*(\.myshopify\.com|\.shopify\.com)$/;
 
-// Guards against SSRF/open-redirect via a spoofed `shop` query param.
 const isValidShopDomain = (shop) => typeof shop === 'string' && SHOP_DOMAIN_REGEX.test(shop);
 
 const getCallbackUrl = () => `${process.env.SHOPIFY_APP_URL}/api/auth/shopify/callback`;

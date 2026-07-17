@@ -4,32 +4,87 @@ const { normalizeImageKeys } = require('./imageUrls');
 
 const HEADER_ALIASES = {
   'product name': 'productName',
+  'product title': 'productName',
+  'item name': 'productName',
+  'title': 'productName',
   name: 'productName',
   type: 'category',
   category: 'category',
+  department: 'category',
+  collection: 'category',
   colour: 'color',
   color: 'color',
   size: 'size',
   price: 'price',
   'price (inr)': 'price',
+  'price inr': 'price',
+  'selling price': 'price',
   'compare-at': 'compareAt',
   'compare-at (inr)': 'compareAt',
   'compare at': 'compareAt',
+  'compare at price': 'compareAt',
+  mrp: 'compareAt',
   sku: 'sku',
+  'item code': 'sku',
+  'product code': 'sku',
   'in stock?': 'inStock',
   'in stock': 'inStock',
+  instock: 'inStock',
+  available: 'inStock',
   quantity: 'quantity',
+  stock: 'quantity',
+  qty: 'quantity',
   'product url': 'productUrl',
+  url: 'productUrl',
+  link: 'productUrl',
+  description: 'description',
+  desc: 'description',
+  details: 'description',
+  brand: 'brand',
+  vendor: 'brand',
+  tags: 'tags',
+  image: 'image0',
 };
 
 const ALLOWED_EXTENSIONS = new Set(['.xlsx', '.csv']);
 
+const coerceNumber = (raw) => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  const s = String(raw || '').replace(/[^0-9.\-]/g, '').trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+};
+
+const isFalsyStock = (s) => {
+  const v = String(s || '').trim().toLowerCase();
+  return ['', 'no', 'n', 'false', '0', 'none', 'out of stock'].includes(v);
+};
+
 const normalizeHeader = (raw) => {
   const key = String(raw || '').trim().toLowerCase();
   if (HEADER_ALIASES[key]) return HEADER_ALIASES[key];
+
+  const CONTAINS_MAP = [
+    ['product name', 'productName'], ['product title', 'productName'], ['item name', 'productName'],
+    ['title', 'productName'],
+    ['department', 'category'], ['collection', 'category'],
+    ['sku', 'sku'], ['item code', 'sku'], ['product code', 'sku'],
+    ['selling price', 'price'], ['mrp', 'compareAt'],
+    ['compare at', 'compareAt'],
+    ['in stock', 'inStock'], ['available', 'inStock'], ['instock', 'inStock'],
+    ['quantity', 'quantity'], ['stock', 'quantity'], ['qty', 'quantity'],
+    ['product url', 'productUrl'], ['url', 'productUrl'], ['link', 'productUrl'],
+    ['description', 'description'], ['desc', 'description'], ['details', 'description'],
+    ['brand', 'brand'], ['vendor', 'brand'],
+    ['tags', 'tags'],
+  ];
+  for (const [substr, canonical] of CONTAINS_MAP) {
+    if (key.includes(substr)) return canonical;
+  }
+
   const imageMatch = key.match(/^image\s*(\d+)$/);
   if (imageMatch) return `image${imageMatch[1]}`;
-  return null; // Unrecognized column — ignored rather than failing the whole import.
+  return null;
 };
 
 const cellText = (value) => {
@@ -104,22 +159,25 @@ const groupRowsIntoProducts = (rows) => {
   const skippedRows = [];
 
   rows.forEach((row) => {
-    const name = row.productName;
-    const price = Number(row.price);
-
-    if (!name) {
+    const rawName = row.productName;
+    if (!rawName) {
       skippedRows.push({ row: row.__row, reason: 'Missing Product Name' });
       return;
     }
+    const name = rawName.trim();
+    const price = coerceNumber(row.price);
+
     if (!Number.isFinite(price) || price <= 0) {
       skippedRows.push({ row: row.__row, reason: 'Missing or invalid Price' });
       return;
     }
 
-    if (!products.has(name)) {
-      products.set(name, { name, category: row.category || 'Uncategorized', images: [], variants: [] });
+    // ponytail: case-insensitive dedup, preserve first-seen casing
+    const nameKey = name.toLowerCase();
+    if (!products.has(nameKey)) {
+      products.set(nameKey, { name, category: row.category || 'Uncategorized', images: [], variants: [] });
     }
-    const product = products.get(name);
+    const product = products.get(nameKey);
 
     const rowImages = Object.keys(row)
       .filter((k) => /^image\d+$/.test(k))
@@ -130,8 +188,9 @@ const groupRowsIntoProducts = (rows) => {
       if (!product.images.includes(img)) product.images.push(img);
     });
 
-    const inStock = String(row.inStock || '').trim().toLowerCase();
-    const stock = inStock === 'no' ? 0 : Number(row.quantity) || 0;
+    const stock = row.quantity !== undefined
+      ? coerceNumber(row.quantity) || 0
+      : isFalsyStock(row.inStock) ? 0 : 1;
 
     const options = {};
     if (row.color) options.Color = row.color;
@@ -189,7 +248,7 @@ const groupRowsIntoProducts = (rows) => {
     return doc;
   });
 
-  return { products: result, skippedRows, droppedColumns };
+  return { products: result, skippedRows };
 };
 
 // Turns reviewed product drafts (from groupRowsIntoProducts, possibly edited by

@@ -8,9 +8,19 @@ const isValidShopDomain = (shop) => {
   return /^[a-zA-Z0-9][a-zA-Z0-9-]*(?:\.[a-zA-Z0-9-]+)+$/.test(shop.trim());
 };
 
+const assertShopifyConfigured = () => {
+  if (!process.env.SHOPIFY_API_KEY) {
+    throw new Error('SHOPIFY_API_KEY is not configured on the server');
+  }
+  if (!process.env.SHOPIFY_API_SECRET) {
+    throw new Error('SHOPIFY_API_SECRET is not configured on the server');
+  }
+};
+
 const getCallbackUrl = () => `${process.env.SHOPIFY_APP_URL}/api/auth/shopify/callback`;
 
 const buildAuthorizeUrl = ({ shop, state }) => {
+  assertShopifyConfigured();
   const params = new URLSearchParams({
     client_id: process.env.SHOPIFY_API_KEY,
     scope: process.env.SHOPIFY_SCOPES || 'read_products,read_collections',
@@ -23,6 +33,10 @@ const buildAuthorizeUrl = ({ shop, state }) => {
 // Verifies Shopify's HMAC signature per their documented algorithm:
 // https://shopify.dev/docs/apps/build/authentication-authorization/oauth/getting-started#step-3-confirm-installation
 const verifyHmac = (query) => {
+  if (!process.env.SHOPIFY_API_SECRET) {
+    console.warn('verifyHmac called without SHOPIFY_API_SECRET — rejecting all callbacks');
+    return false;
+  }
   const { hmac, signature, ...rest } = query;
   if (!hmac) return false;
 
@@ -43,6 +57,7 @@ const verifyHmac = (query) => {
 };
 
 const exchangeCodeForToken = async ({ shop, code }) => {
+  assertShopifyConfigured();
   const res = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

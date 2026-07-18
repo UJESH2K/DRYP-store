@@ -15,6 +15,13 @@ const {
   exchangeCodeForToken,
 } = require('../utils/shopifyOAuth');
 
+let _shopifyConfigError = null;
+if (!process.env.SHOPIFY_API_KEY || !process.env.SHOPIFY_API_SECRET) {
+  _shopifyConfigError = new Error(
+    'Shopify integration is not configured. Set SHOPIFY_API_KEY and SHOPIFY_API_SECRET in the backend .env file.'
+  );
+}
+
 const PLATFORMS = ['web', 'mobile'];
 
 const buildRedirectUrl = (platform, params) => {
@@ -29,9 +36,11 @@ const buildRedirectUrl = (platform, params) => {
 // @access  Public (optionally authenticated via `token` to link an existing account)
 router.get('/start', (req, res) => {
   const { shop, platform, token } = req.query;
-  // Fall back to 'web' so we always have somewhere sane to send the user back
-  // to with a friendly error, even if `platform` itself is missing/bogus.
   const redirectPlatform = PLATFORMS.includes(platform) ? platform : 'web';
+
+  if (_shopifyConfigError) {
+    return res.redirect(buildRedirectUrl(redirectPlatform, { error: 'shopify_not_configured' }));
+  }
 
   if (!isValidShopDomain(shop)) {
     return res.redirect(buildRedirectUrl(redirectPlatform, { error: 'invalid_shop' }));
@@ -66,6 +75,9 @@ router.get('/callback', async (req, res, next) => {
   const { shop, code } = req.query;
 
   if (!verifyHmac(req.query)) {
+    if (_shopifyConfigError) {
+      return res.status(500).json({ message: 'Shopify integration is not configured. Set SHOPIFY_API_KEY and SHOPIFY_API_SECRET in the backend .env.' });
+    }
     return res.status(400).json({ message: 'Invalid Shopify request signature.' });
   }
 
@@ -79,6 +91,10 @@ router.get('/callback', async (req, res, next) => {
   const { platform, userId } = state;
   if (state.shop !== shop || !isValidShopDomain(shop)) {
     return res.status(400).json({ message: 'Shop mismatch in OAuth callback.' });
+  }
+
+  if (_shopifyConfigError) {
+    return res.redirect(buildRedirectUrl(platform || 'web', { error: 'shopify_not_configured' }));
   }
 
   const redirect = (params) => res.redirect(buildRedirectUrl(platform, params));

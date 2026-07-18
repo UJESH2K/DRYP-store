@@ -3,14 +3,29 @@
 // Used when a vendor pastes a custom-domain URL (clothingbrand.com) so we
 // know whether to attempt a Shopify scrape at all.
 
+const FETCH_TIMEOUT_MS = 5000;
+
+async function fetchWithTimeout(url, opts = {}) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...opts, signal: controller.signal });
+    return response;
+  } catch (error) {
+    if (error.name === 'AbortError') return new Response(null, { status: 408 });
+    throw error;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function detectShopify(url) {
   const domain = new URL(url).host;
 
   // 1) Try /products.json — public on 90%+ Shopify stores, returns structured data
   try {
-    const r = await fetch(`https://${domain}/products.json`, {
+    const r = await fetchWithTimeout(`https://${domain}/products.json`, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout,
     });
     if (r.ok) {
       const data = await r.json();
@@ -20,9 +35,8 @@ async function detectShopify(url) {
 
   // 2) Try /meta.json — returns { "myshopify_domain": "..." } on all Shopify stores
   try {
-    const r = await fetch(`https://${domain}/meta.json`, {
+    const r = await fetchWithTimeout(`https://${domain}/meta.json`, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout,
     });
     if (r.ok) {
       const data = await r.json();
@@ -32,12 +46,11 @@ async function detectShopify(url) {
 
   // 3) HTML fingerprint — look for Shopify globals or CDN
   try {
-    const r = await fetch(`https://${domain}/`, {
+    const r = await fetchWithTimeout(`https://${domain}/`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
-      signal: AbortSignal.timeout,
     });
     if (r.ok) {
       const html = await r.text();
@@ -74,67 +87,125 @@ async function scrapeShopifyProduct(url) {
     }
   } catch {}
 
+  if (!handle) {
+    throw new Error(
+      'URL does not point to a Shopify product page. Expected a URL like https://store.com/products/product-name. Collection or homepage URLs are not supported.',
+    );
+  }
+
   // 1) Try the Shopify JSON product endpoint — gives variants, options,
   //    inventory, images, and tags in one structured response.
-  if (handle) {
-    try {
-      const jsonUrl = `https://${new URL(url).host}/products/${handle}.json`;
-      const res = await fetch(jsonUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const p = data?.product;
-        if (p) return parseShopifyJsonProduct(p);
-      }
-    } catch {}
-  }
+  //    Guard against Shopify's "soft redirect": dead handles return a
+  //    different product's JSON with HTTP 200, so we must verify the
+  //    returned handle matches what we asked for.
+  try {
+    const jsonUrl = `https://${new URL(url).host}/products/${handle}.json`;
+    const res = await fetchWithTimeout(jsonUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const p = data?.product;
+      // p.handle === handle means we got the exact product we asked for.
+      // If it differs, Shopify silently redirected us — fall through.
+      if (p && p.handle === handle) return parseShopifyJsonProduct(p);
+    }
+  } catch {}
 
-  // 2) HTML fallback (JSON-LD, __INITIAL_STATE__, meta tags).
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    },
-  });
+  // 1b) Fetch the product page HTML — OG meta / JSON-LD always reflect the
+  // exact product the user pasted, unlike /products.json where we must fuzzy-match.
+  let htmlMeta;
+  try {
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    if (response.ok) htmlMeta = await response.text();
+  } catch {}
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status}`);
-  }
+  // Many Shopify SPAs return HTTP 200 with an error/redirect page for dead
+  // product handles (e.g. "Something went wrong"). Detect real product pages
+  // by JSON-LD, product:price meta, or og:image (present on virtually all
+  // Shopify product pages). Additionally, the page <title> must contain at
+  // least one word from the product handle to avoid matching the homepage.
+  const hasProductMarkup = htmlMeta && (
+    htmlMeta.includes('application/ld+json') ||
+    htmlMeta.includes('product:price') ||
+    htmlMeta.includes('og:image')
+  );
+  const isProductPage = hasProductMarkup && (() => {
+    if (!hasProductMarkup) return false;
+    const titleMatch = htmlMeta.match(/<title>([^<]*)<\/title>/i);
+    const pageTitle = titleMatch ? titleMatch[1].toLowerCase() : '';
+    const handleWords = handle.toLowerCase().replace(/[-_]/g, ' ').split(' ').filter((w) => w.length > 2);
+    return handleWords.some((w) => pageTitle.includes(w));
+  })();
+  if (!isProductPage) htmlMeta = undefined;
 
-  const html = await response.text();
-
-  // Try JSON-LD structured data first
-  const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
-  if (jsonLdMatch) {
-    for (const script of jsonLdMatch) {
-      try {
-        const jsonMatch = script.replace(/<\/?script[^>]*>/gi, '').trim();
-        const data = JSON.parse(jsonMatch);
-        const items = Array.isArray(data) ? data : [data];
-        for (const item of items) {
-          if (item['@type'] === 'Product' || item['@type'] === 'product') {
-            return parseJsonLdProduct(item, url);
+  // 1c) Extract from JSON-LD first (rich, structured product data).
+  if (htmlMeta) {
+    const jsonLdMatch = htmlMeta.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLdMatch) {
+      for (const script of jsonLdMatch) {
+        try {
+          const jsonMatch = script.replace(/<\/?script[^>]*>/gi, '').trim();
+          const data = JSON.parse(jsonMatch);
+          const items = Array.isArray(data) ? data : [data];
+          for (const item of items) {
+            if (item['@type'] === 'Product' || item['@type'] === 'product') {
+              return parseJsonLdProduct(item, url);
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
   }
 
-  // Try Shopify product JSON in script tags (window.__INITIAL_STATE__)
-  const initStateMatch = html.match(/window\s*\.\s*__INITIAL_STATE__\s*=\s*({[\s\S]*?});/);
-  if (initStateMatch) {
+  // 1c) Fallback: /products.json listing + word-overlap handle match.
+  // Only fires when the product page HTML returned no parseable data (SPA
+  // with no static OG meta / JSON-LD). Requires >= 2 word matches AND the
+  // best match must be uniquely better than the runner-up (no ties — if
+  // two products share the same overlap, we can't know which is correct).
+  if (handle && !htmlMeta) {
     try {
-      const stateData = JSON.parse(initStateMatch[1]);
-      const productData = stateData?.product || stateData?.Product;
-      if (productData) {
-        return parseShopifyProductState(productData);
+      const listingUrl = `https://${new URL(url).host}/products.json`;
+      const listingRes = await fetchWithTimeout(listingUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      if (listingRes.ok) {
+        const { products = [] } = await listingRes.json();
+        const urlWords = handle.toLowerCase().replace(/[-_]/g, ' ').split(' ').filter((w) => w.length > 2);
+        const urlSet = new Set(urlWords);
+        const scored = products
+          .filter((p) => p.handle)
+          .map((p) => {
+            const handleWords = p.handle.toLowerCase().replace(/[-_]/g, ' ').split(' ').filter((w) => w.length > 2);
+            const overlap = handleWords.filter((w) => urlSet.has(w)).length;
+            return { product: p, overlap };
+          })
+          .filter((s) => s.overlap > 0)
+          .sort((a, b) => b.overlap - a.overlap);
+
+        // Require >= 2 word matches AND the best match must be unique
+        if (scored.length >= 1 && scored[0].overlap >= 2) {
+          const unique = scored.length === 1 || scored[0].overlap > scored[1].overlap;
+          if (unique) return parseShopifyJsonProduct(scored[0].product);
+        }
       }
     } catch {}
   }
 
-  // Fallback: parse meta tags and basic HTML
-  return parseBasicMeta(html, url);
+  // If we got HTML but no JSON-LD, parse OG meta / basic HTML
+  if (htmlMeta) {
+    return parseBasicMeta(htmlMeta, url);
+  }
+
+  // Nothing worked — throw a clear error instead of returning garbage.
+  throw new Error(
+    `Unable to scrape product data from ${url}: the Shopify store did not return product data. The product may be unavailable or the URL may not be a Shopify product page.`,
+  );
 }
 
 function parseJsonLdProduct(data, url) {
@@ -172,34 +243,16 @@ function parseJsonLdProduct(data, url) {
   };
 }
 
-function parseShopifyProductState(data) {
-  const product = data.product || data;
-  const images = (product.images || []).map(i => typeof i === 'string' ? i : (i.src || i.url || '')).filter(Boolean);
-  const variants = (product.variants || []).map(v => ({
-    options: { 'Default': v.title || 'Default Title' },
-    sku: v.sku || '',
-    price: parseFloat(v.price) || 0,
-    stock: v.inventory_quantity || 0,
-    images: [],
-  }));
-
-  return {
-    name: product.title || '',
-    description: product.description || '',
-    brand: product.vendor || '',
-    category: product.type || '',
-    basePrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : 0,
-    images,
-    tags: product.tags ? product.tags.split(',').map(t => t.trim()) : [],
-    source: 'shopify',
-    externalId: product.handle || url,
-    variants,
-  };
-}
-
-// Parse the structured response from /products/<handle>.json
 function parseShopifyJsonProduct(p) {
-  const images = (p.images?.edges || []).map(e => e.node?.url || '').filter(Boolean);
+  let images = [];
+  if (Array.isArray(p.images)) {
+    // REST Admin API format: images is a flat array of { src, url }
+    images = p.images.map(i => typeof i === 'string' ? i : (i.src || i.url || '')).filter(Boolean);
+  }
+  // Storefront API format: images.edges[].node.url
+  if (images.length === 0 && p.images?.edges) {
+    images = (p.images.edges || []).map(e => e.node?.url || '').filter(Boolean);
+  }
   if (images.length === 0 && p.image) {
     images.push(typeof p.image === 'string' ? p.image : p.image?.url);
   }
@@ -217,17 +270,34 @@ function parseShopifyJsonProduct(p) {
     };
   });
 
+  // REST Admin API format: flat variants array
+  const restVariants = Array.isArray(p.variants) && !p.variants.edges
+    ? p.variants.map(v => {
+        const opts = {};
+        (v.selectedOptions || []).forEach(o => { opts[o.name] = o.value; });
+        return {
+          options: opts,
+          sku: v.sku || '',
+          price: parseFloat(v.price) || 0,
+          stock: v.inventory_quantity ?? 0,
+          images: (v.image?.src ? [v.image.src] : v.image?.url ? [v.image.url] : []),
+        };
+      })
+    : null;
+
   return {
     name: p.title || '',
     description: p.descriptionHtml || p.description || '',
     brand: p.vendor || '',
     category: p.productType || '',
-    basePrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : parseFloat(p.priceRange?.minVariantPrice?.amount) || 0,
+    basePrice: variants.length > 0
+      ? Math.min(...variants.map(v => v.price))
+      : (restVariants?.length ? Math.min(...restVariants.map(v => v.price)) : parseFloat(p.priceRange?.minVariantPrice?.amount) || 0),
     images,
     tags: (p.tags?.edges || []).map(e => e.node?.value).filter(Boolean),
     source: 'shopify',
     externalId: p.handle || p.id || '',
-    variants,
+    variants: restVariants || variants,
   };
 }
 

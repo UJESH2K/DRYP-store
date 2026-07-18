@@ -20,6 +20,7 @@ const CatalogImportSchema = new mongoose.Schema({
     current: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
   },
+  aiSchema: { type: mongoose.Schema.Types.Mixed, default: undefined },
   error: { type: String },
   parseErrors: [{ row: { type: Number }, column: { type: String }, raw: { type: String }, reason: { type: String } }],
   completedAt: { type: Date },

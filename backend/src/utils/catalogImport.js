@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const { Readable } = require('stream');
 const { normalizeImageKeys } = require('./imageUrls');
+const { aiEnhanceSchema } = require('./aiCatalogParser');
 
 // ─── Header mapping ────────────────────────────────────────────────
 
@@ -120,24 +121,44 @@ const normalizeHeader = (raw) => {
 
 // ─── Phase 1: Schema discovery ─────────────────────────────────────
 
-function discoverSchema(worksheet) {
+async function discoverSchema(worksheet) {
   const headerRow = worksheet.getRow(1);
   const columns = {};
+  const unknownCols = [];
+  let aiMap;
 
   headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
     const raw = cell.value;
+    const rawHeader = String(raw).trim();
     const key = normalizeHeader(raw);
+
     if (key) {
       columns[colNumber] = {
         key,
-        rawHeader: String(raw).trim(),
-        // Infer type from first 3 data rows
+        rawHeader,
         type: inferType(worksheet, colNumber),
       };
+    } else if (rawHeader) {
+      unknownCols.push({ colNumber, rawHeader });
     }
   });
 
-  return columns;
+  if (unknownCols.length > 0) {
+    aiMap = await aiEnhanceSchema(worksheet, unknownCols);
+    for (const [colNumberStr, aiKey] of Object.entries(aiMap)) {
+      const colNumber = Number(colNumberStr);
+      const entry = unknownCols.find((c) => c.colNumber === colNumber);
+      if (entry) {
+        columns[colNumber] = {
+          key: aiKey,
+          rawHeader: entry.rawHeader,
+          type: inferType(worksheet, colNumber),
+        };
+      }
+    }
+  }
+
+  return { columns, aiSchema: aiMap || undefined };
 }
 
 function inferType(worksheet, colNumber) {
@@ -198,7 +219,7 @@ async function parseCatalogFile(buffer, filename) {
   }
 
   // Phase 1: Schema discovery
-  const columnMap = discoverSchema(worksheet);
+  const { columns: columnMap, aiSchema } = await discoverSchema(worksheet);
 
   // Phase 2: Streaming parse with per-cell validation
   const rows = [];
@@ -265,7 +286,25 @@ async function parseCatalogFile(buffer, filename) {
     }
   });
 
-  return { rows, errors, unknownHeaders };
+  if (aiSchema) {
+    const mappedColNumbers = new Set(
+      Object.keys(aiSchema).map(Number),
+    );
+    const mappedHeaders = [];
+    headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      if (mappedColNumbers.has(colNumber)) {
+        mappedHeaders.push(String(cell.value).trim());
+      }
+    });
+    return {
+      rows,
+      errors,
+      unknownHeaders: unknownHeaders.filter((h) => !mappedHeaders.includes(h)),
+      aiSchema,
+    };
+  }
+
+  return { rows, errors, unknownHeaders, aiSchema };
 }
 
 // ─── Phase 3: Product grouping ─────────────────────────────────────

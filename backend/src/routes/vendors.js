@@ -505,7 +505,7 @@ router.post(
         return res.status(404).json({ message: "Vendor profile not found" });
       }
 
-      const { rows, errors, unknownHeaders } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { rows, errors, unknownHeaders, aiSchema } = await parseCatalogFile(req.file.buffer, req.file.originalname);
       const { products, skippedRows } = groupRowsIntoProducts(rows);
 
       const catalogImport = await CatalogImport.create({
@@ -517,6 +517,7 @@ router.post(
         skippedRows,
         products,
         parseErrors: errors,
+        aiSchema,
         error: unknownHeaders.length > 0 ? `Unrecognized columns: ${unknownHeaders.join(', ')}` : undefined,
       });
 

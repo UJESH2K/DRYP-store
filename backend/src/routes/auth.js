@@ -255,6 +255,54 @@ router.put('/reset-password/:token', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// @route   PUT /api/auth/change-password
+// @desc    Change the password for the currently authenticated user.
+//          Requires the current password — for forgotten passwords use
+//          /forgot-password + /reset-password instead.
+// @access  Private (any authenticated local user)
+router.put('/change-password', protect, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Both currentPassword and newPassword are required.' });
+    }
+
+    // Re-fetch with passwordHash since middleware strips it via .select('-passwordHash')
+    const user = await User.findById(req.user._id).select('+passwordHash');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // OAuth-only users don't have a passwordHash to verify or replace.
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        message: 'This account does not have a password. Use the social provider to sign in.',
+      });
+    }
+
+    const matches = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!matches) {
+      return res.status(401).json({ message: 'Current password is incorrect.' });
+    }
+
+    if (!isValidPassword(newPassword)) {
+      return res.status(400).json({ message: 'New password does not meet security requirements.' });
+    }
+
+    // Block password reuse — silently reject without revealing whether
+    // the new password happens to match the current one.
+    if (currentPassword === newPassword || await bcrypt.compare(newPassword, user.passwordHash)) {
+      return res.status(400).json({ message: 'New password must be different from the current password.' });
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.status(200).json({ message: 'Password updated successfully.' });
+  } catch (error) { next(error); }
+});
+
 module.exports = router;
 module.exports.mergeGuestData = mergeGuestData;
 module.exports.isValidPassword = isValidPassword;

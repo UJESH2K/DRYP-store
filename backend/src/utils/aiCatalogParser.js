@@ -1,13 +1,14 @@
 // ─── AI-powered column mapping for Excel catalog imports ──────────
-// When the header-matching approach in catalogImport.js can't map a
-// column, this module uses OpenAI's cheapest model (gpt-4o-mini) to
-// determine the correct field.  One API call per file, not per row.
+// This is the PRIMARY path for column mapping.  gpt-4o-mini receives
+// every column header + sample values and returns the best mapping.
 //
-// Graceful degradation: if OPENAI_API_KEY is missing or the call fails,
-// returns an empty map and the caller falls through to existing behaviour.
+// The fuzzy CONTAINS_MAP in catalogImport.js is only a degraded
+// fallback when OPENAI_API_KEY is missing or the API call fails.
+//
+// One API call per file, not per row.
 
 const AI_MODEL = 'gpt-4o-mini';
-const MAX_SAMPLE_ROWS = 3;
+const MAX_SAMPLE_ROWS = 5;
 
 const KNOWN_FIELDS = {
   productName: 'Product title or name',
@@ -24,8 +25,6 @@ const KNOWN_FIELDS = {
   brand: 'Brand or vendor/manufacturer name',
   tags: 'Product tags or keywords (comma-separated or multiple values)',
 };
-
-const IMAGE_SLOT_RE = /^image\d+$/;
 
 let _openai;
 
@@ -57,44 +56,48 @@ function buildSystemPrompt() {
     .map(([key, desc]) => `  - "${key}": ${desc}`)
     .join('\n');
 
-  return `You map unrecognized Excel column headers to canonical field keys for a product import tool.
+  return `You map Excel column headers to canonical field keys for a product import tool.
 
-Return a JSON object mapping each given column header to one of:
+Given column headers and sample cell values, return a JSON object mapping EACH header to one of:
 
 ${fields}
 
   - "image0", "image1", …: Product image URL columns (use "image" as the key prefix).
 
 Rules:
-- Base your decision on the HEADER NAME and the SAMPLE VALUES shown.
+- Base your decision on the HEADER NAME and the SAMPLE VALUES.
 - "Item Name" with values like "Cotton Tee" → productName.
 - "Farbe" with values like "Rot" → color.
-- A column whose values are clearly image URLs → image.
+- "Größe" with values like "M, L, XL" → size.
+- "Preis" or "Price (₹)" with values like "499" or "₹1,200" → price.
+- "Verfügbar" with values like "Ja/Nein" → inStock.
+- "Lager" or "Stock" with numeric values → quantity.
+- A column whose values are clearly image URLs → image (assign sequential slots image0, image1…).
 - A column whose values are product URLs → productUrl.
-- If a column clearly does NOT match any known field, map it to null.
-- Return ONLY a JSON object — no markdown, no explanation.`;
+- If a column does NOT match any known field, map it to null.
+- Return ONLY a JSON object — no markdown, no explanation.
+- Every single header MUST appear as a key in the output object.`;
 }
 
-function buildUserContent(unknownColumns) {
-  const lines = unknownColumns.map(({ rawHeader, samples }) => {
+function buildUserContent(allColumns) {
+  const lines = allColumns.map(({ rawHeader, samples }) => {
     const sampleText = samples.length > 0
-      ? ` values: ${samples.map(s => JSON.stringify(s)).join(', ')}`
-      : ' (no data)';
-    return `"${rawHeader}" —${sampleText}`;
+      ? `  values: ${samples.map(s => JSON.stringify(s)).join(', ')}`
+      : '  (no data)';
+    return `"${rawHeader}"\n${sampleText}`;
   });
-  return lines.join('\n') + '\n\nReturn a JSON object mapping each header to a field key or null.';
+  return lines.join('\n') + '\n\nReturn a JSON object mapping EACH header to a field key or null.';
 }
 
 // ─── Public API ───────────────────────────────────────────────────
 
-// unknownColumns: [{ colNumber, rawHeader }]
+// allColumns: [{ colNumber, rawHeader }]
 // Returns: { colNumber: "fieldKey" } for AI-mapped columns, or {} on failure.
-// The caller merges these into the column map and infers types.
-async function aiEnhanceSchema(worksheet, unknownColumns) {
+async function aiEnhanceSchema(worksheet, allColumns) {
   if (!isKeyAvailable()) return {};
-  if (unknownColumns.length === 0) return {};
+  if (allColumns.length === 0) return {};
 
-  const columnsWithSamples = unknownColumns.map((col) => ({
+  const columnsWithSamples = allColumns.map((col) => ({
     colNumber: col.colNumber,
     rawHeader: col.rawHeader,
     samples: collectSamples(worksheet, col.colNumber),
@@ -111,7 +114,7 @@ async function aiEnhanceSchema(worksheet, unknownColumns) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0,
-      max_tokens: 1024,
+      max_tokens: 2048,
     });
     rawResponse = response.choices?.[0]?.message?.content;
     if (!rawResponse) return {};
@@ -130,14 +133,17 @@ async function aiEnhanceSchema(worksheet, unknownColumns) {
   const mapping = {};
   let nextSlot = 0;
 
-  for (const col of unknownColumns) {
+  for (const col of allColumns) {
     const aiKey = parsed[col.rawHeader];
     if (!aiKey) continue;
 
     if (KNOWN_FIELDS[aiKey]) {
       mapping[col.colNumber] = aiKey;
-    } else if (aiKey.startsWith('image') || aiKey.startsWith('Image')) {
+    } else if (/^image\d*$/i.test(aiKey)) {
       // Assign sequential image slots regardless of AI numbering.
+      mapping[col.colNumber] = `image${nextSlot++}`;
+    } else if (aiKey.startsWith('image') || aiKey.startsWith('Image')) {
+      // Handle "image0", "Image1", etc. from AI
       mapping[col.colNumber] = `image${nextSlot++}`;
     }
   }
@@ -145,4 +151,4 @@ async function aiEnhanceSchema(worksheet, unknownColumns) {
   return mapping;
 }
 
-module.exports = { aiEnhanceSchema };
+module.exports = { aiEnhanceSchema, KNOWN_FIELDS };

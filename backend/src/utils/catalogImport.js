@@ -228,7 +228,7 @@ async function parseCatalogFile(buffer, filename) {
     throw error;
   }
 
-  const { columns: columnMap, aiSchema, unknownHeaders } = await discoverSchema(worksheet);
+  const { columns: columnMap, aiSchema } = await discoverSchema(worksheet);
 
   // Phase 2: Streaming parse with per-cell validation
   const rows = [];

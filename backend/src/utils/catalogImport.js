@@ -2,6 +2,7 @@ const ExcelJS = require('exceljs');
 const { Readable } = require('stream');
 const { normalizeImageKeys } = require('./imageUrls');
 const { aiEnhanceSchema } = require('./aiCatalogParser');
+const { aiParseRows } = require('./aiCatalogRowParser');
 
 // ─── Header mapping ────────────────────────────────────────────────
 
@@ -286,6 +287,17 @@ async function parseCatalogFile(buffer, filename) {
     }
   });
 
+  // Phase 2.5: AI-powered row parsing (optional, with graceful fallback)
+  // Sends the already-validated row data to OpenAI for intelligent grouping,
+  // normalization, and structuring.  If the API key is missing or the call
+  // fails for any reason, fall back to the local rule-based row stream.
+  let aiParsed = null;
+  try {
+    aiParsed = await aiParseRows(columnMap, rows);
+  } catch {
+    aiParsed = null;
+  }
+
   if (aiSchema) {
     const mappedColNumbers = new Set(
       Object.keys(aiSchema).map(Number),
@@ -301,10 +313,11 @@ async function parseCatalogFile(buffer, filename) {
       errors,
       unknownHeaders: unknownHeaders.filter((h) => !mappedHeaders.includes(h)),
       aiSchema,
+      aiParsed,
     };
   }
 
-  return { rows, errors, unknownHeaders, aiSchema };
+  return { rows, errors, unknownHeaders, aiSchema, aiParsed };
 }
 
 // ─── Phase 3: Product grouping ─────────────────────────────────────
@@ -496,8 +509,81 @@ const buildProductBulkOps = (vendor, products, source = 'manual_import') => {
 
 // ─── Public API ────────────────────────────────────────────────────
 
+// Merge AI-parsed products back into the schema used by groupRowsIntoProducts.
+// AI returns cleaner grouping than the rule-based grouper (semantic variants,
+// smarter deduplication), so when AI succeeds we prefer it; on failure the
+// caller falls back to the local rule-based grouper.
+function normalizeAiProducts(aiProducts) {
+  return aiProducts
+    .filter((p) => p && p.name && Array.isArray(p.variants) && p.variants.length > 0)
+    .map((p) => {
+      const sourceRows = Array.isArray(p.sourceRows) ? p.sourceRows : [];
+      const images = Array.from(new Set((p.images || []).filter((u) => isUrl(u))));
+      const variants = p.variants
+        .filter((v) => Number.isFinite(v.price) && v.price > 0)
+        .map((v) => ({
+          options: v.options || {},
+          sku: v.sku || undefined,
+          stock: coerceNumber(v.stock) || 0,
+          price: v.price,
+          images: Array.from(new Set((v.images || []).filter((u) => isUrl(u)))),
+          compareAtPrice: Number.isFinite(v.compareAtPrice) && v.compareAtPrice > 0 ? v.compareAtPrice : undefined,
+          productUrl: v.productUrl || undefined,
+        }));
+
+      if (variants.length === 0) return null;
+
+      const prices = variants.map((v) => v.price);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+
+      const doc = {
+        name: String(p.name).trim(),
+        category: (p.category && String(p.category).trim()) || 'Uncategorized',
+        basePrice: minPrice,
+        images,
+        sourceRows,
+        description: p.description || undefined,
+        tags: Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : undefined,
+        brand: p.brand || undefined,
+      };
+
+      const optionNames = new Set();
+      variants.forEach((v) => Object.keys(v.options).forEach((k) => optionNames.add(k)));
+
+      if (optionNames.size > 0) {
+        doc.options = Array.from(optionNames).map((optName) => ({
+          name: optName,
+          values: Array.from(new Set(variants.map((v) => v.options[optName]).filter(Boolean))),
+        }));
+        doc.variants = variants.map((v) => {
+          const out = { options: v.options, stock: v.stock, price: v.price, images: v.images };
+          if (v.sku) out.sku = v.sku;
+          if (v.compareAtPrice) out.compareAtPrice = v.compareAtPrice;
+          if (v.productUrl) out.productUrl = v.productUrl;
+          return out;
+        });
+      } else if (variants.length === 1) {
+        const sole = variants[0];
+        if (sole.sku) doc.sku = sole.sku;
+        doc.stock = sole.stock;
+      }
+
+      doc.preview = {
+        variantCount: variants.length,
+        priceRange: [minPrice, maxPrice],
+        compareAtPrice: variants.find((v) => v.compareAtPrice)?.compareAtPrice,
+        productUrl: variants.find((v) => v.productUrl)?.productUrl,
+      };
+
+      return doc;
+    })
+    .filter(Boolean);
+}
+
 module.exports = {
   parseCatalogFile,
   groupRowsIntoProducts,
   buildProductBulkOps,
+  normalizeAiProducts,
 };

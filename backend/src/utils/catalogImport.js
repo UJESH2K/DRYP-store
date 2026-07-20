@@ -120,46 +120,55 @@ const normalizeHeader = (raw) => {
   return null;
 };
 
-// ─── Phase 1: Schema discovery ─────────────────────────────────────
+// ─── Phase 1: Schema discovery (AI-first, fuzzy fallback) ─────────
 
 async function discoverSchema(worksheet) {
   const headerRow = worksheet.getRow(1);
-  const columns = {};
-  const unknownCols = [];
-  let aiMap;
-
+  const allCols = [];
   headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const raw = cell.value;
-    const rawHeader = String(raw).trim();
-    const key = normalizeHeader(raw);
-
-    if (key) {
-      columns[colNumber] = {
-        key,
-        rawHeader,
-        type: inferType(worksheet, colNumber),
-      };
-    } else if (rawHeader) {
-      unknownCols.push({ colNumber, rawHeader });
+    const rawHeader = String(cell.value).trim();
+    if (rawHeader) {
+      allCols.push({ colNumber, rawHeader });
     }
   });
 
-  if (unknownCols.length > 0) {
-    aiMap = await aiEnhanceSchema(worksheet, unknownCols);
-    for (const [colNumberStr, aiKey] of Object.entries(aiMap)) {
-      const colNumber = Number(colNumberStr);
-      const entry = unknownCols.find((c) => c.colNumber === colNumber);
-      if (entry) {
-        columns[colNumber] = {
-          key: aiKey,
-          rawHeader: entry.rawHeader,
-          type: inferType(worksheet, colNumber),
-        };
-      }
+  let aiMap = {};
+  try {
+    aiMap = await aiEnhanceSchema(worksheet, allCols);
+  } catch {
+    aiMap = {};
+  }
+
+  const columns = {};
+  const unknownHeaders = [];
+
+  for (const { colNumber, rawHeader } of allCols) {
+    if (aiMap[colNumber]) {
+      columns[colNumber] = {
+        key: aiMap[colNumber],
+        rawHeader,
+        type: inferType(worksheet, colNumber),
+      };
+      continue;
+    }
+
+    const fuzzyKey = normalizeHeader(rawHeader);
+    if (fuzzyKey) {
+      columns[colNumber] = {
+        key: fuzzyKey,
+        rawHeader,
+        type: inferType(worksheet, colNumber),
+      };
+    } else {
+      unknownHeaders.push(rawHeader);
     }
   }
 
-  return { columns, aiSchema: aiMap || undefined };
+  return {
+    columns,
+    aiSchema: Object.keys(aiMap).length > 0 ? aiMap : undefined,
+    unknownHeaders,
+  };
 }
 
 function inferType(worksheet, colNumber) {
@@ -219,8 +228,7 @@ async function parseCatalogFile(buffer, filename) {
     throw error;
   }
 
-  // Phase 1: Schema discovery
-  const { columns: columnMap, aiSchema } = await discoverSchema(worksheet);
+  const { columns: columnMap, aiSchema, unknownHeaders } = await discoverSchema(worksheet);
 
   // Phase 2: Streaming parse with per-cell validation
   const rows = [];

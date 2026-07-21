@@ -1,29 +1,27 @@
 // ─── AI-powered column mapping for Excel catalog imports ──────────
-// This is the PRIMARY path for column mapping.  gpt-4o-mini receives
-// every column header + sample values and returns the best mapping.
+// PRIMARY path: OpenAI returns the best mapping for non-standard headers.
+// FALLBACK: fuzzy CONTAINS_MAP in catalogImport.js (when key missing or call fails).
 //
-// The fuzzy CONTAINS_MAP in catalogImport.js is only a degraded
-// fallback when OPENAI_API_KEY is missing or the API call fails.
-//
-// One API call per file, not per row.
+// One API call per file, not per row. Cost: ~$0.0001 per file at gpt-4.1-nano rates.
 
-const AI_MODEL = 'gpt-4o-mini';
+const AI_MODEL = process.env.OPENAI_CATALOG_MODEL || 'gpt-4.1-nano';
 const MAX_SAMPLE_ROWS = 5;
+const REQUEST_TIMEOUT_MS = 15000;
 
 const KNOWN_FIELDS = {
-  productName: 'Product title or name',
-  category: 'Product category, department, or collection',
+  productName: 'Product title or name (the primary product identifier)',
+  category: 'Product category, department, collection, or type',
   color: 'Product color or colour',
-  size: 'Product size (S, M, L, XL, numeric)',
-  price: 'Selling price (numeric, may include currency symbol or decimals)',
-  compareAt: 'Original/compare-at price, or MRP (numeric, higher than price)',
-  sku: 'SKU, item code, or product code (alphanumeric)',
+  size: 'Product size (S, M, L, XL, or numeric)',
+  price: 'Selling price (numeric, may include currency symbol or thousands separators)',
+  compareAt: 'Original/compare-at price, MRP, or list price (numeric, HIGHER than selling price)',
+  sku: 'SKU, item code, product code, or style number (alphanumeric)',
   inStock: 'Stock availability (yes/no, true/false, in stock/out of stock)',
-  quantity: 'Stock quantity (numeric count)',
+  quantity: 'Stock quantity or count (numeric)',
   productUrl: 'Product URL or link (starts with http:// or https://)',
   description: 'Product description, details, or long free-text',
-  brand: 'Brand or vendor/manufacturer name',
-  tags: 'Product tags or keywords (comma-separated or multiple values)',
+  brand: 'Brand, vendor, or manufacturer name',
+  tags: 'Product tags or keywords (comma-separated or repeated values)',
 };
 
 let _openai;
@@ -56,27 +54,20 @@ function buildSystemPrompt() {
     .map(([key, desc]) => `  - "${key}": ${desc}`)
     .join('\n');
 
-  return `You map Excel column headers to canonical field keys for a product import tool.
+  return `You are a column header mapper. Your only job: map Excel column headers to canonical field keys.
 
-Given column headers and sample cell values, return a JSON object mapping EACH header to one of:
-
+Valid field keys:
 ${fields}
 
-  - "image0", "image1", …: Product image URL columns (use "image" as the key prefix).
+  "image0", "image1", …: image URL columns.
 
-Rules:
-- Base your decision on the HEADER NAME and the SAMPLE VALUES.
-- "Item Name" with values like "Cotton Tee" → productName.
-- "Farbe" with values like "Rot" → color.
-- "Größe" with values like "M, L, XL" → size.
-- "Preis" or "Price (₹)" with values like "499" or "₹1,200" → price.
-- "Verfügbar" with values like "Ja/Nein" → inStock.
-- "Lager" or "Stock" with numeric values → quantity.
-- A column whose values are clearly image URLs → image (assign sequential slots image0, image1…).
-- A column whose values are product URLs → productUrl.
-- If a column does NOT match any known field, map it to null.
-- Return ONLY a JSON object — no markdown, no explanation.
-- Every single header MUST appear as a key in the output object.`;
+CRITICAL RULES:
+- Look at the HEADER NAME first, then the sample values.
+- "Title", "Item", "Name" alone → productName. "Selling Price", "Cost", "Retail" → price. "MRP", "Original Price" → compareAt.
+- Numeric columns → price, compareAt, sku, quantity, inStock. URL columns → productUrl. Free-text → description, brand, category, tags.
+- "Item Code", "Style No", "SKU#" → sku.
+- If genuinely unsure, return null. Never guess.
+- Output ONLY a JSON object: { "Exact Header String": "fieldKeyOrNull", ... }`;
 }
 
 function buildUserContent(allColumns) {
@@ -106,19 +97,32 @@ async function aiEnhanceSchema(worksheet, allColumns) {
   let rawResponse;
   try {
     const openai = getClient();
-    const response = await openai.chat.completions.create({
-      model: AI_MODEL,
-      messages: [
-        { role: 'system', content: buildSystemPrompt() },
-        { role: 'user', content: buildUserContent(columnsWithSamples) },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-      max_tokens: 2048,
-    });
+    const startTime = Date.now();
+    console.log(`[catalogImport] AI mapping started: model=${AI_MODEL}, headers=${allColumns.length}, key=${process.env.OPENAI_API_KEY.slice(0, 7)}...`);
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: AI_MODEL,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: buildUserContent(columnsWithSamples) },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 2048,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`OpenAI timeout after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS)
+      ),
+    ]);
     rawResponse = response.choices?.[0]?.message?.content;
-    if (!rawResponse) return {};
-  } catch {
+    const elapsed = Date.now() - startTime;
+    if (!rawResponse) {
+      console.log(`[catalogImport] AI mapping: empty response from OpenAI (${elapsed}ms)`);
+      return {};
+    }
+    console.log(`[catalogImport] AI mapping succeeded in ${elapsed}ms`);
+  } catch (err) {
+    console.warn(`[catalogImport] AI mapping failed, falling back to fuzzy: ${err.message}`);
     return {};
   }
 

@@ -4,7 +4,7 @@
 //
 // One API call per file, not per row. Cost: ~$0.0001 per file at gpt-4.1-nano rates.
 
-const AI_MODEL = process.env.OPENAI_CATALOG_MODEL || 'gpt-4.1-nano';
+const AI_MODEL = process.env.OPENAI_CATALOG_MODEL || 'gpt-4o-mini';
 const MAX_SAMPLE_ROWS = 5;
 const REQUEST_TIMEOUT_MS = 15000;
 

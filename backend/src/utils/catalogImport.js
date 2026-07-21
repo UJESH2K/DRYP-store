@@ -132,11 +132,14 @@ async function discoverSchema(worksheet) {
     }
   });
 
+  let aiError = null;
   let aiMap = {};
   try {
     aiMap = await aiEnhanceSchema(worksheet, allCols);
-  } catch {
+  } catch (err) {
     aiMap = {};
+    aiError = `AI column mapping failed: ${err.message}`;
+    console.warn(`[catalogImport] aiEnhanceSchema error: ${err.message}`);
   }
 
   const columns = {};
@@ -168,6 +171,7 @@ async function discoverSchema(worksheet) {
     columns,
     aiSchema: Object.keys(aiMap).length > 0 ? aiMap : undefined,
     unknownHeaders,
+    aiError,
   };
 }
 
@@ -300,10 +304,13 @@ async function parseCatalogFile(buffer, filename) {
   // normalization, and structuring.  If the API key is missing or the call
   // fails for any reason, fall back to the local rule-based row stream.
   let aiParsed = null;
+  let aiRowsError = null;
   try {
     aiParsed = await aiParseRows(columnMap, rows);
-  } catch {
+  } catch (err) {
     aiParsed = null;
+    aiRowsError = `AI row parsing failed: ${err.message}`;
+    console.warn(`[catalogImport] aiParseRows error: ${err.message}`);
   }
 
   if (aiSchema) {
@@ -322,10 +329,11 @@ async function parseCatalogFile(buffer, filename) {
       unknownHeaders: unknownHeaders.filter((h) => !mappedHeaders.includes(h)),
       aiSchema,
       aiParsed,
+      aiError,
     };
   }
 
-  return { rows, errors, unknownHeaders, aiSchema, aiParsed };
+  return { rows, errors, unknownHeaders, aiSchema, aiParsed, aiRowsError };
 }
 
 // ─── Phase 3: Product grouping ─────────────────────────────────────

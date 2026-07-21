@@ -18,6 +18,7 @@ const {
   parseCatalogFile,
   groupRowsIntoProducts,
   buildProductBulkOps,
+  normalizeAiProducts,
 } = require("../utils/catalogImport");
 const { signProductImages } = require("../utils/imageUrls");
 const { isValidPassword } = require("./auth");
@@ -505,8 +506,25 @@ router.post(
         return res.status(404).json({ message: "Vendor profile not found" });
       }
 
-      const { rows, errors, unknownHeaders, aiSchema } = await parseCatalogFile(req.file.buffer, req.file.originalname);
-      const { products, skippedRows } = groupRowsIntoProducts(rows);
+      const { rows, errors, unknownHeaders, aiSchema, aiParsed } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+
+      let products, skippedRows, parseErrors, droppedColumns;
+      let parseMethod = 'rule_based';
+
+      // Prefer AI-parsed results when available; fall back to local grouper.
+      if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
+        products = normalizeAiProducts(aiParsed.products);
+        skippedRows = aiParsed.skippedRows || [];
+        parseErrors = aiParsed.parseErrors || [];
+        parseMethod = 'ai_assisted';
+      } else {
+        const grouped = groupRowsIntoProducts(rows, errors);
+        products = grouped.products;
+        skippedRows = grouped.skippedRows;
+        parseErrors = errors;
+      }
+
+      droppedColumns = unknownHeaders;
 
       const catalogImport = await CatalogImport.create({
         vendor: vendor._id,
@@ -516,12 +534,12 @@ router.post(
         totalRows: products.reduce((sum, p) => sum + (p.variants?.length || 1), 0),
         skippedRows,
         products,
-        parseErrors: errors,
+        parseErrors,
         aiSchema,
-        error: unknownHeaders.length > 0 ? `Unrecognized columns: ${unknownHeaders.join(', ')}` : undefined,
+        error: droppedColumns.length > 0 ? `Unrecognized columns: ${droppedColumns.join(', ')}` : undefined,
       });
 
-      res.json({ importId: catalogImport._id, products, skippedRows, parseErrors: errors, droppedColumns: unknownHeaders });
+      res.json({ importId: catalogImport._id, products, skippedRows, parseErrors, droppedColumns, parseMethod });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);
@@ -787,8 +805,17 @@ router.post(
           .json({ message: "No file uploaded (expected field name 'file')." });
       }
 
-      const { rows, errors, unknownHeaders } = await parseCatalogFile(req.file.buffer, req.file.originalname);
-      const { products, skippedRows } = groupRowsIntoProducts(rows);
+      const { rows, errors, unknownHeaders, aiParsed } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+
+      let products, skippedRows;
+      if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
+        products = normalizeAiProducts(aiParsed.products);
+        skippedRows = aiParsed.skippedRows || [];
+      } else {
+        const grouped = groupRowsIntoProducts(rows);
+        products = grouped.products;
+        skippedRows = grouped.skippedRows;
+      }
       res.json({ importId: null, products, skippedRows, droppedColumns: unknownHeaders });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });

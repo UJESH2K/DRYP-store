@@ -1,53 +1,45 @@
 // ─── AI-powered row parser for Excel catalog imports ──────────────────
-// Sends normalized row data to OpenAI (gpt-4o-mini by default) to produce
-// structured product objects.  Falls back gracefully on any failure.
+// PRIMARY path: sends row data + column mappings to OpenAI for intelligent
+// parsing, grouping, and structuring.  Falls back gracefully on any failure.
 //
-// Batches rows into groups of 30 to keep token usage predictable.
-// One API call per batch, not per row.
+// Batches rows into groups of 30.  One API call per batch, not per row.
 
 const { isKeyAvailable, getClient } = require('./aiCatalogParser');
 
 const AI_MODEL = process.env.CATALOG_AI_MODEL || 'gpt-4o-mini';
 const BATCH_SIZE = 30;
 
-const FIELD_DESCRIPTIONS = {
-  productName: 'Product title/name (string)',
-  category: 'Category or collection (string)',
-  color: 'Color variant value (string or null)',
-  size: 'Size variant value (string or null)',
-  price: 'Selling price as a positive number (required per variant)',
-  compareAt: 'Original/MRP price as a number, or null if not provided',
-  sku: 'SKU/item code string, or null',
-  inStock: 'Boolean — true if in stock, false if out',
-  quantity: 'Stock quantity number, or null',
-  productUrl: 'Full URL starting with https://, or null',
-  description: 'Product description text, or null',
-  brand: 'Brand name, or null',
-  tags: 'Array of tag strings, or empty array',
-};
-
 function buildSystemPrompt() {
-  const fields = Object.entries(FIELD_DESCRIPTIONS)
-    .map(([key, desc]) => `  - "${key}": ${desc}`)
-    .join('\n');
+  return `You are a robust product catalog importer.  Your job is to read raw spreadsheet rows with column-key mappings and produce clean, structured product objects — even when the data is messy, incomplete, or has unexpected column names.
 
-  return `You are a product data parser.  Given raw spreadsheet rows with their mapped column keys, produce clean, structured product objects.
+CRITICAL RULES:
+- Be TOLERANT of missing fields.  If a column mapping exists but the value is absent, just skip it — never crash or refuse to parse.
+- Be SMART about column names.  "Item", "Prod", "Name/Title", "Product", "Artikel" all mean productName.  "Cat", "Dept", "Collection", "Type" all mean category.  "Clr", "Shade", "Hue" mean color.  "Qty", "Units", "Stock Level" mean quantity.  "₹", "Rs", "Cost", "Rate" mean price.
+- Each row is a VARIANT of a product.  Multiple rows with the same productName → one product with multiple variants.
+- If price is missing or not a positive number for a row, SKIP that row (add to "skipped" with the row number).
+- Stock: use quantity if present; otherwise 1 if inStock=true, 0 if inStock=false.
+- Variant "options": only include keys with actual values (e.g., {"Color": "Red", "Size": "M"}).
+- Deduplicate image URLs.
+- Descriptions: take the longest meaningful text across rows for the same product.
+- Preserve original casing for names, brands, tags.
+- If a row has no recognizable product name, skip it.
+- You may see columns you don't recognize — just include them in the output as-is in an "extra" field if needed, but focus on the known fields.
 
-Return a JSON object with this shape:
+OUTPUT FORMAT — Return ONLY this JSON shape:
 {
   "products": [
     {
-      "name": "...",
-      "category": "...",
-      "description": "...",
+      "name": "string",
+      "category": "string or null",
+      "description": "string or null",
       "images": ["https://..."],
-      "brand": "...",
-      "tags": ["..."],
+      "brand": "string or null",
+      "tags": ["string"],
       "sourceRows": [2, 3],
       "variants": [
         {
           "options": {"Color": "Red", "Size": "M"},
-          "sku": "...",
+          "sku": "string or null",
           "stock": 10,
           "price": 299,
           "compareAtPrice": 599,
@@ -56,33 +48,19 @@ Return a JSON object with this shape:
       ]
     }
   ],
-  "skipped": [{"reason": "...", "row": 7}]
+  "skipped": [{"row": 7, "reason": "Missing price"}]
 }
 
-Field reference:
-${fields}
-
-Rules:
-- GROUP rows that share the same product name into one product with multiple variants.
-- Include "sourceRows": the list of "__row" numbers that were grouped into this product.
-- Each variant MUST have a positive "price" number.  If price is missing or not a positive number, skip that row.
-- "stock": use the quantity number if present, otherwise 1 if inStock=true, 0 if inStock=false.
-- "options": only include keys that have a value (Color, Size, etc.).
-- Deduplicate image URLs.
-- If a row has no productName, skip it and add to "skipped" with its "__row" number.
-- Keep descriptions as the longest meaningful text found across rows for the same product.
-- Preserve original casing for names, brands, tags.
-- Return ONLY valid JSON — no markdown, no explanation.`;
+Return ONLY valid JSON — no markdown, no explanation text before or after.`;
 }
 
 function buildUserContent(columnMap, rows) {
   const headerInfo = Object.entries(columnMap)
-    .map(([colNum, col]) => `Column ${colNum} (${col.key})`)
-    .join(', ');
+    .map(([colNum, col]) => `  Col ${colNum} → ${col.key}  (header: "${col.rawHeader}")`)
+    .join('\n');
 
-  // Strip __row (internal metadata) and number rows sequentially for the AI
-  const rowsJson = rows.map((row, idx) => {
-    const simplified = { __row: row.__row || idx + 2 };
+  const rowsJson = rows.map((row) => {
+    const simplified = { __row: row.__row };
     for (const [key, value] of Object.entries(row)) {
       if (key === '__row') continue;
       if (value !== null && value !== undefined && value !== '') {
@@ -92,15 +70,15 @@ function buildUserContent(columnMap, rows) {
     return simplified;
   });
 
-  return `Columns: ${headerInfo}
+  return `Column mappings (column number → field key):
+${headerInfo}
 
-Each row has a "__row" field indicating its original spreadsheet row number.
+Each row has "__row" (original spreadsheet row number).  Parse all rows:
 
-Rows:
 ${JSON.stringify(rowsJson, null, 2)}`;
 }
 
-// ─── Parse a batch of rows via AI ────────────────────────────────────
+// ─── Parse a single batch via AI ────────────────────────────────────
 
 async function aiParseBatch(columnMap, rows) {
   if (!isKeyAvailable()) return null;
@@ -123,22 +101,21 @@ async function aiParseBatch(columnMap, rows) {
     if (!content) return null;
 
     const parsed = JSON.parse(content);
-
-    // Validate shape
     if (!parsed || !Array.isArray(parsed.products)) return null;
 
     return parsed;
   } catch {
-    // Any AI failure → fall back to local parser
-    return null;
+    return null; // Any failure → signal caller to skip this batch
   }
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
 
 // columnMap: { colNumber: { key, rawHeader, type } } from discoverSchema
-// rows: array of { key: value } row objects (already extracted from cells)
-// Returns: { products, skippedRows, parseErrors, usedAI } or null on failure
+// rows: array of { key: value } row objects (with __row metadata)
+//
+// Returns: { products, skippedRows, parseErrors, usedAI } or null on failure.
+//   Returns null only if ALL batches fail or no API key — caller falls back.
 async function aiParseRows(columnMap, rows) {
   if (!isKeyAvailable()) return null;
   if (rows.length === 0) return null;
@@ -156,7 +133,7 @@ async function aiParseRows(columnMap, rows) {
     const result = await aiParseBatch(columnMap, batch);
     if (!result) {
       failed = true;
-      continue; // Skip this batch, try the next one
+      continue; // Skip bad batch, keep going
     }
 
     if (Array.isArray(result.products)) {
@@ -167,7 +144,8 @@ async function aiParseRows(columnMap, rows) {
     }
   }
 
-  if (allProducts.length === 0 && failed) return null; // All batches failed → fall back
+  // Only fall back if every single batch failed
+  if (allProducts.length === 0 && failed) return null;
 
   return {
     products: allProducts,

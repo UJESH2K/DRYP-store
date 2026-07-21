@@ -99,7 +99,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "x-guest-id"],
   }),
 );
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the 'public' directory

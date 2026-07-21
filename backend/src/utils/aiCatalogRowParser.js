@@ -3,11 +3,15 @@
 // parsing, grouping, and structuring.  Falls back gracefully on any failure.
 //
 // Batches rows into groups of 30.  One API call per batch, not per row.
+// Batches are processed in parallel (4 at a time) with per-call timeout.
 
 const { isKeyAvailable, getClient } = require('./aiCatalogParser');
 
 const AI_MODEL = process.env.CATALOG_AI_MODEL || 'gpt-4o-mini';
 const BATCH_SIZE = 30;
+const BATCH_CONCURRENCY = 4;
+const PER_BATCH_TIMEOUT_MS = 30000;
+const MAX_CELL_VALUE_LENGTH = 500;
 
 function buildSystemPrompt() {
   return `You are a robust product catalog importer.  Your job is to read raw spreadsheet rows with column-key mappings and produce clean, structured product objects — even when the data is messy, incomplete, or has unexpected column names.
@@ -64,7 +68,11 @@ function buildUserContent(columnMap, rows) {
     for (const [key, value] of Object.entries(row)) {
       if (key === '__row') continue;
       if (value !== null && value !== undefined && value !== '') {
-        simplified[key] = value;
+        // Truncate long cell values to keep payload bounded.
+        const str = typeof value === 'string' ? value : String(value);
+        simplified[key] = str.length > MAX_CELL_VALUE_LENGTH
+          ? str.slice(0, MAX_CELL_VALUE_LENGTH) + '…'
+          : value;
       }
     }
     return simplified;
@@ -86,16 +94,25 @@ async function aiParseBatch(columnMap, rows) {
 
   try {
     const openai = getClient();
-    const response = await openai.chat.completions.create({
-      model: AI_MODEL,
-      messages: [
-        { role: 'system', content: buildSystemPrompt() },
-        { role: 'user', content: buildUserContent(columnMap, rows) },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-      max_tokens: 8192,
-    });
+    const startTime = Date.now();
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: AI_MODEL,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: buildUserContent(columnMap, rows) },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 8192,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`AI batch timeout after ${PER_BATCH_TIMEOUT_MS}ms`)),
+          PER_BATCH_TIMEOUT_MS,
+        ),
+      ),
+    ]);
 
     const content = response.choices?.[0]?.message?.content;
     if (!content) return null;
@@ -104,9 +121,27 @@ async function aiParseBatch(columnMap, rows) {
     if (!parsed || !Array.isArray(parsed.products)) return null;
 
     return parsed;
-  } catch {
+  } catch (err) {
+    console.warn(`[aiCatalogRowParser] batch failed: ${err.message}`);
     return null; // Any failure → signal caller to skip this batch
   }
+}
+
+// Run N tasks with bounded parallelism (preserves order).
+async function runWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  async function next() {
+    const idx = cursor++;
+    if (idx >= items.length) return;
+    results[idx] = await worker(items[idx], idx);
+    await next();
+  }
+
+  const starters = Array.from({ length: Math.min(limit, items.length) }, next);
+  await Promise.all(starters);
+  return results;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -125,17 +160,22 @@ async function aiParseRows(columnMap, rows) {
     batches.push(rows.slice(i, i + BATCH_SIZE));
   }
 
+  const startTime = Date.now();
+  console.log(`[aiCatalogRowParser] parsing ${rows.length} rows in ${batches.length} batches (concurrency=${BATCH_CONCURRENCY})`);
+
+  const results = await runWithConcurrency(batches, BATCH_CONCURRENCY, (batch) =>
+    aiParseBatch(columnMap, batch),
+  );
+
   const allProducts = [];
   const allSkipped = [];
-  let failed = false;
+  let failedBatches = 0;
 
-  for (const batch of batches) {
-    const result = await aiParseBatch(columnMap, batch);
+  for (const result of results) {
     if (!result) {
-      failed = true;
-      continue; // Skip bad batch, keep going
+      failedBatches++;
+      continue;
     }
-
     if (Array.isArray(result.products)) {
       allProducts.push(...result.products);
     }
@@ -144,8 +184,11 @@ async function aiParseRows(columnMap, rows) {
     }
   }
 
+  const elapsed = Date.now() - startTime;
+  console.log(`[aiCatalogRowParser] done: ${allProducts.length} products, ${allSkipped.length} skipped, ${failedBatches}/${batches.length} batches failed, ${elapsed}ms`);
+
   // Only fall back if every single batch failed
-  if (allProducts.length === 0 && failed) return null;
+  if (allProducts.length === 0 && failedBatches === batches.length) return null;
 
   return {
     products: allProducts,

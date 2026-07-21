@@ -42,6 +42,8 @@ const CONTAINS_MAP = [
 ];
 
 const ALLOWED_EXTENSIONS = new Set(['.xlsx', '.csv']);
+const MAX_ROWS = 50000;                // hard cap — prevents OOM on absurd files
+const MAX_CELL_VALUE_LENGTH = 1000;    // truncate blob cells before AI or grouping
 
 // ─── Type coercion ───────────────────────────────────────────────────
 
@@ -69,19 +71,23 @@ function isFalsyStock(s) { return FALSY_STOCK.has(safeStr(s).toLowerCase()); }
 
 // Coerce ANY value to a plain string.  Handles ExcelJS rich text, numbers,
 // dates, null/undefined, nested objects, arrays — never throws.
+// Truncates to MAX_CELL_VALUE_LENGTH to prevent OOM on pathological cells.
 function safeStr(value) {
   if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') return value.length > MAX_CELL_VALUE_LENGTH
+    ? value.slice(0, MAX_CELL_VALUE_LENGTH) + '…' : value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (value instanceof Date) return value.toISOString().split('T')[0];
   if (typeof value === 'object') {
-    if (typeof value.text === 'string') return value.text;
+    if (typeof value.text === 'string') return value.text.length > MAX_CELL_VALUE_LENGTH
+      ? value.text.slice(0, MAX_CELL_VALUE_LENGTH) + '…' : value.text;
     if (Array.isArray(value.richText)) return value.richText.map((r) => typeof r?.text === 'string' ? r.text : '').join('');
     if (typeof value.hyperlink === 'string') return value.hyperlink;
-    if (typeof value.result === 'string') return value.result; // formula results
+    if (typeof value.result === 'string') return value.result;
   }
   if (Array.isArray(value)) return value.map(v => safeStr(v)).join(' ');
-  return String(value);
+  const str = String(value);
+  return str.length > MAX_CELL_VALUE_LENGTH ? str.slice(0, MAX_CELL_VALUE_LENGTH) + '…' : str;
 }
 
 // ─── Header normalization ────────────────────────────────────────────
@@ -187,9 +193,15 @@ function inferType(key) {
 function extractRows(worksheet, columnMap) {
   const rows = [];
   const errors = [];
+  let skipped = 0;
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
+
+    if (rows.length >= MAX_ROWS) {
+      skipped++;
+      return;
+    }
 
     const rowData = {};
     const rowErrors = [];
@@ -237,6 +249,10 @@ function extractRows(worksheet, columnMap) {
       rows.push(rowData);
     }
   });
+
+  if (skipped > 0) {
+    errors.push({ row: 0, column: 'FILE', raw: '', reason: `Row limit reached: ${MAX_ROWS.toLocaleString()} rows imported, ${skipped.toLocaleString()} rows skipped` });
+  }
 
   return { rows, errors };
 }
@@ -534,19 +550,25 @@ async function parseCatalogFile(buffer, filename) {
     return { rows: [], errors, unknownHeaders, aiSchema, aiParsed: null, usedAI: false, aiError };
   }
 
-  // Phase 2.5: AI parses rows into products (primary)
-  // Falls back to rule-based grouper on any failure.
+  // Phase 2.5: AI parses rows into products (primary).
+  // For very large files, skip AI and use rule-based parser — much faster.
+  // Threshold: 5000 rows or ~100k cells of payload.
+  const AI_ROW_THRESHOLD = 5000;
   let aiParsed = null;
   let usedAI = false;
-  try {
-    aiParsed = await aiParseRows(columnMap, rows);
-    if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
-      usedAI = true;
-    } else {
+  if (rows.length <= AI_ROW_THRESHOLD) {
+    try {
+      aiParsed = await aiParseRows(columnMap, rows);
+      if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
+        usedAI = true;
+      } else {
+        aiParsed = null;
+      }
+    } catch {
       aiParsed = null;
     }
-  } catch {
-    aiParsed = null;
+  } else {
+    console.log(`[catalogImport] ${rows.length} rows exceeds AI threshold (${AI_ROW_THRESHOLD}); using rule-based parser`);
   }
 
   return { rows, errors, unknownHeaders, aiSchema, aiParsed, usedAI, aiError };
@@ -562,4 +584,6 @@ module.exports = {
   safeStr,
   coerceNumber,
   coerceBoolean,
+  MAX_ROWS,
+  MAX_CELL_VALUE_LENGTH,
 };

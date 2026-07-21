@@ -115,8 +115,10 @@ async function discoverSchema(worksheet) {
   try {
     const { aiEnhanceSchema } = require('./aiCatalogParser');
     aiMap = await aiEnhanceSchema(worksheet, allCols);
-  } catch {
+  } catch (err) {
     aiMap = {};
+    aiError = `AI column mapping failed: ${err.message}`;
+    console.warn(`[catalogImport] aiEnhanceSchema error: ${err.message}`);
   }
 
   const columns = {};
@@ -149,6 +151,7 @@ async function discoverSchema(worksheet) {
     columns,
     aiSchema: Object.keys(aiMap).length > 0 ? aiMap : undefined,
     unknownHeaders,
+    aiError,
   };
 }
 

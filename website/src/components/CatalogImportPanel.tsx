@@ -93,7 +93,16 @@ export default function CatalogImportPanel({
         body: formData,
       });
 
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (!res.ok) throw new Error(`Server error (${res.status}). Please try again later.`);
+        throw new Error("Unexpected response from server.");
+      }
+
       if (!res.ok) throw new Error(data.message || "Failed to parse the file.");
 
       setProducts(data.products);
@@ -124,7 +133,15 @@ export default function CatalogImportPanel({
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        if (!res.ok) throw new Error(`Server error (${res.status}). Please try again later.`);
+        throw new Error("Unexpected response from server.");
+      }
+
       if (!res.ok) throw new Error(data.message || "Failed to import the catalog.");
 
       setImportedCount(data.imported);

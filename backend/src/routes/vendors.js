@@ -506,7 +506,7 @@ router.post(
         return res.status(404).json({ message: "Vendor profile not found" });
       }
 
-      const { rows, errors, unknownHeaders, aiSchema, aiParsed, aiError, aiRowsError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { rows, errors, unknownHeaders, aiSchema, aiParsed, aiError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
 
       let products, skippedRows, parseErrors, droppedColumns;
       let parseMethod = 'rule_based';
@@ -539,7 +539,7 @@ router.post(
         error: droppedColumns.length > 0 ? `Unrecognized columns: ${droppedColumns.join(', ')}` : undefined,
       });
 
-      res.json({ importId: catalogImport._id, products, skippedRows, parseErrors, droppedColumns, parseMethod, aiError, aiRowsError });
+      res.json({ importId: catalogImport._id, products, skippedRows, parseErrors, droppedColumns, parseMethod, aiError });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);
@@ -805,7 +805,7 @@ router.post(
           .json({ message: "No file uploaded (expected field name 'file')." });
       }
 
-      const { rows, errors, unknownHeaders, aiParsed, aiError, aiRowsError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const { rows, errors, unknownHeaders, aiParsed, aiError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
 
       let products, skippedRows;
       if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
@@ -816,7 +816,7 @@ router.post(
         products = grouped.products;
         skippedRows = grouped.skippedRows;
       }
-      res.json({ importId: null, products, skippedRows, droppedColumns: unknownHeaders, aiError, aiRowsError });
+      res.json({ importId: null, products, skippedRows, droppedColumns: unknownHeaders, aiError });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);

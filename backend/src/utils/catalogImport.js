@@ -112,6 +112,7 @@ async function discoverSchema(worksheet) {
 
   // Primary: AI maps every column
   let aiMap = {};
+  let aiError;
   try {
     const { aiEnhanceSchema } = require('./aiCatalogParser');
     aiMap = await aiEnhanceSchema(worksheet, allCols);
@@ -524,13 +525,13 @@ async function parseCatalogFile(buffer, filename) {
   }
 
   // Phase 1: Schema discovery (AI-first)
-  const { columns: columnMap, aiSchema, unknownHeaders } = await discoverSchema(worksheet);
+  const { columns: columnMap, aiSchema, unknownHeaders, aiError } = await discoverSchema(worksheet);
 
   // Phase 2: Extract raw row data
   const { rows, errors } = extractRows(worksheet, columnMap);
 
   if (rows.length === 0) {
-    return { rows: [], errors, unknownHeaders, aiSchema, aiParsed: null, usedAI: false };
+    return { rows: [], errors, unknownHeaders, aiSchema, aiParsed: null, usedAI: false, aiError };
   }
 
   // Phase 2.5: AI parses rows into products (primary)
@@ -548,7 +549,7 @@ async function parseCatalogFile(buffer, filename) {
     aiParsed = null;
   }
 
-  return { rows, errors, unknownHeaders, aiSchema, aiParsed, usedAI };
+  return { rows, errors, unknownHeaders, aiSchema, aiParsed, usedAI, aiError };
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────

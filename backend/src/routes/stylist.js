@@ -3,7 +3,7 @@ const { identifyUser } = require('../middleware/auth');
 const StylistConversation = require('../models/StylistConversation');
 const Product = require('../models/Product');
 const { buildStyleProfile } = require('../utils/styleProfile');
-const { embed } = require('../utils/embedding');
+const { generateProductEmbedding } = require('../utils/embeddings');
 
 const router = express.Router();
 let _openai;
@@ -233,7 +233,7 @@ async function prepareStylistRequest(req) {
 
   try {
     const queryText = message || 'style recommendation';
-    const queryEmbedding = validKey ? await embed(queryText) : null;
+    const queryEmbedding = validKey ? await generateEmbedding(queryText) : null;
     matchedProducts = await searchCatalog(queryEmbedding, queryText, 10);
 
     if (matchedProducts.length > 0) {

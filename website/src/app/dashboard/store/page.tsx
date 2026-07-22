@@ -224,17 +224,17 @@ const StoreProfilePage = () => {
         }}
       />
 
-      <div className="min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white px-6 py-12 md:px-16 lg:px-24">
-        
+      <div className="min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white px-5 sm:px-8 py-10 md:px-16 md:py-12 lg:px-24">
+
         {/* Minimalist Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-8 mb-16 gap-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-6 md:pb-8 mb-10 md:mb-16 gap-6">
           <div>
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-3">
               Vendor Identification
             </p>
-            <h1 className="font-editorial text-5xl md:text-6xl font-light tracking-tight text-black">
+            <h1 className="font-editorial text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-black">
               The{" "}
-              <span className="font-cursive text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
+              <span className="font-cursive text-5xl sm:text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
                 dossier
               </span>
             </h1>
@@ -259,7 +259,7 @@ const StoreProfilePage = () => {
 
             <div className="space-y-6">
               <h3 className="font-editorial text-3xl mb-8 border-b border-gray-200 pb-4">Direct Line</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
                 <div>
                   <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">Phone</label>
                   <input type="tel" name="phone" value={formData.phone || ""} onChange={handleInputChange} className="w-full border-b border-gray-300 bg-transparent py-2 text-sm focus:border-black focus:outline-none transition-colors" />
@@ -277,7 +277,7 @@ const StoreProfilePage = () => {
                 <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">Street Address</label>
                 <input type="text" name="street" value={formData.address?.street || ""} onChange={handleAddressChange} className="w-full border-b border-gray-300 bg-transparent py-2 text-sm focus:border-black focus:outline-none transition-colors" />
               </div>
-              <div className="grid grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
                 <div>
                   <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">City</label>
                   <input type="text" name="city" value={formData.address?.city || ""} onChange={handleAddressChange} className="w-full border-b border-gray-300 bg-transparent py-2 text-sm focus:border-black focus:outline-none transition-colors" />
@@ -287,7 +287,7 @@ const StoreProfilePage = () => {
                   <input type="text" name="state" value={formData.address?.state || ""} onChange={handleAddressChange} className="w-full border-b border-gray-300 bg-transparent py-2 text-sm focus:border-black focus:outline-none transition-colors" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
                 <div>
                   <label className="block font-sans text-[9px] uppercase tracking-widest text-gray-400 mb-2">Zip/Postal Code</label>
                   <input type="text" name="zipCode" value={formData.address?.zipCode || ""} onChange={handleAddressChange} className="w-full border-b border-gray-300 bg-transparent py-2 text-sm focus:border-black focus:outline-none transition-colors" />
@@ -312,11 +312,11 @@ const StoreProfilePage = () => {
         ) : (
 
           /* --- VIEW MODE --- */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24">
-            
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24">
+
             {/* Left Column (Manifesto & Visual Archive) */}
             <div className="lg:col-span-7 flex flex-col">
-              <h2 className="font-editorial text-5xl md:text-6xl tracking-tighter leading-none mb-8">
+              <h2 className="font-editorial text-4xl sm:text-5xl md:text-6xl tracking-tighter leading-none mb-8">
                 {vendor.name || "Unnamed House"}
               </h2>
               <div className="border-t border-gray-200 pt-8 mt-4">
@@ -330,19 +330,19 @@ const StoreProfilePage = () => {
 
               {/* Visual Archive Collage */}
               {archiveImages.length > 0 && (
-                <div className="mt-16 border-t border-gray-200 pt-8">
+                <div className="mt-12 md:mt-16 border-t border-gray-200 pt-8">
                   <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 mb-8">
                     Visual Archive
                   </p>
-                  
+
                   {/* Masonry Layout */}
                   <div className="columns-2 md:columns-3 gap-4 space-y-4">
                     {archiveImages.map((imgUrl, index) => (
                       <div key={index} className="break-inside-avoid overflow-hidden bg-gray-100">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                          src={getRenderableImageUrl(imgUrl)} 
-                          alt={`Archive piece ${index + 1}`} 
+                        <img
+                          src={getRenderableImageUrl(imgUrl)}
+                          alt={`Archive piece ${index + 1}`}
                           className="w-full h-auto object-cover grayscale hover:grayscale-0 transition-all duration-700 ease-in-out hover:scale-105"
                           onError={(e) => {
                             const img = e.currentTarget;
@@ -357,7 +357,7 @@ const StoreProfilePage = () => {
             </div>
 
             {/* Right Column (Contact Data) */}
-            <div className="lg:col-span-5 flex flex-col gap-10 border-l-0 lg:border-l border-gray-200 lg:pl-16">
+            <div className="lg:col-span-5 flex flex-col gap-10 border-t border-gray-200 pt-10 lg:border-t-0 lg:border-l border-gray-200 lg:pt-0 lg:pl-16">
               
               <div>
                 <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 mb-6 pb-2 border-b border-gray-100">

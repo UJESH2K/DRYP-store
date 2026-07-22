@@ -63,11 +63,11 @@ export default function DashboardPage() {
         }}
       />
 
-      <div className="min-h-screen bg-[#FCFCFA] px-6 py-12 md:px-16 lg:px-24 selection:bg-black selection:text-white">
+      <div className="min-h-screen bg-[#FCFCFA] px-5 sm:px-8 py-10 md:px-16 md:py-12 lg:px-24 selection:bg-black selection:text-white">
         {/* Minimalist Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-8 mb-16 gap-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-6 md:pb-8 mb-10 md:mb-16 gap-6">
           <div>
-            <Link href="/" className="mb-8 block w-max">
+            <Link href="/" className="mb-6 md:mb-8 hidden md:block w-max">
               <span className="font-editorial text-2xl italic tracking-[0.2em] text-black hover:opacity-70 transition-opacity cursor-pointer">
                 DRYP
               </span>
@@ -75,9 +75,9 @@ export default function DashboardPage() {
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-3">
               Secure Session
             </p>
-            <h1 className="font-editorial text-5xl md:text-6xl font-light tracking-tight text-black">
+            <h1 className="font-editorial text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-black">
               Welcome,{" "}
-              <span className="font-cursive text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
+              <span className="font-cursive text-5xl sm:text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
                 {user?.name || "vendor"}
               </span>
             </h1>
@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
           <button
             onClick={logout}
-            className="group relative inline-flex overflow-hidden border border-black px-8 py-4 text-[10px] font-medium uppercase tracking-[0.3em] text-black transition-all duration-500 hover:text-white"
+            className="group relative inline-flex overflow-hidden border border-black px-6 md:px-8 py-3 md:py-4 text-[10px] font-medium uppercase tracking-[0.3em] text-black transition-all duration-500 hover:text-white self-start md:self-auto"
           >
             <div className="absolute inset-0 h-full w-full translate-y-[100%] bg-black transition-transform duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-y-0" />
             <span className="relative z-10 transition-colors duration-500">
@@ -95,17 +95,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Onboarding Prompt */}
-        <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.4em] text-gray-400 mb-12">
+        <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.4em] text-gray-400 mb-8 md:mb-12">
           Choose how to add products to your studio
         </p>
 
         {/* Three Option Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           {OPTIONS.map((option) => (
             <Link
               key={option.href}
               href={option.href}
-              className="group block bg-white border border-gray-200 p-10 transition-all duration-500 hover:border-black hover:shadow-lg hover:-translate-y-1"
+              className="group block bg-white border border-gray-200 p-6 md:p-10 transition-all duration-500 hover:border-black hover:shadow-lg hover:-translate-y-1"
             >
               <div className="text-gray-300 group-hover:text-black transition-colors duration-500 mb-8">
                 {option.icon}

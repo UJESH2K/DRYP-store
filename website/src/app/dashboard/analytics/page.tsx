@@ -93,16 +93,16 @@ const AnalyticsPage = () => {
         }}
       />
 
-      <div className="min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white px-6 py-12 md:px-16 lg:px-24">
+      <div className="min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white px-5 sm:px-8 py-10 md:px-16 md:py-12 lg:px-24">
         {/* Minimalist Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-8 mb-16 gap-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-6 md:pb-8 mb-10 md:mb-16 gap-6">
           <div>
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-3">
               Performance & Reach
             </p>
-            <h1 className="font-editorial text-5xl md:text-6xl font-light tracking-tight text-black">
+            <h1 className="font-editorial text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-black">
               The{" "}
-              <span className="font-cursive text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
+              <span className="font-cursive text-5xl sm:text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
                 analytics
               </span>
             </h1>
@@ -118,53 +118,53 @@ const AnalyticsPage = () => {
         </div>
 
         {/* --- KPI Grid (Architectural / Editorial Style) --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-gray-200 border border-gray-200 mb-24">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-gray-200 border border-gray-200 mb-16 md:mb-24">
           {/* Revenue */}
-          <div className="bg-[#FCFCFA] p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
+          <div className="bg-[#FCFCFA] p-6 md:p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
             <h2 className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 group-hover:text-gray-400 transition-colors">
               Gross Revenue
             </h2>
-            <p className="font-editorial text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
+            <p className="font-editorial text-3xl sm:text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
               ${analytics.summary.totalRevenue.toFixed(2)}
             </p>
           </div>
 
           {/* Orders */}
-          <div className="bg-[#FCFCFA] p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
+          <div className="bg-[#FCFCFA] p-6 md:p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
             <h2 className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 group-hover:text-gray-400 transition-colors">
               Acquisitions
             </h2>
-            <p className="font-editorial text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
+            <p className="font-editorial text-3xl sm:text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
               {analytics.summary.totalOrders}
             </p>
           </div>
 
           {/* Products */}
-          <div className="bg-[#FCFCFA] p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
+          <div className="bg-[#FCFCFA] p-6 md:p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
             <h2 className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 group-hover:text-gray-400 transition-colors">
               Archive Size
             </h2>
-            <p className="font-editorial text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
+            <p className="font-editorial text-3xl sm:text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
               {analytics.summary.totalProducts}
             </p>
           </div>
 
           {/* Likes */}
-          <div className="bg-[#FCFCFA] p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
+          <div className="bg-[#FCFCFA] p-6 md:p-8 flex flex-col justify-between aspect-square md:aspect-auto md:h-48 group hover:bg-black transition-colors duration-500 cursor-default">
             <h2 className="font-sans text-[9px] font-semibold uppercase tracking-[0.3em] text-gray-400 group-hover:text-gray-400 transition-colors">
               Global Interest
             </h2>
-            <p className="font-editorial text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
+            <p className="font-editorial text-3xl sm:text-4xl lg:text-5xl text-black group-hover:text-white transition-colors duration-500">
               {analytics.summary.totalLikes}
             </p>
           </div>
         </div>
 
         {/* --- Top Lists Section --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24">
           {/* Top Liked Products */}
           <div>
-            <div className="border-b border-black pb-4 mb-6 flex items-baseline justify-between">
+            <div className="border-b border-black pb-4 mb-6 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
               <h2 className="font-editorial text-2xl tracking-tight">
                 Most Desired
               </h2>
@@ -203,7 +203,7 @@ const AnalyticsPage = () => {
 
           {/* Top Sold Products */}
           <div>
-            <div className="border-b border-black pb-4 mb-6 flex items-baseline justify-between">
+            <div className="border-b border-black pb-4 mb-6 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
               <h2 className="font-editorial text-2xl tracking-tight">
                 Highest Movement
               </h2>

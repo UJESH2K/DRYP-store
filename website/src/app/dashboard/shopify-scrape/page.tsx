@@ -98,10 +98,10 @@ export default function ShopifyScrapePage() {
         }}
       />
 
-      <div className="min-h-screen bg-[#FCFCFA] text-black px-6 py-12 md:px-16 lg:px-24 selection:bg-black selection:text-white">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-8 mb-16 gap-6">
+      <div className="min-h-screen bg-[#FCFCFA] text-black px-5 sm:px-8 py-10 md:px-16 md:py-12 lg:px-24 selection:bg-black selection:text-white">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-6 md:pb-8 mb-10 md:mb-16 gap-6">
           <div>
-            <Link href="/dashboard" className="mb-8 block w-max">
+            <Link href="/dashboard" className="mb-6 md:mb-8 hidden md:block w-max">
               <span className="font-editorial text-2xl italic tracking-[0.2em] text-black hover:opacity-70 transition-opacity cursor-pointer">
                 DRYP
               </span>
@@ -109,9 +109,9 @@ export default function ShopifyScrapePage() {
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-3">
               Automated Intake
             </p>
-            <h1 className="font-editorial text-5xl md:text-6xl font-light tracking-tight text-black">
+            <h1 className="font-editorial text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-black">
               Link{" "}
-              <span className="font-cursive text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
+              <span className="font-cursive text-5xl sm:text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
                 scraper
               </span>
             </h1>
@@ -119,11 +119,11 @@ export default function ShopifyScrapePage() {
         </div>
 
         <div className="max-w-3xl">
-          <p className="font-sans text-[11px] font-light leading-relaxed tracking-[0.15em] text-gray-500 uppercase max-w-xl mb-10">
+          <p className="font-sans text-[11px] font-light leading-relaxed tracking-[0.15em] text-gray-500 uppercase max-w-xl mb-8 md:mb-10">
             Paste a Shopify product URL below. We&apos;ll extract the product details, images, and pricing automatically.
           </p>
 
-          <div className="flex gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mb-10 md:mb-12">
             <input
               type="url"
               value={url}
@@ -134,13 +134,13 @@ export default function ShopifyScrapePage() {
                 setSuccess(false);
               }}
               placeholder="https://your-store.myshopify.com/products/example"
-              className="flex-1 border-b border-gray-300 bg-transparent py-3 text-sm focus:border-black focus:outline-none transition-colors"
+              className="flex-1 border-b border-gray-300 bg-transparent py-3 text-sm focus:border-black focus:outline-none transition-colors min-w-0"
               onKeyDown={(e) => e.key === "Enter" && handlePreview()}
             />
             <button
               onClick={handlePreview}
               disabled={!url.trim() || loading}
-              className="border border-black bg-black px-8 py-3 font-sans text-[10px] font-medium uppercase tracking-[0.3em] text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
+              className="border border-black bg-black px-6 md:px-8 py-3 font-sans text-[10px] font-medium uppercase tracking-[0.3em] text-white hover:bg-zinc-800 transition-colors disabled:opacity-40 whitespace-nowrap"
             >
               {loading ? "Scanning..." : "Preview"}
             </button>
@@ -158,7 +158,7 @@ export default function ShopifyScrapePage() {
               <p className="font-sans text-[10px] uppercase tracking-widest text-gray-500 mb-6">
                 The product has been added to your catalog.
               </p>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   onClick={() => setSuccess(false)}
                   className="border border-black bg-transparent px-6 py-3 font-sans text-[10px] font-medium uppercase tracking-[0.3em] text-black hover:bg-black hover:text-white transition-colors"

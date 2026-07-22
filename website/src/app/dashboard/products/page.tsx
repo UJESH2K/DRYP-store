@@ -105,8 +105,8 @@ const ProductsPage = () => {
 
       {/* --- CUSTOM DELETION CONFIRMATION DIALOG --- */}
       {confirmDeleteId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/90 backdrop-blur-md transition-all">
-          <div className="flex flex-col items-center justify-center border border-white/20 bg-black p-12 shadow-2xl max-w-lg text-center animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/90 backdrop-blur-md transition-all p-4">
+          <div className="flex flex-col items-center justify-center border border-white/20 bg-black p-8 md:p-12 shadow-2xl w-full max-w-lg text-center animate-in zoom-in-95 duration-300">
             <span className="font-editorial text-4xl italic text-red-600 mb-4">Warning</span>
             <h3 className="font-editorial text-2xl font-light text-white mb-4">
               Permanent Deletion
@@ -114,8 +114,8 @@ const ProductsPage = () => {
             <p className="font-sans text-[10px] uppercase tracking-widest text-gray-400 mb-10 max-w-sm leading-relaxed">
               You are about to permanently remove this piece from the global archive. This action cannot be reversed.
             </p>
-            
-            <div className="flex items-center gap-6 w-full">
+
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full">
               <button
                 onClick={() => setConfirmDeleteId(null)}
                 disabled={isDeleting}
@@ -135,16 +135,16 @@ const ProductsPage = () => {
         </div>
       )}
 
-      <div className="min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white px-6 py-12 md:px-16 lg:px-24">
+      <div className="min-h-screen bg-[#FCFCFA] text-black font-sans selection:bg-black selection:text-white px-5 sm:px-8 py-10 md:px-16 md:py-12 lg:px-24">
         {/* Minimalist Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-8 mb-16 gap-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-black pb-6 md:pb-8 mb-10 md:mb-16 gap-6">
           <div>
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.4em] text-gray-400 mb-3">
               Vendor Dashboard
             </p>
-            <h1 className="font-editorial text-5xl md:text-6xl font-light tracking-tight text-black">
+            <h1 className="font-editorial text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-black">
               The{" "}
-              <span className="font-cursive text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
+              <span className="font-cursive text-5xl sm:text-6xl md:text-7xl lowercase text-gray-400 -ml-2">
                 archive
               </span>
             </h1>
@@ -152,7 +152,7 @@ const ProductsPage = () => {
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="group relative inline-flex overflow-hidden bg-black px-8 py-4 text-[10px] font-medium uppercase tracking-[0.3em] text-white transition-all duration-500 hover:tracking-[0.4em]"
+            className="group relative inline-flex overflow-hidden bg-black px-6 md:px-8 py-3 md:py-4 text-[10px] font-medium uppercase tracking-[0.3em] text-white transition-all duration-500 hover:tracking-[0.4em] self-start md:self-auto"
           >
             <div className="absolute inset-0 h-full w-full -translate-x-full bg-zinc-800 transition-transform duration-700 ease-[cubic-bezier(0.87,0,0.13,1)] group-hover:translate-x-0" />
             <span className="relative z-10 transition-colors duration-500">
@@ -185,7 +185,7 @@ const ProductsPage = () => {
               </p>
             </div>
           ) : products.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12 md:gap-x-8 md:gap-y-16">
               {products.map((product) => (
                 <div key={product._id} className="group relative flex flex-col">
                   {/* High-Fashion Image Container (4:5 Aspect Ratio) */}

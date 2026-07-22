@@ -42,7 +42,6 @@ const CONTAINS_MAP = [
 ];
 
 const ALLOWED_EXTENSIONS = new Set(['.xlsx', '.csv']);
-const MAX_ROWS = 50000;                // hard cap — prevents OOM on absurd files
 const MAX_CELL_VALUE_LENGTH = 1000;    // truncate blob cells before AI or grouping
 
 // ─── Type coercion ───────────────────────────────────────────────────
@@ -193,15 +192,9 @@ function inferType(key) {
 function extractRows(worksheet, columnMap) {
   const rows = [];
   const errors = [];
-  let skipped = 0;
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
-
-    if (rows.length >= MAX_ROWS) {
-      skipped++;
-      return;
-    }
 
     const rowData = {};
     const rowErrors = [];
@@ -249,10 +242,6 @@ function extractRows(worksheet, columnMap) {
       rows.push(rowData);
     }
   });
-
-  if (skipped > 0) {
-    errors.push({ row: 0, column: 'FILE', raw: '', reason: `Row limit reached: ${MAX_ROWS.toLocaleString()} rows imported, ${skipped.toLocaleString()} rows skipped` });
-  }
 
   return { rows, errors };
 }
@@ -584,6 +573,6 @@ module.exports = {
   safeStr,
   coerceNumber,
   coerceBoolean,
-  MAX_ROWS,
+  isUrl,
   MAX_CELL_VALUE_LENGTH,
 };

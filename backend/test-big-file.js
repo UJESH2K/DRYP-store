@@ -68,12 +68,13 @@ async function main() {
     process.exit(1);
   }
 
-  // ── Test 2: hard cap at MAX_ROWS ──
-  console.log(`\nTest 2: generating ${MAX_ROWS + 1000} rows (exceeds cap)...`);
+  // ── Test 2: no hard cap — all rows should parse ──
+  const ROWS_2 = 51000;
+  console.log(`\nTest 2: generating ${ROWS_2} rows (no cap)...`);
   const wb2 = new ExcelJS.Workbook();
   const ws2 = wb2.addWorksheet('Catalog');
   ws2.columns = ws1.columns;
-  for (let i = 0; i < MAX_ROWS + 1000; i++) {
+  for (let i = 0; i < ROWS_2; i++) {
     ws2.addRow({
       productName: `P${i}`,
       price: 100 + i,
@@ -85,18 +86,27 @@ async function main() {
   const result2 = await parseCatalogFile(buf2, 'big.xlsx');
   console.log(`  Parsed in ${Date.now() - t2}ms`);
 
-  if (result2.rows.length !== MAX_ROWS) {
-    console.error(`FAIL: expected ${MAX_ROWS} rows, got ${result2.rows.length}`);
+  if (result2.rows.length !== ROWS_2) {
+    console.error(`FAIL: expected ${ROWS_2} rows, got ${result2.rows.length}`);
     process.exit(1);
   }
-  console.log(`  OK: capped at ${MAX_ROWS} rows`);
+  console.log(`  OK: parsed all ${result2.rows.length} rows (no cap)`);
 
-  const rowLimitWarn = result2.errors.find((e) => e.reason && e.reason.includes('Row limit'));
-  if (!rowLimitWarn) {
-    console.error('FAIL: expected row-limit warning');
+  // ── Test 3: streaming parser with the real Gully Labs file ──
+  console.log('\nTest 3: streaming parser on Gully Labs.xlsx...');
+  const { parseCatalogFileStream } = require('./src/utils/catalogImportStream');
+  const fs = require('fs');
+  const gullyBuf = fs.readFileSync('/Users/dan/Desktop/x/Gully Labs.xlsx');
+  console.log(`  File: ${(gullyBuf.length/1024/1024).toFixed(2)}MB`);
+  const t3 = Date.now();
+  const streamResult = await parseCatalogFileStream(gullyBuf, 'Gully Labs.xlsx');
+  console.log(`  Streamed in ${Date.now() - t3}ms`);
+  console.log(`  Products: ${streamResult.products.length}, skipped: ${streamResult.skippedRows.length}, totalRows: ${streamResult.totalRows}`);
+  if (streamResult.products.length === 0) {
+    console.error('FAIL: no products from real file');
     process.exit(1);
   }
-  console.log(`  OK: row-limit warning present`);
+  console.log(`  OK: real file parsed (first product: ${streamResult.products[0].name})`);
 
   // ── Test 3: long cell truncation (via in-memory workbook) ──
   // Long strings are truncated before they hit AI/grouping to keep

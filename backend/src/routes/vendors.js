@@ -19,7 +19,9 @@ const {
   groupRowsIntoProducts,
   buildProductBulkOps,
   normalizeAiProducts,
+  safeStr,
 } = require("../utils/catalogImport");
+const { parseCatalogFileStream } = require("../utils/catalogImportStream");
 const { signProductImages } = require("../utils/imageUrls");
 const { isValidPassword } = require("./auth");
 const { createPasswordToken } = require("../utils/passwordTokens");
@@ -506,25 +508,44 @@ router.post(
         return res.status(404).json({ message: "Vendor profile not found" });
       }
 
-      const { rows, errors, unknownHeaders, aiSchema, aiParsed, aiError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      // Files above STREAM_THRESHOLD use ExcelJS streaming reader — processes
+      // rows one at a time so peak memory stays bounded regardless of file size.
+      const STREAM_THRESHOLD = 5 * 1024 * 1024; // 5 MB
+      const fileTooBig = req.file.size > STREAM_THRESHOLD;
 
       let products, skippedRows, parseErrors, droppedColumns;
       let parseMethod = 'rule_based';
+      let aiSchema, aiError;
+      let totalRowCount = 0;
 
-      // Prefer AI-parsed results when available; fall back to local grouper.
-      if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
-        products = normalizeAiProducts(aiParsed.products);
-        skippedRows = aiParsed.skippedRows || [];
-        parseErrors = aiParsed.parseErrors || [];
-        parseMethod = 'ai_assisted';
+      if (fileTooBig) {
+        console.log(`[catalog-preview] large file (${(req.file.size/1024/1024).toFixed(2)}MB), using streaming parser`);
+        const result = await parseCatalogFileStream(req.file.buffer, req.file.originalname);
+        products = result.products;
+        skippedRows = result.skippedRows;
+        parseErrors = result.parseErrors;
+        droppedColumns = result.droppedColumns;
+        totalRowCount = result.totalRows;
+        parseMethod = 'rule_based_streaming';
       } else {
-        const grouped = groupRowsIntoProducts(rows, errors);
-        products = grouped.products;
-        skippedRows = grouped.skippedRows;
-        parseErrors = errors;
-      }
+        const { rows, errors, unknownHeaders, aiSchema: aiS, aiParsed, aiError: aiErr } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+        aiSchema = aiS;
+        aiError = aiErr;
 
-      droppedColumns = unknownHeaders;
+        // Prefer AI-parsed results when available; fall back to local grouper.
+        if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
+          products = normalizeAiProducts(aiParsed.products);
+          skippedRows = aiParsed.skippedRows || [];
+          parseErrors = aiParsed.parseErrors || [];
+          parseMethod = 'ai_assisted';
+        } else {
+          const grouped = groupRowsIntoProducts(rows, errors);
+          products = grouped.products;
+          skippedRows = grouped.skippedRows;
+          parseErrors = errors;
+        }
+        droppedColumns = unknownHeaders;
+      }
 
       const catalogImport = await CatalogImport.create({
         vendor: vendor._id,
@@ -805,18 +826,30 @@ router.post(
           .json({ message: "No file uploaded (expected field name 'file')." });
       }
 
-      const { rows, errors, unknownHeaders, aiParsed, aiError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+      const STREAM_THRESHOLD = 5 * 1024 * 1024; // 5 MB
+      const fileTooBig = req.file.size > STREAM_THRESHOLD;
 
       let products, skippedRows;
-      if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
-        products = normalizeAiProducts(aiParsed.products);
-        skippedRows = aiParsed.skippedRows || [];
+      let droppedColumns = unknownHeaders;
+
+      if (fileTooBig) {
+        const result = await parseCatalogFileStream(req.file.buffer, req.file.originalname);
+        products = result.products;
+        skippedRows = result.skippedRows;
+        droppedColumns = result.droppedColumns;
       } else {
-        const grouped = groupRowsIntoProducts(rows, errors);
-        products = grouped.products;
-        skippedRows = grouped.skippedRows;
+        const { rows, errors, unknownHeaders, aiParsed, aiError } = await parseCatalogFile(req.file.buffer, req.file.originalname);
+        droppedColumns = unknownHeaders;
+        if (aiParsed && aiParsed.products && aiParsed.products.length > 0) {
+          products = normalizeAiProducts(aiParsed.products);
+          skippedRows = aiParsed.skippedRows || [];
+        } else {
+          const grouped = groupRowsIntoProducts(rows, errors);
+          products = grouped.products;
+          skippedRows = grouped.skippedRows;
+        }
       }
-      res.json({ importId: null, products, skippedRows, droppedColumns: unknownHeaders, aiError });
+      res.json({ importId: null, products, skippedRows, droppedColumns, aiError });
     } catch (error) {
       if (error.status) return res.status(error.status).json({ message: error.message });
       next(error);

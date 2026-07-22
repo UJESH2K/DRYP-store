@@ -25,7 +25,7 @@ const { parseCatalogFileStream } = require("../utils/catalogImportStream");
 const { signProductImages } = require("../utils/imageUrls");
 const { isValidPassword } = require("./auth");
 const { createPasswordToken } = require("../utils/passwordTokens");
-const MAX_CATALOG_FILE_SIZE_MB = 100;
+const MAX_CATALOG_FILE_SIZE_MB = 500;
 const BULK_BATCH_SIZE = 100;
 
 const catalogUpload = multer({

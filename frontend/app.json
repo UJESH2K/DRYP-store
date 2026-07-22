@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "DRYP",
-    "slug": "DRYP",
+    "slug": "dryp",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -23,6 +23,7 @@
       "bundleIdentifier": "com.dryp.store",
       "buildNumber": "1",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "DRYP needs access to your photos so you can share style inspiration and save your favorite looks.",
         "NSCameraUsageDescription": "DRYP uses the camera to let you capture outfit photos and discover similar styles.",
         "NSPhotoLibraryAddUsageDescription": "DRYP can save outfit photos and screenshots to your photo library.",
@@ -45,9 +46,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "d2fdfdd1-076c-48bc-aa2e-9b0dc3dad786"
+        "projectId": "536cd845-448b-48b5-a5a9-c7386ec35dde"
       }
     },
-    "owner": "sodan-works-team"
+    "owner": "dryps-team"
   }
 }

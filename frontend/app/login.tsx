@@ -65,9 +65,11 @@ export default function LoginScreen() {
       if (result.type !== 'success' || !result.url) {
         return;
       }
-      const url = new URL(result.url);
-      const token = url.searchParams.get('token');
-      const oauthError = url.searchParams.get('error');
+      // Parse query params manually — new URL() rejects non-http schemes.
+      const queryString = result.url.split('?')[1] || '';
+      const params = new URLSearchParams(queryString);
+      const token = params.get('token');
+      const oauthError = params.get('error');
       if (oauthError) {
         Alert.alert('Google Sign-In', 'Google login was cancelled or failed. Please try again.');
         return;

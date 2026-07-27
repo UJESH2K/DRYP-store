@@ -195,10 +195,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const user = JSON.parse(userData);
         set({ user, token, isAuthenticated: true, isGuest: false, guestId: null });
       } catch {
-        await initGuestUser();
+        await get().initGuestUser();
       }
     } else {
-      await initGuestUser();
+      await get().initGuestUser();
     }
   },
 

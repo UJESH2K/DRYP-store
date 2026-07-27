@@ -7,7 +7,7 @@ import { API_BASE_URL } from './config';
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
   try {
     const fullUrl = `${API_BASE_URL}${endpoint}`;
-    if (__DEV) console.log(`🚀 FRONTEND API CALL: ${options.method || 'GET'} ${fullUrl}`);
+    if (__DEV__) console.log(`🚀 FRONTEND API CALL: ${options.method || 'GET'} ${fullUrl}`);
 
     const { token } = useAuthStore.getState();
     
@@ -22,7 +22,7 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     if (!(body instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
       if (body) {
-        if (__DEV) console.log(`📤 Sending data:`, body);
+        if (__DEV__) console.log(`📤 Sending data:`, body);
       }
     }
 
@@ -41,7 +41,7 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
       // For non-JSON, we can't assume a { message: ... } structure
       // If the request was not ok, we create an error structure
       if (!response.ok) {
-          if (__DEV) console.warn(`❌ API call failed with non-JSON response: ${endpoint}`, response.status, textData);
+          if (__DEV__) console.warn(`❌ API call failed with non-JSON response: ${endpoint}`, response.status, textData);
           return { message: textData || 'An unknown error occurred on the server.' };
       }
       // If the request was ok but not JSON, we return it as content
@@ -49,15 +49,15 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     }
     
     if (!response.ok) {
-      if (__DEV) console.warn(`❌ API call failed: ${endpoint}`, response.status, data);
+      if (__DEV__) console.warn(`❌ API call failed: ${endpoint}`, response.status, data);
       return data; // Return error data from server
     }
 
-    if (__DEV) console.log(`✅ API success: ${endpoint}`, data);
+    if (__DEV__) console.log(`✅ API success: ${endpoint}`, data);
     return data;
   } catch (error) {
     console.error(`❌ API error: ${endpoint}`, error);
-    if (__DEV) console.error(`❌ Full URL was: ${API_BASE_URL}${endpoint}`);
+    if (__DEV__) console.error(`❌ Full URL was: ${API_BASE_URL}${endpoint}`);
     return { message: error.message || 'An unexpected error occurred.' };
   }
 }

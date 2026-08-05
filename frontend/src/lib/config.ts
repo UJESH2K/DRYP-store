@@ -8,7 +8,7 @@
 // In development the Metro bundler inlines EXPO_PUBLIC_* at bundle time.
 // In production (EAS Build) they are baked in at build time.
 export const API_BASE_URL: string =
-  process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 export const SUPABASE_URL: string =
   process.env.EXPO_PUBLIC_SUPABASE_URL || '';

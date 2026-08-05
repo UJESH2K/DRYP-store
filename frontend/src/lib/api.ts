@@ -9,11 +9,14 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     const fullUrl = `${API_BASE_URL}${endpoint}`;
     if (__DEV__) console.log(`🚀 FRONTEND API CALL: ${options.method || 'GET'} ${fullUrl}`);
 
-    const { token } = useAuthStore.getState();
-    
+    const { token, guestId } = useAuthStore.getState();
+
     const headers = { ...options.headers };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (guestId) {
+      headers['x-guest-id'] = guestId;
     }
 
     let body = options.body;

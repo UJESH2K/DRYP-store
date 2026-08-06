@@ -8,8 +8,12 @@
 // Backend runs on port 8081 (NOT 8080). The fallback only kicks in for Metro
 // dev runs where EXPO_PUBLIC_API_BASE_URL is unset; EAS builds bake the env
 // at build time, so this fallback must never run in a TestFlight install.
-export const API_BASE_URL: string =
-  process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8081';
+const IS_SIMULATOR =
+  typeof Platform !== 'undefined' && Platform.OS === 'ios' && typeof __DEV__ !== 'undefined';
+
+export const API_BASE_URL: string = IS_SIMULATOR
+  ? 'http://10.130.201.28:8081'
+  : process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8081';
 
 export const SUPABASE_URL: string =
   process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ztxryljoqcsvjqwmdvnm.supabase.co';

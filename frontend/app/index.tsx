@@ -11,7 +11,7 @@ export default function Index() {
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        console.log('Checking onboarding status...');
+        if (__DEV__) console.log('Checking onboarding status...');
         
         // Add timeout for Android
         const timeoutPromise = new Promise((_, reject) => 
@@ -21,7 +21,7 @@ export default function Index() {
         const storagePromise = AsyncStorage.getItem('categories:selected');
         const result = await Promise.race([storagePromise, timeoutPromise]) as string | null;
         
-        console.log('AsyncStorage result:', result);
+        if (__DEV__) console.log('AsyncStorage result:', result);
         
         if (result) {
           const categories = JSON.parse(result);
@@ -59,10 +59,10 @@ export default function Index() {
 
   // Navigate based on onboarding status
   if (hasOnboarded) {
-    console.log('User has onboarded, going to home');
+    if (__DEV__) console.log('User has onboarded, going to home');
     return <Redirect href="/(tabs)/home" />;
   } else {
-    console.log('User needs onboarding, going to onboarding');
+    if (__DEV__) console.log('User needs onboarding, going to onboarding');
     return <Redirect href="/onboarding" />;
   }
 }

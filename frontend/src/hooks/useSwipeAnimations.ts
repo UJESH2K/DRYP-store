@@ -4,7 +4,7 @@ import { SCREEN_WIDTH } from '../constants/dimensions';
 import { useInteractionStore } from '../state/interactions';
 import { useAuthStore } from '../state/auth';
 import type { Item } from '../types';
-import { sendInteraction } from '../lib/api';
+import { sendInteraction, trackInteraction } from '../lib/api';
 import { updateModel } from '../lib/recommender';
 import { useCustomRouter } from './useCustomRouter';
 
@@ -74,7 +74,8 @@ export function useSwipeAnimations(
     setCanUndo(true);
     setLastSwipeDirection(decision === 'like' ? 'right' : 'left');
     pushInteraction({ itemId: currentItem.id, action: decision, at: Date.now(), tags: currentItem.tags, priceTier: currentItem.priceTier });
-    sendInteraction(decision, currentItem.id, user?._id);
+    sendInteraction(decision, currentItem.id);
+    trackInteraction({ action: decision === 'like' ? 'swipe_right' : 'swipe_left', productId: currentItem.id, source: 'swipe_feed' });
     updateModel(decision, currentItem);
 
     if (undoTimer.current) {
@@ -187,7 +188,10 @@ export function useSwipeAnimations(
               const currentItem = items[currentIndex];
 
 
-              if(currentItem) onShowDetails(currentItem);
+              if(currentItem) {
+                onShowDetails(currentItem);
+                trackInteraction({ action: 'swipe_up', productId: currentItem.id, source: 'swipe_feed' });
+              }
 
 
           }

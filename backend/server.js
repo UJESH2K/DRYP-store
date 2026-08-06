@@ -6,6 +6,7 @@ if (!process.env.JWT_SECRET) {
 }
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path"); // Import path module
 const connectDatabase = require("./src/config/database");
@@ -28,6 +29,8 @@ const vendorAnalyticsRoutes = require("./src/routes/analytics/vendor");
 const cartRoutes = require("./src/routes/cart");
 const aiRoutes = require("./src/routes/ai");
 const stylistRoutes = require("./src/routes/stylist");
+const interactionRoutes = require("./src/routes/interactions");
+const paymentsWebhookRoutes = require("./src/routes/payments-webhook");
 const rateLimit = require('express-rate-limit');
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -91,30 +94,50 @@ const server = http.createServer({ maxHeaderSize: 32768 }, app);
 app.set('trust proxy', 1);
 
 // Middlewares
-// app.use(cors());
+app.use(helmet());
+const corsOrigins = (process.env.CORS_ORIGIN || "https://dryp.store,https://api.dryp.store,https://www.dryp.store,http://localhost:3000,http://localhost:8081").split(",").map(s => s.trim()).filter(Boolean);
 app.use(
   cors({
-    origin: "*", // Allow all origins
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // Allow all methods
+    origin: corsOrigins,
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: ["Content-Type", "Authorization", "x-guest-id"],
+    credentials: false,
   }),
 );
+app.use("/api/payments/webhook", paymentsWebhookRoutes);
+app.get('/api/payments/checkout', (req, res) => {
+  const order_id = String(req.query.order_id || '');
+  const key = String(req.query.key || '');
+  const amount = String(req.query.amount || '0');
+  const currency = String(req.query.currency || 'INR');
+  res.setHeader('Content-Type', 'text/html');
+  // JSON.stringify on every interpolated value to prevent HTML/JS injection
+  const options = {
+    key, amount, currency, order_id,
+    handler: "function(response){window.ReactNativeWebView.postMessage(JSON.stringify(response));}",
+    modal: {
+      ondismiss: "function(){window.ReactNativeWebView.postMessage(JSON.stringify({action:\"cancel\"}));}",
+    },
+  };
+  const script = `var options=${JSON.stringify(options)};var rzp=new Razorpay(options);rzp.open();`;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://checkout.razorpay.com/v1/checkout.js"></script></head><body style="margin:0;padding:0"><script>${script}</script></body></html>`;
+  res.send(html);
+});
+
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, "public")));
 
-// Custom logging middleware to track API calls
-app.use((req, res, next) => {
-  console.log(`
-🔥 API CALL: ${req.method} ${req.path}`);
-  console.log(`📱 From: ${req.get("origin") || "localhost"}`);
-  if (req.body && Object.keys(req.body).length > 0) {
-    console.log(`📦 Body:`, JSON.stringify(req.body, null, 2));
-  }
-  next();
-});
+// Custom logging middleware — disabled in production to prevent leaking
+// passwords, OAuth tokens, and PII to log aggregators.
+if (!isProduction) {
+  app.use((req, res, next) => {
+    console.log(`API CALL: ${req.method} ${req.path} from ${req.get("origin") || "localhost"}`);
+    next();
+  });
+}
 
 // Health check
 app.get("/health", (_req, res) => {
@@ -147,14 +170,15 @@ app.use("/api/analytics", vendorAnalyticsRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/stylist", stylistRoutes);
+app.use("/api/interactions", interactionRoutes);
 
-// Global error handler
+// Global error handler — never leak err.message in production
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error(err);
   res
     .status(err.status || 500)
-    .json({ message: err.message || "Server error" });
+    .json({ message: isProduction ? "Server error" : (err.message || "Server error") });
 });
 
 const PORT = process.env.PORT || 8081; // Backend runs on port from .env (currently 8081)

@@ -32,6 +32,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
+    "expo-updates": "~0.26.9",
     "expo-web-browser": "~15.0.11",
     "lodash": "^4.17.21",
     "react": "19.1.0",
@@ -44,6 +45,7 @@
     "react-native-text-ticker": "^1.15.0",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "^0.21.0",
+    "react-native-webview": "^14.0.1",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

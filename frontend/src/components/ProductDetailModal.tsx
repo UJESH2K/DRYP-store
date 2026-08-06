@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { apiCall } from '../lib/api';
+import { apiCall, trackInteraction } from '../lib/api';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
 import { useAuthStore } from '../../src/state/auth';
@@ -133,6 +133,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
       const productData: Product = await apiCall(`/api/products/${id}`);
       if (productData) {
         setProduct(productData);
+        trackInteraction({ action: 'product_view', productId: id, source: 'detail_modal' });
       }
     } catch (error) {
       console.error('Failed to fetch product details:', error);

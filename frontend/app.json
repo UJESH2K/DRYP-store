@@ -2,7 +2,7 @@
   "expo": {
     "name": "DRYP",
     "slug": "dryp",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "dryp",
@@ -21,14 +21,27 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dryp.store",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "DRYP needs access to your photos so you can share style inspiration and save your favorite looks.",
         "NSCameraUsageDescription": "DRYP uses the camera to let you capture outfit photos and discover similar styles.",
         "NSPhotoLibraryAddUsageDescription": "DRYP can save outfit photos and screenshots to your photo library.",
         "NSMicrophoneUsageDescription": "DRYP may use the microphone for video-based style recommendations in the future.",
-        "NSPrivacyPolicyURL": "https://www.dryp.store/legal/privacy"
+        "NSPrivacyPolicyURL": "https://www.dryp.store/legal/privacy",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "api.dryp.store": {
+              "NSIncludesSubdomains": true,
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": false
+            },
+            "localhost": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
       }
     },
     "android": {

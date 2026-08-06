@@ -112,7 +112,13 @@ export default function CheckoutScreen() {
       if (result && result.length > 0) {
         showToast('Order placed successfully!', 'success');
         clearCart();
-        router.push({ pathname: '/(checkout)/order-confirmation', params: { orderId: result[0].orderNumber } });
+        const createdOrder = result[0];
+        const intent = await apiCall('/api/payments/create-intent', { method: 'POST', body: JSON.stringify({ orderId: createdOrder._id }) });
+        if (intent && intent.id) {
+          router.push({ pathname: "/(checkout)/razorpay-checkout", params: { orderId: String(createdOrder._id), amount: String(intent.amount), currency: String(intent.currency || 'INR') } });
+          return;
+        }
+        router.push({ pathname: '/(checkout)/order-confirmation', params: { orderId: createdOrder.orderNumber } });
       } else {
         throw new Error('Failed to place order.');
       }

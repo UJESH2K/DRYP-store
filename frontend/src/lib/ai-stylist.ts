@@ -35,7 +35,7 @@ function buildStylistBody(payload: StylistMessagePayload) {
 }
 
 function buildStylistHeaders(acceptStream = false) {
-  const { token } = useAuthStore.getState();
+  const { token, guestId } = useAuthStore.getState();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -46,6 +46,8 @@ function buildStylistHeaders(acceptStream = false) {
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  } else if (guestId) {
+    headers['x-guest-id'] = guestId;
   }
 
   return headers;

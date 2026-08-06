@@ -5,13 +5,14 @@
  * This gives us ONE fallback line and ONE place to manage environment logic.
  */
 
-// In development the Metro bundler inlines EXPO_PUBLIC_* at bundle time.
-// In production (EAS Build) they are baked in at build time.
+// Backend runs on port 8081 (NOT 8080). The fallback only kicks in for Metro
+// dev runs where EXPO_PUBLIC_API_BASE_URL is unset; EAS builds bake the env
+// at build time, so this fallback must never run in a TestFlight install.
 export const API_BASE_URL: string =
-  process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8081';
 
 export const SUPABASE_URL: string =
-  process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+  process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ztxryljoqcsvjqwmdvnm.supabase.co';
 
 export const SUPABASE_ANON_KEY: string =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';

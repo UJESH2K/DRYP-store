@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiCall } from '../../src/lib/api';
+import { apiCall, trackInteraction } from '../../src/lib/api';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
 import { resolveImageUri } from '../../src/utils/imageUri';
@@ -94,6 +94,20 @@ export default function ProductDetailScreen() {
     // 2. Call it when the screen loads
     useEffect(() => {
         fetchProduct();
+    }, [id]);
+
+    // Track product view + dwell time
+    const viewStartRef = useRef<number>(Date.now());
+    useEffect(() => {
+        if (!id) return;
+        viewStartRef.current = Date.now();
+        trackInteraction({ action: 'product_view', productId: id as string, source: 'product_detail' });
+        return () => {
+            const dwellMs = Date.now() - viewStartRef.current;
+            if (dwellMs > 0) {
+                trackInteraction({ action: 'product_view', productId: id as string, source: 'product_detail', dwellTimeMs: dwellMs });
+            }
+        };
     }, [id]);
 
     // 3. Call it when the user pulls down to refresh

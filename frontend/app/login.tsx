@@ -16,9 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
 import { FontAwesome } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+// Required for expo-web-browser to complete auth sessions on iOS
+WebBrowser.maybeCompleteAuthSession();
 import { useAuthStore } from '../src/state/auth';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
-import { API_BASE_URL } from '../src/lib/config';
+
+import { API_BASE_URL } from '../src/lib/api';
 
 export default function LoginScreen() {
   const router = useCustomRouter();
@@ -57,29 +61,27 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
+    const redirectUri = AuthSession.makeRedirectUri({
+      scheme: 'dryp',
+      path: 'oauth-callback',
+    });
+
     const guestQuery = guestId ? `&guestId=${encodeURIComponent(guestId)}` : '';
-    const startUrl = `${API_BASE_URL}/api/auth/google?platform=mobile${guestQuery}`;
+    const authUrl = `${API_BASE_URL}/api/auth/google?platform=mobile&redirect_uri=${encodeURIComponent(redirectUri)}${guestQuery}`;
+
     try {
-      const result = await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
-      if (result.type !== 'success' || !result.url) {
-        return;
-      }
-      // Parse query params manually — new URL() rejects non-http schemes.
-      const queryString = result.url.split('?')[1] || '';
-      const params = new URLSearchParams(queryString);
-      const token = params.get('token');
-      const oauthError = params.get('error');
-      if (oauthError) {
-        Alert.alert('Google Sign-In', 'Google login was cancelled or failed. Please try again.');
-        return;
-      }
-      if (!token) {
-        Alert.alert('Google Sign-In', 'No authentication token was returned.');
-        return;
-      }
-      const user = await loginWithToken(token);
-      if (!user) {
-        Alert.alert('Google Sign-In', 'Failed to complete Google login.');
+      const result = await AuthSession.startAsync({ authUrl });
+
+      if (result.type === 'success' && result.params.token) {
+        const user = await loginWithToken(result.params.token);
+        if (user) {
+          router.replace('/(tabs)/home');
+        } else {
+          Alert.alert('Sign-In Failed', 'Could not authenticate with the returned token.');
+        }
+      } else if (result.type === 'error') {
+        Alert.alert('Google Sign-In', result.errorMessage || 'Something went wrong. Please try again.');
+      } else if (result.type === 'dismiss') {
       }
     } catch (err) {
       console.error('Google login error:', err);
@@ -102,9 +104,7 @@ export default function LoginScreen() {
       return;
     }
     const startUrl = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=mobile`;
-    // Opens Shopify's authorize page; the OS intercepts the final redirect to
-    // dryp://oauth-callback, which app/oauth-callback.tsx handles.
-    await WebBrowser.openAuthSessionAsync(startUrl, 'dryp://oauth-callback');
+    await Linking.openURL(startUrl);
   };
 
   const handleSkip = () => {
@@ -166,6 +166,8 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={handleAuthAction}
           />
 
           <Pressable 

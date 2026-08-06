@@ -100,22 +100,6 @@ router.post('/', protect, async (req, res, next) => {
     const cartQuery = userId ? { user: userId } : { guestId: guestId };
     await Cart.findOneAndUpdate(cartQuery, { $set: { items: [] } });
 
-    for (const item of items) {
-      const quantityToDeduct = Math.abs(parseInt(item.quantity) || 1); // Ensure it's a positive number
-      
-      if (item.options && item.options.size) {
-        await Product.updateOne(
-          { _id: item.productId, "variants.options.Size": item.options.size },
-          { $inc: { "variants.$.stock": -quantityToDeduct } }
-        );
-      } else {
-        await Product.updateOne(
-          { _id: item.productId },
-          { $inc: { stock: -quantityToDeduct } }
-        );
-      }
-    }
-    
     res.status(201).json(savedOrders);
   } catch (error) { 
     console.error('Order creation error:', error);

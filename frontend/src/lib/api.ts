@@ -14,6 +14,9 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     const headers = { ...options.headers };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      const { guestId } = useAuthStore.getState();
+      if (guestId) headers['x-guest-id'] = guestId;
     }
     if (guestId) {
       headers['x-guest-id'] = guestId;
@@ -84,6 +87,10 @@ export async function sendInteraction(action: 'like' | 'dislike', itemId: string
       body: JSON.stringify(payload),
     });
   }
+}
+
+export async function trackInteraction(data: { action: string; productId: string; source?: string; swipeVelocity?: number; dwellTimeMs?: number }) {
+  return apiCall('/api/interactions', { method: 'POST', body: JSON.stringify(data) });
 }
 
 // Fetch products from backend (optional - can be used to replace static data later)

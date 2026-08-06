@@ -231,7 +231,6 @@ router.put("/applications/:id", protect, async (req, res, next) => {
 // @desc    Admin: View all applications
 // @access  Private (Admin Only)
 router.get("/applications", protect, async (req, res, next) => {
-  console.log(req.user);
   try {
     if (req.user.role !== "admin")
       return res.status(403).json({ message: "Admins only." });
@@ -423,9 +422,7 @@ router.get("/me", protect, async (req, res, next) => {
         .status(403)
         .json({ message: "Forbidden: Only vendors can access this route" });
     }
-    console.log("Searching for vendor with owner ID:", req.user._id);
     const vendor = await Vendor.findOne({ owner: req.user._id });
-    console.log("Found vendor:", vendor);
     if (!vendor) {
       return res
         .status(404)

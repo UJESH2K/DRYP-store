@@ -184,6 +184,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Error logging out:', error);
       set({ isLoading: false });
+    } finally {
+      await get().initGuestUser();
     }
   },
 

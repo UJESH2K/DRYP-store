@@ -4,6 +4,18 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 const Order = require('../models/Order');
+const Razorpay = require('razorpay');
+const Product = require('../models/Product');
+let razorpayClient;
+function getRazorpay() {
+  if (!razorpayClient) {
+    razorpayClient = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpayClient;
+}
 
 // @route   GET /api/payments/methods
 // @desc    Get user's saved payment methods
@@ -126,59 +138,86 @@ router.delete('/methods/:id', protect, async (req, res) => {
 
 router.post('/create-intent', protect, async (req, res, next) => {
   try {
-    const { orderId, amount } = req.body; 
-
+    const { orderId } = req.body;
     const order = await Order.findOne({ _id: orderId, user: req.user._id });
-    if (!order) {
-        return res.status(404).json({ message: 'Order not found or unauthorized' });
-    }
+    if (!order) return res.status(404).json({ message: 'Order not found or unauthorized' });
 
-    const razorpayOrderId = `rzp_order_${Date.now()}`;
+    const rzp = getRazorpay();
+    const razorpayOrder = await rzp.orders.create({
+      amount: Math.round(order.totalAmount * 100),
+      currency: 'INR',
+      receipt: order.orderNumber,
+      payment_capture: 1,
+    });
 
-    order.razorpayOrderId = razorpayOrderId;
+    order.razorpayOrderId = razorpayOrder.id;
     await order.save();
 
-    res.json({
-      id: razorpayOrderId,
-      amount: order.totalAmount, 
-      currency: 'USD',
-      status: 'created',
-    });
+    res.json({ id: razorpayOrder.id, amount: razorpayOrder.amount, currency: razorpayOrder.currency, key: process.env.RAZORPAY_KEY_ID });
   } catch (error) { next(error); }
 });
 
 router.post('/verify', protect, async (req, res, next) => {
   try {
-    const { razorpayOrderId, paymentId, signature } = req.body; 
-    
+    const { razorpayOrderId, paymentId, signature } = req.body;
     const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) throw new Error('FATAL: RAZORPAY_KEY_SECRET missing in environment variables');
+    if (!secret) return res.status(500).json({ message: 'Razorpay not configured' });
 
-    const generated = crypto.createHmac('sha256', secret).update(`${razorpayOrderId}|${paymentId}`).digest('hex');
+    const generated = crypto.createHmac('sha256', secret).update(razorpayOrderId + '|' + paymentId).digest('hex');
     const isVerified = generated === signature;
 
     if (!isVerified) {
-        await Order.findOneAndUpdate({ razorpayOrderId }, { paymentStatus: 'failed' });
-        return res.status(400).json({ verified: false, message: 'Invalid payment signature. Potential fraud attempt.' });
+      await Order.findOneAndUpdate({ razorpayOrderId }, { paymentStatus: 'failed' });
+      return res.status(400).json({ verified: false, message: 'Invalid payment signature' });
     }
 
     const order = await Order.findOneAndUpdate(
-        { razorpayOrderId: razorpayOrderId }, 
-        { 
-            paymentStatus: 'completed',
-            status: 'confirmed', 
-            razorpayPaymentId: paymentId,
-            razorpaySignature: signature
-        },
-        { new: true }
+      { razorpayOrderId },
+      { paymentStatus: 'completed', status: 'confirmed', razorpayPaymentId: paymentId, razorpaySignature: signature },
+      { new: true }
     );
 
-    if (!order) {
-        return res.status(404).json({ verified: true, message: 'Payment verified, but Order record missing from database.' });
+    if (order) {
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
+      }
     }
 
-    res.json({ verified: true, message: 'Payment successful and order confirmed.' });
+    res.json({ verified: true, message: 'Payment successful' });
   } catch (error) { next(error); }
+});
+
+router.get('/checkout', (req, res) => {
+  const { order_id, amount, currency = 'INR', name = 'DRYP', description = 'Order Payment', email, contact } = req.query;
+  const key = req.query.key || process.env.RAZORPAY_KEY_ID;
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  function post(m){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(m))}
+  var options = {
+    key: "${esc(key)}",
+    amount: ${Number(amount) || 0},
+    currency: "${esc(currency)}",
+    order_id: "${esc(order_id)}",
+    name: "${esc(name)}",
+    description: "${esc(description)}",
+    handler: function (r) { post({ type: 'success', payment_id: r.razorpay_payment_id, order_id: r.razorpay_order_id, signature: r.razorpay_signature }); },
+    modal: { ondismiss: function () { post({ type: 'dismiss' }); } },
+  };
+  var em="${esc(email || '')}", co="${esc(contact || '')}";
+  if (em || co) options.prefill = { email: em, contact: co };
+  try {
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function (r) { post({ type: 'failed', error: r.error }); });
+    rzp.open();
+  } catch (e) { post({ type: 'error', message: String(e) }); }
+</script>
+</body></html>`;
+  res.set('Content-Type', 'text/html').send(html);
 });
 
 module.exports = router;

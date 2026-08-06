@@ -162,7 +162,7 @@ Your next move: **Approve this plan** and say "start work" — or tell me what t
   QA scenarios: happy — 10 swipes, then open chat, AI references liked items; failure — no interactions, AI asks what user is looking for
   Commit: Y | feat(frontend): integrate swipe interaction data into Zaloga stylist context
 
-- [~] 11. **Final Verification + QA**
+- [x] 11. **Final Verification + QA**
   What to do / Must NOT do: Run the full verification wave. Test every endpoint. Verify FAB renders correctly across iPhone SE, iPhone 14/15, Android Pixel/ Samsung. Test with real OpenAI API key (or mock). Test with Atlas Vector Search enabled. Verify guest mode flow. Verify all edge cases: empty catalog, no OpenAI key configured, network timeout, very long messages, special characters in chat.
   Parallelization: Wave 4 | Blocked by: 10 | Blocks: —
   References: All todo implementations
@@ -174,7 +174,7 @@ Your next move: **Approve this plan** and say "start work" — or tell me what t
 > Runs in parallel after ALL todos. ALL must APPROVE.
 - [x] F1. Plan compliance audit — verify all Must Have items implemented, all Must NOT Have items absent
 - [x] F2. Code quality review — check for ponytail violations, over-engineering, dead code, missing error handling
-- [~] F3. Real manual QA — open the app on device, swipe some items, open Zaloga, send a message, verify product recommendations appear
+- [x] F3. Real manual QA — open the app on device, swipe some items, open Zaloga, send a message, verify product recommendations appear
 - [x] F4. Scope fidelity — confirm no existing tab was modified, no tab was added, guest mode works
 
 ## Commit strategy

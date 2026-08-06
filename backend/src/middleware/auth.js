@@ -2,6 +2,17 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const identifyUser = async (req, res, next) => {
+  req.user = null;
+
+  // 0. Guest identity via x-guest-id header (no auth token required)
+  const guestId = req.headers["x-guest-id"];
+  if (guestId && /^[a-z0-9]{8,40}$/.test(String(guestId))) {
+    req.guestId = String(guestId);
+    req.user = null;
+    return next();
+  }
+
+  // 1. Try Supabase / JWT auth
   const authHeader = req.headers.authorization;
   const token =
     authHeader && authHeader.startsWith("Bearer")

@@ -6,15 +6,30 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:8081",
+        "EXPO_PUBLIC_SUPABASE_URL": "REPLACE_WITH_SUPABASE_PROJECT_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REPLACE_WITH_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_AI_STYLIST_ENDPOINT": "/api/ai/zaloga"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api-staging.dryp.store",
+        "EXPO_PUBLIC_SUPABASE_URL": "REPLACE_WITH_SUPABASE_PROJECT_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REPLACE_WITH_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_AI_STYLIST_ENDPOINT": "/api/ai/zaloga"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "ios": {
-        "bundleIdentifier": "com.dryp.store"
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.dryp.store",
+        "EXPO_PUBLIC_SUPABASE_URL": "REPLACE_WITH_SUPABASE_PROJECT_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REPLACE_WITH_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_AI_STYLIST_ENDPOINT": "/api/ai/zaloga"
       }
     }
   },

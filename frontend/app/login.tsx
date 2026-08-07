@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { normalizeShopDomain } from '@/lib/shopify';
 import {
   View,
   Text,
@@ -16,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
 import { FontAwesome } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
+import { makeRedirectUri } from 'expo-auth-session';
 // Required for expo-web-browser to complete auth sessions on iOS
 WebBrowser.maybeCompleteAuthSession();
 import { useAuthStore } from '../src/state/auth';
@@ -30,9 +29,6 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showShopifyInput, setShowShopifyInput] = useState(false);
-  const [shopDomain, setShopDomain] = useState('');
-  const [shopifyError, setShopifyError] = useState('');
 
   const { login, register, loginWithToken, isLoading, guestId } = useAuthStore();
 
@@ -61,7 +57,7 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
-    const redirectUri = AuthSession.makeRedirectUri({
+    const redirectUri = makeRedirectUri({
       scheme: 'dryp',
       path: 'oauth-callback',
     });
@@ -70,18 +66,22 @@ export default function LoginScreen() {
     const authUrl = `${API_BASE_URL}/api/auth/google?platform=mobile&redirect_uri=${encodeURIComponent(redirectUri)}${guestQuery}`;
 
     try {
-      const result = await AuthSession.startAsync({ authUrl });
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
-      if (result.type === 'success' && result.params.token) {
-        const user = await loginWithToken(result.params.token);
-        if (user) {
-          router.replace('/(tabs)/home');
-        } else {
-          Alert.alert('Sign-In Failed', 'Could not authenticate with the returned token.');
+      if (result.type === 'success') {
+        // Parse query params manually — new URL() rejects non-http schemes
+        // like dryp://oauth-callback in React Native.
+        const queryString = result.url.split('?')[1] || '';
+        const params = new URLSearchParams(queryString);
+        const token = params.get('token');
+        if (token) {
+          const user = await loginWithToken(token);
+          if (user) {
+            router.replace('/(tabs)/home');
+          } else {
+            Alert.alert('Sign-In Failed', 'Could not authenticate with the returned token.');
+          }
         }
-      } else if (result.type === 'error') {
-        Alert.alert('Google Sign-In', result.errorMessage || 'Something went wrong. Please try again.');
-      } else if (result.type === 'dismiss') {
       }
     } catch (err) {
       console.error('Google login error:', err);
@@ -95,16 +95,6 @@ export default function LoginScreen() {
       return;
     }
     Alert.alert('Coming Soon', `Login with ${provider} is not available yet.`);
-  };
-
-  const handleShopifyConnect = async () => {
-    const domain = normalizeShopDomain(shopDomain);
-    if (!domain) {
-      setShopifyError('Enter a valid Shopify domain, e.g. your-store.myshopify.com');
-      return;
-    }
-    const startUrl = `${API_BASE_URL}/api/auth/shopify/start?shop=${encodeURIComponent(domain)}&platform=mobile`;
-    await Linking.openURL(startUrl);
   };
 
   const handleSkip = () => {
@@ -197,38 +187,6 @@ export default function LoginScreen() {
               <FontAwesome name="apple" size={24} color="black" />
             </Pressable>
           </View>
-
-          {showShopifyInput ? (
-            <>
-              <View style={styles.shopifyInputRow}>
-                <TextInput
-                  style={[styles.input, styles.shopifyInput]}
-                  placeholder="your-store.myshopify.com"
-                  value={shopDomain}
-                  onChangeText={(text) => {
-                    setShopDomain(text);
-                    setShopifyError('');
-                  }}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Pressable
-                  style={styles.primaryButton}
-                  onPress={handleShopifyConnect}
-                  disabled={!shopDomain.trim()}
-                >
-                  <Text style={styles.primaryButtonText}>Connect Shopify Store</Text>
-                </Pressable>
-              </View>
-              {shopifyError ? (
-                <Text style={styles.errorText}>{shopifyError}</Text>
-              ) : null}
-            </>
-          ) : (
-            <Pressable style={styles.toggleButton} onPress={() => setShowShopifyInput(true)}>
-              <Text style={styles.toggleButtonText}>Continue with Shopify</Text>
-            </Pressable>
-          )}
         </View>
 
         <View style={styles.footer}>
@@ -359,12 +317,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 10,
   },
-  shopifyInputRow: {
-    marginTop: 15,
-  },
-  shopifyInput: {
-    marginBottom: 8,
-  },
   footer: {
     paddingBottom: 20,
   },
@@ -386,14 +338,6 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 16,
     fontFamily: 'Zaloga',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 11,
-    fontFamily: 'Zaloga',
-    marginTop: -4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   terms: {
     fontSize: 12,

@@ -39,6 +39,10 @@
             "localhost": {
               "NSExceptionAllowsInsecureHTTPLoads": true,
               "NSIncludesSubdomains": true
+            },
+            "127.0.0.1": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
             }
           }
         }
@@ -56,7 +60,9 @@
     "plugins": [
       "expo-font",
       "expo-web-browser",
-      "expo-document-picker"
+      "expo-document-picker",
+      "expo-image-picker",
+      "expo-router"
     ],
     "extra": {
       "eas": {

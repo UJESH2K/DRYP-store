@@ -28,15 +28,24 @@ const buildRegisterStatusRedirect = (status) => {
   return `${base}/register?${query}`;
 };
 
-const buildOAuthStatePayload = ({ guestId, platform, intent, draftId }) => ({
+const buildOAuthStatePayload = ({ guestId, platform, intent, draftId, redirectUri }) => ({
   guestId: guestId || null,
   platform: platform === 'mobile' ? 'mobile' : 'web',
   intent: intent === 'register' ? 'register' : 'login',
   draftId: draftId || null,
+  redirectUri: redirectUri || null,
 });
 
-const buildRedirect = (platform, params) => {
+const buildRedirect = (platform, params, customRedirectUri) => {
   if (platform === 'mobile') {
+    // If a custom redirect_uri was provided (e.g. Expo auth proxy), use it
+    if (customRedirectUri) {
+      const url = new URL(customRedirectUri);
+      for (const [k, v] of Object.entries(params)) {
+        url.searchParams.set(k, v);
+      }
+      return url.toString();
+    }
     const query = new URLSearchParams(params).toString();
     return `dryp://oauth-callback?${query}`;
   }
@@ -54,7 +63,7 @@ router.get('/', async (req, res, next) => {
     });
   }
 
-  const { guestId, draftId } = req.query;
+  const { guestId, draftId, redirect_uri } = req.query;
   const platform = req.query.platform === 'mobile' ? 'mobile' : 'web';
   const intent = req.query.intent === 'register' ? 'register' : 'login';
 
@@ -74,7 +83,7 @@ router.get('/', async (req, res, next) => {
   }
 
   const state = jwt.sign(
-    buildOAuthStatePayload({ guestId, platform, intent, draftId }),
+    buildOAuthStatePayload({ guestId, platform, intent, draftId, redirectUri: redirect_uri }),
     process.env.JWT_SECRET,
     { expiresIn: '10m' },
   );
@@ -105,6 +114,7 @@ router.get('/callback', async (req, res) => {
   let guestId = null;
   let intent = 'login';
   let draftId = null;
+  let customRedirectUri = null;
 
   if (stateParam) {
     try {
@@ -113,17 +123,18 @@ router.get('/callback', async (req, res) => {
       guestId = decoded.guestId || null;
       intent = decoded.intent === 'register' ? 'register' : 'login';
       draftId = decoded.draftId || null;
+      customRedirectUri = decoded.redirectUri || null;
     } catch {
       // Fall through — will fail state check below when code path runs.
     }
   }
 
   if (error) {
-    return res.redirect(buildRedirect(platform, { error: 'google_denied' }));
+    return res.redirect(buildRedirect(platform, { error: 'google_denied' }, customRedirectUri));
   }
 
   if (!code) {
-    return res.redirect(buildRedirect(platform, { error: 'no_code' }));
+    return res.redirect(buildRedirect(platform, { error: 'no_code' }, customRedirectUri));
   }
 
   let state;
@@ -133,8 +144,9 @@ router.get('/callback', async (req, res) => {
     guestId = state.guestId || null;
     intent = state.intent === 'register' ? 'register' : 'login';
     draftId = state.draftId || null;
+    customRedirectUri = state.redirectUri || null;
   } catch {
-    return res.redirect(buildRedirect(platform, { error: 'invalid_state' }));
+    return res.redirect(buildRedirect(platform, { error: 'invalid_state' }, customRedirectUri));
   }
 
   try {
@@ -153,7 +165,7 @@ router.get('/callback', async (req, res) => {
     const tokenData = await tokenRes.json();
     if (tokenData.error) {
       console.error('Google token exchange error:', tokenData);
-      return res.redirect(buildRedirect(platform, { error: 'token_exchange_failed' }));
+      return res.redirect(buildRedirect(platform, { error: 'token_exchange_failed' }, customRedirectUri));
     }
 
     const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -162,7 +174,7 @@ router.get('/callback', async (req, res) => {
 
     const googleUser = await userInfoRes.json();
     if (!googleUser.email) {
-      return res.redirect(buildRedirect(platform, { error: 'no_email' }));
+      return res.redirect(buildRedirect(platform, { error: 'no_email' }, customRedirectUri));
     }
 
     const email = normalizeEmail(googleUser.email);
@@ -309,10 +321,10 @@ router.get('/callback', async (req, res) => {
     }
 
     const dryToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    return res.redirect(buildRedirect(platform, { token: dryToken }));
+    return res.redirect(buildRedirect(platform, { token: dryToken }, customRedirectUri));
   } catch (err) {
     console.error('Google OAuth callback failed:', err.message);
-    return res.redirect(buildRedirect(platform, { error: 'oauth_failed' }));
+    return res.redirect(buildRedirect(platform, { error: 'oauth_failed' }, customRedirectUri));
   }
 });
 

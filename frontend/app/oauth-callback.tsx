@@ -2,11 +2,8 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../src/state/auth';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_shop: "That doesn't look like a valid Shopify domain. Use the format your-store.myshopify.com.",

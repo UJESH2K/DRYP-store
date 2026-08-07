@@ -19,12 +19,6 @@ const identifyUser = async (req, res, next) => {
       ? authHeader.split(" ")[1]
       : null;
 
-  // Guest identity is sent via x-guest-id header by the Expo app for
-  // unauthenticated actions (likes, wishlist, cart, orders). It is merged
-  // into the user account on login/register/Google OAuth.
-  const guestId = req.headers["x-guest-id"];
-  req.guestId = typeof guestId === "string" && guestId.length > 0 ? guestId : null;
-
   if (token && token !== "null" && token !== "undefined") {
     try {
       // 1. Try Supabase verification

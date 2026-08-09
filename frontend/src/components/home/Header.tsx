@@ -15,10 +15,18 @@ export function Header({ onAIStylistPress }: HeaderProps) {
     <View style={styles.header}>
       <Text style={styles.headerTitle}>DRYP</Text>
       <View style={styles.headerIcons}>
-        <Pressable onPress={() => router.push('/liked-items')}>
+        <Pressable
+          onPress={() => router.push('/liked-items')}
+          accessibilityLabel="Liked items"
+          accessibilityRole="button"
+        >
           <Ionicons name="heart-outline" size={28} color="#000" />
         </Pressable>
-        <Pressable onPress={() => router.push('/notifications')}>
+        <Pressable
+          onPress={() => router.push('/notifications')}
+          accessibilityLabel="Notifications"
+          accessibilityRole="button"
+        >
           <Ionicons name="notifications-outline" size={28} color="#000" />
         </Pressable>
         <Pressable 

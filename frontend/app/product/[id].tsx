@@ -7,6 +7,7 @@ import { apiCall, trackInteraction } from '../../src/lib/api';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
 import { resolveImageUri } from '../../src/utils/imageUri';
+import { formatPrice } from '../../src/utils/formatting';
 const { width: screenWidth } = Dimensions.get('window');
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -192,7 +193,7 @@ export default function ProductDetailScreen() {
             <View style={styles.detailsContainer}>
                 <Text style={styles.brand}>{product.brand}</Text>
                 <Text style={styles.name}>{product.name}</Text>
-                <Text style={styles.price}>${(selectedVariant?.price || product.basePrice).toFixed(2)}</Text>
+                <Text style={styles.price}>{formatPrice((selectedVariant?.price ?? product.basePrice) ?? 0)}</Text>
                 <Text style={styles.description}>{product.description}</Text>
 
                 {product.options.map(option => (

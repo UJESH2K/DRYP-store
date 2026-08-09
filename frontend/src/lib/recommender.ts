@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { type Item } from '../types';
 
 // Styl Spec — Recommendation Engine
@@ -6,13 +8,14 @@ import { type Item } from '../types';
 // - User profile vectors (tags, categories, brands, colors, price tier)
 // - Real-time re-ranking with exploration bucket (10–20%)
 
-type EventType = 'view' | 'like' | 'cart' | 'purchase'
+type EventType = 'view' | 'like' | 'cart' | 'purchase' | 'chat_interest'
 
 const EVENT_WEIGHTS: Record<EventType, number> = {
   view: 1,
   like: 3,
   cart: 5,
   purchase: 10,
+  chat_interest: 4,
 }
 
 const HALF_LIFE_MS = 1000 * 60 * 30 // 30 min half-life
@@ -45,6 +48,36 @@ async function loadProfile() {
 // Public API — call at app start
 export async function initRecommender() {
   await loadProfile()
+  // Cold start: if profile is empty, seed initial vectors from User.preferences
+  if (profileEmpty()) {
+    seedProfileFromPreferences()
+  }
+}
+
+function profileEmpty() {
+  return (
+    Object.keys(profile.tag).length === 0 &&
+    Object.keys(profile.category).length === 0 &&
+    Object.keys(profile.brand).length === 0 &&
+    Object.keys(profile.color).length === 0 &&
+    profile.priceTier.low === 0 &&
+    profile.priceTier.mid === 0 &&
+    profile.priceTier.high === 0
+  )
+}
+
+// Seed profile from User.preferences (auth store) — lazy require to break circular deps
+function seedProfileFromPreferences() {
+  try {
+    const { useAuthStore } = require('../state/auth') as typeof import('../state/auth')
+    const prefs = useAuthStore.getState().user?.preferences
+    if (!prefs) return
+    const w = EVENT_WEIGHTS.like
+    for (const c of prefs.categories || []) profile.category[c] = (profile.category[c] || 0) + w
+    for (const b of prefs.brands || []) profile.brand[b] = (profile.brand[b] || 0) + w
+    for (const col of prefs.colors || []) profile.color[col] = (profile.color[col] || 0) + w
+    saveProfile()
+  } catch {}
 }
 
 // Cold start + category filter + diverse seed ordering
@@ -128,7 +161,7 @@ export function recordEvent(type: EventType, item: Item) {
 }
 
 // Backwards compatibility with existing code paths
-export function updateModel(action: 'like' | 'dislike' | 'cart', item: Item) {
+export function updateModel(action: 'like' | 'dislike' | 'cart' | 'view' | 'chat_interest', item: Item) {
   if (action === 'dislike') {
     // Apply a negative signal for dislikes
     const ts = Date.now(); const f = decayFactor(ts)
@@ -141,11 +174,54 @@ export function updateModel(action: 'like' | 'dislike' | 'cart', item: Item) {
     return profile
   }
   // map to recordEvent
-  recordEvent(action === 'cart' ? 'cart' : 'like', item)
+  recordEvent(
+    action === 'cart' ? 'cart'
+    : action === 'view' ? 'view'
+    : action === 'chat_interest' ? 'chat_interest'
+    : 'like',
+    item
+  )
   return profile
 }
 
 // Utility to mark that an item was viewed
 export function onItemViewed(item: Item) {
   recordEvent('view', item)
+}
+
+type Interaction = {
+  itemId: string
+  action: 'like' | 'dislike' | 'cart' | 'view' | 'chat_interest'
+  at: number
+  tags: string[]
+  priceTier: Item['priceTier']
+}
+
+type InteractionState = {
+  history: Interaction[]
+  pushInteraction: (i: Interaction) => void
+}
+
+export const useInteractionStore = create<InteractionState>()(
+  persist(
+    (set) => ({
+      history: [],
+      pushInteraction: (i) => set((s) => ({ history: [i, ...s.history].slice(0, 500) })),
+    }),
+    {
+      name: 'interactions-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+)
+
+export function recordInteraction(action: 'like' | 'dislike' | 'cart' | 'view' | 'chat_interest', item: Item) {
+  updateModel(action, item)
+  useInteractionStore.getState().pushInteraction({
+    itemId: item.id,
+    action,
+    at: Date.now(),
+    tags: item.tags,
+    priceTier: item.priceTier,
+  })
 }

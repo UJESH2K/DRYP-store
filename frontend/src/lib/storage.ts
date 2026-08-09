@@ -9,7 +9,7 @@ export const getRecentSearches = async (): Promise<string[]> => {
     const searchesJson = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
     return searchesJson ? JSON.parse(searchesJson) : [];
   } catch (e) {
-    console.error('Failed to load recent searches.', e);
+    if (__DEV__) { console.error('Failed to load recent searches.', e); }
     return [];
   }
 };
@@ -33,6 +33,6 @@ export const addRecentSearch = async (searchQuery: string): Promise<void> => {
     
     await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newSearches));
   } catch (e) {
-    console.error('Failed to save recent search.', e);
+    if (__DEV__) { console.error('Failed to save recent search.', e); }
   }
 };

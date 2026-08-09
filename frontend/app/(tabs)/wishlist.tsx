@@ -17,6 +17,7 @@ import { useWishlistStore } from '../../src/state/wishlist';
 import { apiCall } from '../../src/lib/api';
 import type { Item } from '../../src/types';
 import { mapProductsToItems } from '../../src/utils/productMapping';
+import { formatPrice } from '../../src/utils/formatting';
 import AnimatedLoadingScreen from '../../src/components/common/AnimatedLoadingScreen';
 import CustomAlert from '../../src/components/common/CustomAlert';
 import ProductDetailModal from '../../src/components/ProductDetailModal';
@@ -118,10 +119,6 @@ export default function WishlistScreen() {
         },
       ]
     });
-  };
-
-  const formatPrice = (price: number) => {
-    return `$${price.toFixed(2)}`;
   };
 
   const renderWishlistItem = ({ item }: { item: Item }) => (

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { useFocusEffect } from 'expo-router';
+import { formatPrice } from '../../src/utils/formatting';
 import { apiCall } from '../../src/lib/api';
 import { useAuthStore } from '../../src/state/auth';
 import { resolveImageUri } from '../../src/utils/imageUri';
@@ -59,9 +60,6 @@ export default function OrdersScreen() {
       default: return { color: '#6c757d', text: 'Unknown' };
     }
   };
-
-  const formatPrice = (price: number = 0) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
 
   const renderOrderItem = ({ item }: { item: any }) => {
     const statusStyle = getStatusStyle(item.status);

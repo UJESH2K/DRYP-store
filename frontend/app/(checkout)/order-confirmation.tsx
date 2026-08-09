@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '../../src/lib/api';
 import { API_BASE_URL } from '../../src/lib/config';
 import { resolveImageUri } from '../../src/utils/imageUri';
+import { formatPrice } from '../../src/utils/formatting';
 
 export default function OrderConfirmationScreen() {
   const router = useCustomRouter();
@@ -43,7 +44,7 @@ export default function OrderConfirmationScreen() {
         <Text style={styles.itemDetailsText}>Brand: {item.product.brand}</Text>
         <Text style={styles.itemDetailsText}>Qty: {item.quantity}</Text>
       </View>
-      <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+      <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
     </View>
   );
 
@@ -91,19 +92,19 @@ export default function OrderConfirmationScreen() {
           <View style={styles.summaryContainer}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>${order.subtotal.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>{formatPrice(order.subtotal)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Shipping</Text>
-              <Text style={styles.summaryValue}>${order.shippingCost.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>{formatPrice(order.shippingCost)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tax</Text>
-              <Text style={styles.summaryValue}>${order.tax.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>{formatPrice(order.tax)}</Text>
             </View>
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>${order.totalAmount.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>{formatPrice(order.totalAmount)}</Text>
             </View>
           </View>
         </View>

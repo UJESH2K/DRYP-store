@@ -1,7 +1,7 @@
 import { API_BASE_URL, apiCall } from './api';
 import { useAuthStore } from '../state/auth';
 
-const AI_ENDPOINT = process.env.EXPO_PUBLIC_AI_STYLIST_ENDPOINT || '/api/ai/zaloga';
+const AI_ENDPOINT = process.env.EXPO_PUBLIC_AI_STYLIST_ENDPOINT || '/api/stylist';
 
 export interface StylistMessagePayload {
   message: string;

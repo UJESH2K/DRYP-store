@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFonts, Zaloga } from '../../constants/theme';
+import { FONTS } from '../../constants/theme';
 
 interface ZalogaFABProps {
   visible: boolean;
@@ -11,7 +11,6 @@ interface ZalogaFABProps {
 export default function ZalogaFAB({ visible, onPress }: ZalogaFABProps) {
   const pulse = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
-  const [fontsLoaded] = useFonts();
 
   useEffect(() => {
     if (!visible) return;
@@ -33,7 +32,7 @@ export default function ZalogaFAB({ visible, onPress }: ZalogaFABProps) {
     return () => loop.stop();
   }, [visible, pulse]);
 
-  if (!visible || !fontsLoaded) return null;
+  if (!visible) return null;
 
   return (
     <Pressable

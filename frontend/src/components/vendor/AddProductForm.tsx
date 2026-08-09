@@ -63,7 +63,7 @@ export const AddProductForm = ({ visible, onClose, onProductAdded }) => {
             uri: asset.uri,
             name: `photo.${fileType}`,
             type: `image/${fileType}`,
-          });
+          } as any);
   
           try {
             const res = await apiCall('/api/upload', {
@@ -126,8 +126,8 @@ export const AddProductForm = ({ visible, onClose, onProductAdded }) => {
         variants: [],
       };
       
-      if (productData.sku === '') {
-        delete productData.sku;
+      if ((productData as any).sku === '') {
+        delete (productData as any).sku;
       }
   
       const allColors = variants.map(v => v.color).filter(Boolean);

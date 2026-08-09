@@ -340,6 +340,10 @@ const styles = StyleSheet.create({
           color: '#888',
           fontFamily: 'Zaloga',
       },
+      tabButtonTextActive: {
+          color: '#000',
+          fontFamily: 'Zaloga',
+      },
       verticalFilterRow: {
           marginBottom: 10,
       },

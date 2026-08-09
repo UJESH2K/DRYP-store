@@ -83,7 +83,7 @@ const renderItem = ({ item }: { item: Item }) => (
       style={styles.itemContainer}
       onPress={() => {
         // Open the modal instead of routing!
-        const productId = item.id || item._id;
+        const productId = item.id;
         setSelectedProductId(productId);
         setIsModalVisible(true);
       }}

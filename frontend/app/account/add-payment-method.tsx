@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiCall } from '../../src/lib/api';
 import { useToastStore } from '../../src/state/toast';
 import { Ionicons } from '@expo/vector-icons';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
+
+function detectCardBrand(number: string): string {
+  const cleanNumber = number.replace(/\s/g, '');
+  if (cleanNumber.startsWith('4')) return 'Visa';
+  if (cleanNumber.startsWith('5') || (cleanNumber.startsWith('2') && parseInt(cleanNumber.slice(0, 4)) >= 2221 && parseInt(cleanNumber.slice(0, 4)) <= 2720)) return 'Mastercard';
+  if (cleanNumber.startsWith('34') || cleanNumber.startsWith('37')) return 'American Express';
+  if (cleanNumber.startsWith('6')) return 'Discover';
+  return 'Unknown';
+}
 
 export default function AddPaymentMethodScreen() {
   const router = useCustomRouter();
@@ -17,6 +26,8 @@ export default function AddPaymentMethodScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const showToast = useToastStore((state) => state.showToast);
 
+  const cardBrand = useMemo(() => detectCardBrand(cardData.number), [cardData.number]);
+
   const handleAddCard = async () => {
     if (!cardData.number || !cardData.expiry || !cardData.cvc || !cardData.name) {
       showToast('Please fill in all fields.', 'error');
@@ -28,7 +39,7 @@ export default function AddPaymentMethodScreen() {
       // This is a mock. In a real app, you would use a payment provider's SDK
       // to tokenize the card details before sending them to your server.
       const last4 = cardData.number.slice(-4);
-      const brand = 'Visa'; // Mock brand
+      const brand = cardBrand || 'Visa';
 
       const newMethod = {
         type: 'card',
@@ -67,6 +78,9 @@ export default function AddPaymentMethodScreen() {
       </View>
 
       <View style={styles.form}>
+        <View style={styles.demoBanner}>
+          <Text style={styles.demoText}>Demo Mode — No real payment is processed</Text>
+        </View>
         <TextInput
           style={styles.input}
           placeholder="Card Number"
@@ -74,6 +88,9 @@ export default function AddPaymentMethodScreen() {
           value={cardData.number}
           onChangeText={(text) => setCardData(p => ({ ...p, number: text }))}
         />
+        {cardBrand !== 'Unknown' && (
+          <Text style={styles.brandText}>Detected: {cardBrand}</Text>
+        )}
         <View style={styles.row}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
@@ -118,8 +135,29 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
   },
   backButton: {},
-  title: { fontSize: 20, fontWeight: 'bold' },
+  title: { fontFamily: 'Zaloga', fontSize: 28 },
   form: { padding: 16 },
+  demoBanner: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  demoText: {
+    fontSize: 14,
+    fontFamily: 'Zaloga',
+    color: '#856404',
+    textAlign: 'center',
+  },
+  brandText: {
+    fontSize: 13,
+    fontFamily: 'Zaloga',
+    color: '#6c757d',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#dee2e6',

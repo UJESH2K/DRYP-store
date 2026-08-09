@@ -15,7 +15,7 @@ const uploadImage = async (uri) => {
       uri,
       name: `upload_${Date.now()}.jpg`,
       type: 'image/jpeg',
-    });
+    } as any);
 
     const result = await apiCall('/api/upload', {
       method: 'POST',
@@ -221,7 +221,7 @@ export default function EditProductScreen() {
           ...variant,
           stock: Number(variant.stock) || 0,
           price: variant.price !== undefined && variant.price !== '' ? Number(variant.price) : undefined,
-          options: Object.fromEntries(Object.entries(variant.options).filter(([key, value]) => key.trim() && value.trim()))
+          options: Object.fromEntries(Object.entries(variant.options).filter(([key, value]) => key.trim() && (value as string).trim()))
         })).filter(variant => Object.keys(variant.options).length > 0 && variant.stock >= 0) // Filter out variants with empty options or negative stock
     };
     
@@ -372,7 +372,7 @@ export default function EditProductScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
+  title: { fontFamily: 'Zaloga', fontSize: 28, marginBottom: 20 },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 5, marginBottom: 10 },
   switchContainer: {
     flexDirection: 'row',

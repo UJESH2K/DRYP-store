@@ -14,7 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiCall } from '../src/lib/api';
+import { API_BASE_URL, trackInteraction } from '../src/lib/api';
+import { useAuthStore } from '../src/state/auth';
+import { formatPrice } from '../src/utils/formatting';
+import { recordInteraction } from '../src/lib/recommender';
+import { getPriceTier } from '../src/utils/productMapping';
+import type { Item } from '../src/types';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -26,8 +31,28 @@ interface ProductRef {
   _id: string;
   name: string;
   brand: string;
+  category?: string;
   basePrice: number;
   image: string | null;
+  tags?: string[];
+  colors?: string[];
+}
+
+function toItem(p: ProductRef): Item {
+  return {
+    id: p._id,
+    title: p.name,
+    subtitle: p.brand,
+    image: p.image || '',
+    tags: p.tags || [],
+    category: p.category || 'Uncategorized',
+    priceTier: getPriceTier(p.basePrice || 0),
+    brand: p.brand || 'Unknown',
+    price: p.basePrice || 0,
+    description: '',
+    sizes: [],
+    colors: p.colors || p.tags || [],
+  };
 }
 
 const SUGGESTIONS = [
@@ -47,6 +72,7 @@ export default function AIChatScreen() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const conversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
@@ -62,27 +88,44 @@ export default function AIChatScreen() {
     setIsLoading(true);
 
     try {
-      const data = await apiCall('/api/ai/chat', {
+      // Use the Zaloga stylist endpoint — it has personality, interaction history,
+      // and taste-based product ranking. The old /api/ai/chat is bland and generic.
+      const { token, guestId } = useAuthStore.getState();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      else if (guestId) headers['x-guest-id'] = guestId;
+
+      const response = await fetch(`${API_BASE_URL}/api/stylist`, {
         method: 'POST',
+        headers,
         body: JSON.stringify({
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
+          message: text,
+          conversationId: conversationIdRef.current,
         }),
       });
 
-      if (data.message) {
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Save conversationId for follow-up messages in the same session
+      if (data.conversationId) {
+        conversationIdRef.current = data.conversationId;
+      }
+
+      if (data.reply) {
         const assistantMessage: ChatMessage = {
           role: 'assistant',
-          content: data.message,
-          products: data.products || [],
+          content: data.reply,
+          products: data.suggestions || [],
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: data.message || 'Sorry, I had trouble processing that. Please try again.',
+          content: 'Sorry, I had trouble processing that. Please try again.',
         }]);
       }
     } catch {
@@ -93,6 +136,14 @@ export default function AIChatScreen() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleProductTap = (p: ProductRef) => {
+    const item = toItem(p);
+    recordInteraction('view', item);
+    recordInteraction('chat_interest', item);
+    trackInteraction({ action: 'chat_interest', productId: p._id, source: 'ai_chat' }).catch(() => {});
+    router.push(`/product/${p._id}`);
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => (
@@ -106,7 +157,7 @@ export default function AIChatScreen() {
             <Pressable
               key={p._id}
               style={styles.productChip}
-              onPress={() => router.push(`/product/${p._id}`)}
+              onPress={() => handleProductTap(p)}
             >
               {p.image && (
                 <Image source={{ uri: p.image }} style={styles.chipImage} />
@@ -114,7 +165,7 @@ export default function AIChatScreen() {
               <View style={styles.chipInfo}>
                 <Text style={styles.chipName} numberOfLines={1}>{p.name}</Text>
                 <Text style={styles.chipBrand}>{p.brand}</Text>
-                <Text style={styles.chipPrice}>${p.basePrice}</Text>
+                <Text style={styles.chipPrice}>{formatPrice(p.basePrice ?? 0)}</Text>
               </View>
             </Pressable>
           ))}
@@ -193,6 +244,8 @@ export default function AIChatScreen() {
             style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
             onPress={sendMessage}
             disabled={!input.trim() || isLoading}
+            accessibilityLabel="Send message"
+            accessibilityRole="button"
           >
             <Ionicons
               name="send"

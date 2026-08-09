@@ -7,6 +7,7 @@ export interface User {
   _id: string;
   email: string;
   name: string;
+  phone?: string;
   role: 'user' | 'vendor' | 'admin';
   authProvider?: 'local' | 'shopify' | 'google' | 'invited';
   createdAt: string;
@@ -57,7 +58,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       set({ isGuest: true, guestId, isAuthenticated: false, user: null, token: null });
     } catch (error) {
-      console.error('Error initializing guest user:', error);
+      if (__DEV__) { console.error('Error initializing guest user:', error); }
     }
   },
 
@@ -86,7 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return null;
       }
     } catch (error) {
-      console.error('Error registering:', error);
+      if (__DEV__) { console.error('Error registering:', error); }
       useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
       return null;
     } finally {
@@ -126,7 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return null;
       }
     } catch (error) {
-      console.error('Error logging in:', error);
+      if (__DEV__) { console.error('Error logging in:', error); }
       useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
       return null;
     } finally {
@@ -166,7 +167,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error) {
       set({ token: null });
-      console.error('Error completing token login:', error);
+      if (__DEV__) { console.error('Error completing token login:', error); }
       useToastStore.getState().showToast('An unexpected error occurred. Please try again.', 'error');
       return null;
     } finally {
@@ -182,7 +183,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       useWishlistStore.getState().setWishlist([]);
       set({ user: null, token: null, isAuthenticated: false, isLoading: false });
     } catch (error) {
-      console.error('Error logging out:', error);
+      if (__DEV__) { console.error('Error logging out:', error); }
       set({ isLoading: false });
     } finally {
       await get().initGuestUser();

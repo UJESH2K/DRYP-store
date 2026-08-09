@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "lib": ["es2017"],
+    "target": "es2020",
+    "lib": ["es2020", "dom"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -9,12 +9,12 @@
     "strict": false,
     "forceConsistentCasingInFileNames": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["nativewind/types", "expo-router"],
+    "types": ["expo-router"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]

@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Item } from '../types';
 import { apiCall } from '../lib/api';
 import { mapProductsToItems } from '../utils/productMapping';
+import { rankItems } from '../lib/recommender';
 
 export function useHomeScreenData() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [brands, setBrands] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -26,7 +28,7 @@ export function useHomeScreenData() {
       if (Array.isArray(categoriesData)) setCategories(categoriesData);
       if (Array.isArray(colorsData)) setColors(colorsData);
     } catch (error) {
-      console.warn('Failed to load filter options', error);
+      if (__DEV__) { console.warn('Failed to load filter options', error); }
     }
   }, []);
 
@@ -67,13 +69,16 @@ export function useHomeScreenData() {
         const uniqueItems = mappedItems.filter((item, index, self) =>
           index === self.findIndex((t) => t.id === item.id)
         );
-        setItems(uniqueItems);
+        setItems(rankItems(uniqueItems));
+        setError(null);
       } else {
         setItems([]);
+        setError(null);
       }
     } catch (error) {
-      console.warn('Failed to load products', error);
+      if (__DEV__) { console.error('Failed to load products:', error); }
       setItems([]);
+      setError('Unable to load products. Check your connection.');
     } finally {
       // This will turn off the initial boot loader, and stay safely false afterward
       setLoading(false); 
@@ -98,6 +103,7 @@ export function useHomeScreenData() {
     items,
     setItems,
     loading,
+    error,
     filters: {
       brands,
       categories,

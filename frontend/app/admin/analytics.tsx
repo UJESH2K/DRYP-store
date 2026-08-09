@@ -41,7 +41,7 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  title: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
+  title: { fontFamily: 'Zaloga', fontSize: 28, color: '#1a1a1a' },
   content: { padding: 16 },
   kpi: { padding: 16, borderRadius: 12, backgroundColor: '#fafafa', marginBottom: 12, borderWidth: 1, borderColor: '#f0f0f0' },
   kpiValue: { fontSize: 22, fontWeight: '700', color: '#FF6B6B' },

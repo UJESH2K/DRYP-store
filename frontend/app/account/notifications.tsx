@@ -1,3 +1,5 @@
+// TODO: This screen is currently unreachable — needs navigation link
+// Root /notifications.tsx is used instead (from Header component)
 import React, { useState } from 'react'
 import {
   View,
@@ -183,8 +185,8 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontFamily: 'Zaloga',
+    fontSize: 28,
     color: '#000000',
   },
   placeholder: {

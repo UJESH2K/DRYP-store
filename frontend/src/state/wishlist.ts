@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { apiCall } from '../lib/api'; // REMOVED to break cycle
 import { Product } from '../types'; // Assuming you have a Product type defined
 
@@ -12,40 +14,46 @@ interface WishlistState {
   isWishlisted: (productId: string) => boolean;
 }
 
-export const useWishlistStore = create<WishlistState>((set, get) => ({
-  items: [],
-  setWishlist: (items) => set({ items }),
-  addToWishlist: async (product) => {
-    try {
-      const { apiCall } = require('../lib/api'); // LAZY REQUIRE
-      const existingItem = get().items.find(item => item._id === product._id);
-      if (existingItem) return; // Don't add if it's already there
+export const useWishlistStore = create<WishlistState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      setWishlist: (items) => set({ items }),
+      addToWishlist: async (product) => {
+        try {
+          const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+          const existingItem = get().items.find(item => item._id === product._id);
+          if (existingItem) return;
 
-      set(state => ({ items: [...state.items, product] }));
-      await apiCall(`/api/wishlist/${product._id}`, {
-        method: 'POST',
-      });
-    } catch (error) {
-      console.error('Failed to add item to wishlist:', error);
-      // Revert state on failure
-      set(state => ({ items: state.items.filter(item => item._id !== product._id) }));
+          set(state => ({ items: [...state.items, product] }));
+          await apiCall(`/api/wishlist/${product._id}`, {
+            method: 'POST',
+          });
+        } catch (error) {
+          if (__DEV__) { console.error('Failed to add item to wishlist:', error); }
+          set(state => ({ items: state.items.filter(item => item._id !== product._id) }));
+        }
+      },
+      removeFromWishlist: async (productId) => {
+        const { apiCall } = require('../lib/api'); // LAZY REQUIRE
+        const originalItems = get().items;
+        try {
+          set(state => ({ items: state.items.filter(item => item._id !== productId) }));
+          await apiCall(`/api/wishlist/${productId}`, {
+            method: 'DELETE',
+          });
+        } catch (error) {
+          if (__DEV__) { console.error('Failed to remove item from wishlist:', error); }
+          set({ items: originalItems });
+        }
+      },
+      isWishlisted: (productId) => {
+        return get().items.some(item => item._id === productId);
+      },
+    }),
+    {
+      name: 'wishlist-storage',
+      storage: createJSONStorage(() => AsyncStorage),
     }
-  },
-  removeFromWishlist: async (productId) => {
-    const { apiCall } = require('../lib/api'); // LAZY REQUIRE
-    const originalItems = get().items;
-    try {
-      set(state => ({ items: state.items.filter(item => item._id !== productId) }));
-      await apiCall(`/api/wishlist/${productId}`, {
-        method: 'DELETE',
-      });
-    } catch (error) {
-      console.error('Failed to remove item from wishlist:', error);
-      // Revert state on failure
-      set({ items: originalItems });
-    }
-  },
-  isWishlisted: (productId) => {
-    return get().items.some(item => item._id === productId);
-  },
-}));
+  )
+);

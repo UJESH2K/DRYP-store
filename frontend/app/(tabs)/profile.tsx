@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/state/auth';
 import { useToastStore } from '../../src/state/toast';
 
-const Section = ({ header, children, footer }) => (
+const Section = ({ header, children, footer }: { header?: any; children?: any; footer?: any }) => (
   <View style={styles.sectionContainer}>
     {header && <Text style={styles.sectionHeader}>{header.toUpperCase()}</Text>}
     <View style={styles.sectionBody}>
@@ -24,8 +24,13 @@ const Section = ({ header, children, footer }) => (
   </View>
 );
 
-const Row = ({ title, icon, onPress, isFirst, isLast, isDestructive = false }) => (
-  <Pressable onPress={onPress} style={({ pressed }) => [styles.row, isLast && { borderBottomWidth: 0 }, pressed && styles.rowPressed]}>
+const Row = ({ title, icon, onPress, isFirst, isLast, isDestructive = false }: { title: any; icon?: any; onPress: any; isFirst?: any; isLast?: any; isDestructive?: boolean }) => (
+  <Pressable 
+    onPress={onPress} 
+    style={({ pressed }) => [styles.row, isLast && { borderBottomWidth: 0 }, pressed && styles.rowPressed]}
+    accessibilityLabel={title}
+    accessibilityRole="button"
+  >
     <View style={styles.rowLeft}>
       {icon && <View style={styles.rowIcon}>{icon}</View>}
       <Text style={[styles.rowLabel, isDestructive && styles.destructiveText]}>{title}</Text>
@@ -98,7 +103,7 @@ export default function ProfileScreen() {
             <Text style={styles.headerTitle}>Account</Text>
         </View>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <Pressable style={styles.profileHeader} onPress={() => router.push('/account/profile-details')}>
+        <Pressable style={styles.profileHeader} onPress={() => router.push('/account/profile-details')} accessibilityLabel="View profile details" accessibilityRole="button">
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(user?.name?.[0] ?? '?').toUpperCase()}</Text>
           </View>

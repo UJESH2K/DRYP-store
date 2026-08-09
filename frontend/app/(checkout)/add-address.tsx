@@ -15,7 +15,7 @@ export default function AddAddressScreen() {
     street: '',
     city: '',
     state: '',
-    zipCode: '',
+    pincode: '',
     country: 'US',
   });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -40,9 +40,9 @@ const handleAddAddress = async () => {
     }
 
     // 2. Strict exactly 6-digit zipCode/pincode check
-    const zipRegex = /^\d{6}$/;
-    if (!zipRegex.test(address.zipCode)) {
-      showToast('ZIP/Pincode must be exactly 6 digits.', 'error');
+    const pincodeRegex = /^\d{5,6}$/;
+    if (!pincodeRegex.test(address.pincode)) {
+      showToast('ZIP/Pincode must be 5 or 6 digits.', 'error');
       return;
     }
 
@@ -58,6 +58,7 @@ const handleAddAddress = async () => {
         street: trimmedStreet,
         city: trimmedCity,
         state: trimmedState,
+        pincode: address.pincode,
       };
 
       const result = await apiCall('/api/users/profile', {
@@ -100,7 +101,7 @@ const handleAddAddress = async () => {
         <Pressable onPress={() => router.goBack()} style={{}}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </Pressable>
-        <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Add New Address</Text>
+        <Text style={{ fontFamily: 'Zaloga', fontSize: 28 }}>Add New Address</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -178,10 +179,10 @@ const handleAddAddress = async () => {
             marginBottom: 12,
             backgroundColor: '#fff',
           }}
-          placeholder="ZIP Code"
+          placeholder="ZIP/Pincode"
           keyboardType="number-pad"
-          value={address.zipCode}
-          onChangeText={(text) => setAddress(p => ({ ...p, zipCode: text }))}
+          value={address.pincode}
+          onChangeText={(text) => setAddress(p => ({ ...p, pincode: text }))}
         />
         <TextInput
           style={{

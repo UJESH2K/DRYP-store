@@ -14,6 +14,7 @@ import { useAuthStore } from '../src/state/auth';
 import Toast from '../src/components/Toast';
 import ErrorBoundary from '../src/components/common/ErrorBoundary';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
+import { initRecommender } from '../src/lib/recommender';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,6 +34,7 @@ export default function RootLayout() {
     async function prepare() {
       try {
         await loadUser();
+        await initRecommender();
       } catch (e) {
         console.warn(e);
       } finally {

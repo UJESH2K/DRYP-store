@@ -15,7 +15,6 @@ import TextTicker from 'react-native-text-ticker';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../src/state/auth';
 import { apiCall } from '../src/lib/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VendorHeader } from '../src/components/vendor/Header';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
 import { API_BASE_URL } from '../src/lib/config';
@@ -66,12 +65,9 @@ export default function VendorRegisterScreen() {
       });
 
       if (response && response.token) {
-        const { token, user } = response;
-        authActions.updateUser(user);
-        await AsyncStorage.setItem('user_token', token);
-        await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        await authActions.loginWithToken(response.token);
         Alert.alert('Success', 'Vendor account created successfully!', [
-          { text: 'OK', onPress: () => router.replace('/(vendor-tabs)/products') },
+          { text: 'OK', onPress: () => router.replace('/(vendor-tabs)') },
         ]);
       } else {
         throw new Error(response?.message || 'Failed to register vendor');

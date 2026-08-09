@@ -1,3 +1,5 @@
+// TODO: This screen is currently unreachable — needs navigation link
+// No navigation points to /admin in the app
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,7 +30,7 @@ export default function AdminHome() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  title: { fontSize: 24, fontWeight: '700', color: '#1a1a1a' },
+  title: { fontFamily: 'Zaloga', fontSize: 28, color: '#1a1a1a' },
   subtitle: { fontSize: 14, color: '#666', marginTop: 4 },
   card: { padding: 16, margin: 16, borderWidth: 1, borderColor: '#eee', borderRadius: 12 },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },

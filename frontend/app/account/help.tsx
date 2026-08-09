@@ -62,16 +62,16 @@ export default function HelpScreen() {
     {
       id: 'email',
       title: 'Email Support',
-      description: 'support@dryp.com',
+      description: 'support@dryp.store',
       icon: 'mail-outline',
-      action: () => Linking.openURL('mailto:support@dryp.com'),
+      action: () => Linking.openURL('mailto:support@dryp.store'),
     },
     {
       id: 'phone',
       title: 'Phone Support',
-      description: '+1 (555) 123-DRYP',
+      description: 'Contact us at support@dryp.store',
       icon: 'call-outline',
-      action: () => Linking.openURL('tel:+15551234379'),
+      action: () => Linking.openURL('tel:+1234567890'),
     },
     {
       id: 'help-center',
@@ -133,6 +133,7 @@ export default function HelpScreen() {
               </Pressable>
             ))}
           </View>
+          <Text style={styles.responseNote}>Our team typically responds within 24 hours</Text>
         </View>
 
         {/* FAQ Section */}
@@ -293,6 +294,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Zaloga',
     color: '#000',
     flex: 1,
+  },
+  responseNote: {
+    fontSize: 13,
+    fontFamily: 'Zaloga',
+    color: '#6c757d',
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
   },
   bottomSpacing: {
     height: 100,

@@ -30,6 +30,7 @@ const cartRoutes = require("./src/routes/cart");
 const aiRoutes = require("./src/routes/ai");
 const stylistRoutes = require("./src/routes/stylist");
 const interactionRoutes = require("./src/routes/interactions");
+const feedRoutes = require("./src/routes/feed");
 const paymentsWebhookRoutes = require("./src/routes/payments-webhook");
 const rateLimit = require('express-rate-limit');
 
@@ -171,6 +172,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/stylist", stylistRoutes);
 app.use("/api/interactions", interactionRoutes);
+app.use("/api/feed", feedRoutes);
 
 // Global error handler — never leak err.message in production
 // eslint-disable-next-line no-unused-vars

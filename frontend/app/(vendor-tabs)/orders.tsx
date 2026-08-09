@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { apiCall } from '../../src/lib/api';
 import { VendorHeader } from '../../src/components/vendor/Header';
 import { useAuthStore } from '../../src/state/auth';
+import { formatPrice } from '../../src/utils/formatting';
 
 export default function VendorOrdersScreen() {
   const [orders, setOrders] = useState([]);
@@ -67,13 +68,13 @@ export default function VendorOrdersScreen() {
         {item.items.map(productItem => (
           <View key={productItem.product?._id || Math.random()} style={styles.productItem}>
             <Text style={styles.productName}>{productItem.product?.name || 'Product not found'} (x{productItem.quantity})</Text>
-            <Text style={styles.productPrice}>${(productItem.price * productItem.quantity).toFixed(2)}</Text>
+            <Text style={styles.productPrice}>{formatPrice(productItem.price * productItem.quantity)}</Text>
           </View>
         ))}
       </View>
 
       <View style={styles.cardFooter}>
-        <Text style={styles.totalAmount}>Total: ${item.totalAmount.toFixed(2)}</Text>
+        <Text style={styles.totalAmount}>Total: {formatPrice(item.totalAmount)}</Text>
         <Text style={[styles.status, styles[`status_${item.status}`]]}>{item.status}</Text>
       </View>
     </View>

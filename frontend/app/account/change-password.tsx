@@ -5,6 +5,7 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
+  ScrollView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -31,8 +32,9 @@ export default function ChangePasswordScreen() {
       Alert.alert('Error', 'New password and confirmation do not match.');
       return;
     }
-    if (newPassword.length < 6) {
-      Alert.alert('Error', 'New password must be at least 6 characters long.');
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      Alert.alert('Error', 'Password must be at least 8 characters with uppercase, lowercase, and a number.');
       return;
     }
 
@@ -137,8 +139,8 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: 'Zaloga',
+    fontSize: 28,
     color: '#333333',
   },
   placeholder: {

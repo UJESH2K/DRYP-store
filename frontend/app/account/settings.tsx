@@ -31,11 +31,11 @@ const countryCurrencyOptions = [
   { label: '🇦🇺 Australia (AUD)', value: 'AUD' },
 ];
 
-const Row = ({ children, isFirst, isLast }) => (
-  <View 
+const Row = ({ children, isFirst, isLast }: { children: React.ReactNode; isFirst?: boolean; isLast?: boolean }) => (
+  <View
     style={[
-      styles.row, 
-      isFirst && styles.rowFirst, 
+      styles.row,
+      isFirst && styles.rowFirst,
       isLast && styles.rowLast
     ]}
   >
@@ -61,13 +61,11 @@ export default function SettingsScreen() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState(user?.preferences?.currency || currency);
-  const [notificationSettings, setNotificationSettings] = useState(
-    user?.preferences?.notificationSettings || {
-      orderUpdates: true,
-      promotions: false,
-      newItemAlerts: false,
-    }
-  );
+  const [notificationSettings, setNotificationSettings] = useState({
+    orderUpdates: true,
+    promotions: false,
+    newItemAlerts: false,
+  });
 
   // Delete account modal state
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -75,7 +73,34 @@ export default function SettingsScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSaveChanges = async () => {
-    // ... (logic remains the same)
+    setIsLoading(true);
+    try {
+      setCurrency(selectedCurrency);
+
+      const updatedUser = await apiCall('/api/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: user?.name,
+          phone: user?.phone,
+        }),
+      });
+
+      if (!updatedUser || !updatedUser._id) {
+        throw new Error(updatedUser?.message || 'Failed to save settings.');
+      }
+
+      await updateUser({
+        ...updatedUser,
+        preferences: { ...updatedUser.preferences, currency: selectedCurrency },
+      });
+
+      showToast('Settings saved successfully!', 'success');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      showToast('Failed to save settings. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useLayoutEffect(() => {
@@ -186,6 +211,7 @@ export default function SettingsScreen() {
               options={countryCurrencyOptions}
               selectedValue={selectedCurrency}
               onSelectionChange={setSelectedCurrency}
+              placeholder="Select currency"
             />
           </Row>
         </Section>

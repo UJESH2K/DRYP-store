@@ -475,7 +475,7 @@ function buildProductBulkOps(vendor, products, source = 'manual_import') {
       vendor: vendor.owner,
       source,
     };
-    if (p.description) doc.description = safeStr(p.description).trim();
+    doc.description = p.description ? safeStr(p.description).trim() : `${doc.brand} ${doc.name}`;
     if (Array.isArray(p.tags) && p.tags.length > 0) doc.tags = p.tags.map(safeStr);
     if (Array.isArray(p.options)) doc.options = p.options;
     if (Array.isArray(p.variants)) {

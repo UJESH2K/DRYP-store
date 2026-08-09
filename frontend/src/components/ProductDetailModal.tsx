@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiCall, trackInteraction } from '../lib/api';
+import { formatPrice } from '../utils/formatting';
 import { useCartStore } from '../../src/state/cart';
 import { useWishlistStore } from '../../src/state/wishlist';
 import { useAuthStore } from '../../src/state/auth';
@@ -136,7 +137,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
         trackInteraction({ action: 'product_view', productId: id, source: 'detail_modal' });
       }
     } catch (error) {
-      console.error('Failed to fetch product details:', error);
+      if (__DEV__) { console.error('Failed to fetch product details:', error); }
       setAlertInfo({
         visible: true,
         title: 'Error',
@@ -155,16 +156,6 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
     const scrollX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(scrollX / SCREEN_WIDTH);
     setActiveImageIndex(newIndex);
-  }, []);
-
-  const formatPrice = useCallback((price: number | undefined | null) => {
-    const numericPrice = Number(price);
-    if (isNaN(numericPrice)) return '₹0.00';
-    try {
-      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(numericPrice);
-    } catch (e) {
-      return `$${(numericPrice || 0).toFixed(2)}`;
-    }
   }, []);
 
   const handleAddToWishlist = async () => {
@@ -287,9 +278,13 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
       <ScrollView contentContainerStyle={[styles.detailsContent, { paddingBottom: bottomPadding }]} scrollEventThrottle={16} style={{ flex: 1 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={true}>
         <View style={styles.imageWrapper}>
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onScroll={onImageScroll} scrollEventThrottle={16} style={styles.detailsImageCarousel} nestedScrollEnabled={true} directionalLockEnabled={true}>
-            {displayImages.map((img: string, index: number) => (
-              <Image key={img || index} source={{ uri: resolveImageUri(img) }} style={styles.detailsImage} resizeMode="cover" accessible accessibilityLabel={`Product image ${index + 1}`} />
-            ))}
+            {displayImages.map((img: string, index: number) => {
+              const uri = resolveImageUri(img);
+              const source = uri ? { uri } : require('../../assets/casa_denim.jpg');
+              return (
+                <Image key={img || index} source={source} style={styles.detailsImage} resizeMode="cover" accessible accessibilityLabel={`Product image ${index + 1}`} />
+              );
+            })}
           </ScrollView>
           {displayImages.length > 1 && renderImageIndicators()}
         </View>

@@ -11,12 +11,19 @@ import {
   FlatList,
   LayoutAnimation,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiCall } from '../../src/lib/api';
 import { rankItems } from '../../src/lib/recommender';
 import type { Item } from '../../src/types';
+
+interface SearchSection {
+  type: string;
+  data: any[];
+  title: string;
+}
 import { mapProductsToItems } from '../../src/utils/productMapping';
 import ProductDetailModal from '../../src/components/ProductDetailModal';
 import Filters from '../../src/components/Filters';
@@ -31,14 +38,22 @@ export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<Item[]>([]);
   const [trending, setTrending] = useState<Item[]>([]);
-  
+
+  const {
+    categories: cachedCategories,
+    brands: cachedBrands,
+    recentSearches,
+    setCategories: setCachedCategories,
+    setBrands: setCachedBrands,
+    setRecentSearches,
+  } = useCacheStore();
+
   const [brands, setBrands] = useState<string[]>((cachedBrands && cachedBrands.data) || []);
   const [categories, setCategories] = useState<string[]>((cachedCategories && cachedCategories.data) || []);
   const [colors, setColors] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Item[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  
-  
+
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [minPrice, setMinPrice] = useState('');
@@ -50,18 +65,9 @@ export default function SearchScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [areFiltersVisible, setAreFiltersVisible] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
-  
+
   const [selectedProductIdForModal, setSelectedProductIdForModal] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-
-  const {
-    categories: cachedCategories,
-    brands: cachedBrands,
-    recentSearches,
-    setCategories: setCachedCategories,
-    setBrands: setCachedBrands,
-    setRecentSearches,
-  } = useCacheStore();
 
   useEffect(() => {
     fetchInitialData();
@@ -306,22 +312,21 @@ export default function SearchScreen() {
                             <Text style={{ color: 'gray', paddingRight: 20 }}>Clear</Text>
                         </Pressable>
                     </View>
-                    <FlatList
+                    <ScrollView
                       horizontal
-                      data={item.data}
-                      renderItem={({ item: recentSearch }) => (
-                        <Pressable style={styles.recentSearchCard} onPress={() => {
-                          setSearchQuery(recentSearch.query);
-                          fetchData();
-                        }}>
-                          <Image source={{ uri: recentSearch.image }} style={styles.recentSearchImage} />
-                          <Text style={styles.recentSearchTitle}>{recentSearch.query}</Text>
-                        </Pressable>
-                      )}
-                      keyExtractor={(recentSearch) => recentSearch.query}
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={{ paddingHorizontal: 20 }}
-                    />
+                    >
+                      {recentSearches.map(({ query, image }) => (
+                        <Pressable style={styles.recentSearchCard} key={query} onPress={() => {
+                          setSearchQuery(query);
+                          fetchData();
+                        }}>
+                          <Image source={{ uri: image }} style={styles.recentSearchImage} />
+                          <Text style={styles.recentSearchTitle}>{query}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
                   </View>
                 );
               }
@@ -335,6 +340,7 @@ export default function SearchScreen() {
                       renderItem={({item}) => renderProductCard({item, large: false})}
                       keyExtractor={(item) => item.id.toString()}
                       numColumns={2}
+                      scrollEnabled={false}
                       columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
                       ListEmptyComponent={<Text style={styles.emptyText}>No products found for your search.</Text>}
                     />

@@ -34,7 +34,7 @@ export default function FeedHealthScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  title: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
+  title: { fontFamily: 'Zaloga', fontSize: 28, color: '#1a1a1a' },
   content: { padding: 16 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f8f8f8' },
   label: { fontSize: 14, color: '#333' },

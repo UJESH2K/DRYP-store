@@ -3,17 +3,45 @@ const { identifyUser } = require('../middleware/auth');
 const StylistConversation = require('../models/StylistConversation');
 const Product = require('../models/Product');
 const { buildStyleProfile } = require('../utils/styleProfile');
-const { generateProductEmbedding } = require('../utils/embeddings');
+const { buildUserProfile, buildTasteVector, scoreProducts } = require('../utils/feedRanking');
+const InteractionEvent = require('../models/InteractionEvent');
+const { generateEmbedding, generateProductEmbedding } = require('../utils/embeddings');
 
 const router = express.Router();
 let _openai;
 function getOpenAI() { if (!_openai) { const OpenAI = require('openai'); _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY }); } return _openai; }
 
-const SYSTEM_PROMPT = `You are Zaloga, an AI fashion stylist for DRYP — a mobile fashion discovery app.
-You help users build outfits, find complementary pieces, and discover new styles from the DRYP catalog.
-Be concise, warm, and fashion-forward. Suggest specific products when possible.
-When the user shares an image, analyze the clothing and suggest matching items.
-Always respond in 2-4 short paragraphs max. Use bullet points for product suggestions.`;
+const SYSTEM_PROMPT = `You are Zaloga — DRYP's in-house fashion stylist. You're opinionated, warm, and you actually know the catalog. Think of yourself as that friend who works at a cool boutique and always picks the right thing.
+
+PERSONALITY:
+- Speak like a real person, not a chatbot. No "I'd be happy to help!" or "Great question!"
+- Be direct. Lead with your recommendation, not preamble.
+- Use casual language. Contractions, short sentences, real talk.
+- When you see the user's interaction history, weave observations naturally: "You clearly have a thing for oversized fits" not "Based on your interaction history, I observe a preference for..."
+
+WHAT YOU DO:
+1. Every response MUST reference specific product names from the catalog. If the catalog context is empty, say you're having trouble pulling up the catalog right now — never make up product names.
+2. Suggest 2-4 products per response. Quality over quantity.
+3. For each product, say WHY it fits them: their taste, what they've liked before, or what's trending.
+4. Include the price naturally ("The Sherpa Hoodie at ₹8,495 is a solid pick") not as a formal list.
+5. Use the dryp://product/<id> deep link format so users can tap to view.
+6. If they share an image, describe what you see and suggest pieces that match or complement it.
+
+STYLE DNA:
+Read their interaction history and identify:
+- What categories they gravitate toward
+- Their brand preferences
+- Their price comfort zone
+- Color and vibe preferences
+- What they've PASSED on (avoid similar items)
+
+OUTPUT FORMAT:
+Open with a one-line style insight or reaction to what they said. Then list products:
+
+• Product Name by Brand — ₹price — one line why it fits them
+  dryp://product/<productId>
+
+Keep it under 200 words. No walls of text.`;
 
 const CHAT_MODEL = 'gpt-4o-mini';
 const INPUT_TOKEN_COST = 0.15 / 1_000_000;
@@ -154,6 +182,48 @@ async function searchCatalog(queryEmbedding, queryText, limit = 10) {
   return textSearchCatalog(queryText, limit);
 }
 
+async function buildInteractionHistory(userId, guestId) {
+  const query = userId ? { user: userId } : { guestId };
+  if (!userId && !guestId) return null;
+
+  const recent = await InteractionEvent.find(query)
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .select('action productSnapshot createdAt')
+    .lean();
+
+  if (recent.length === 0) return null;
+
+  const liked = [];
+  const disliked = [];
+  const carted = [];
+  const viewed = [];
+
+  for (const ev of recent) {
+    const snap = ev.productSnapshot;
+    if (!snap) continue;
+    const item = `${snap.name || 'Unknown'} by ${snap.brand || 'Unknown'} (${snap.category || ''})`;
+
+    if (['swipe_right', 'like', 'wishlist_add'].includes(ev.action)) {
+      liked.push(item);
+    } else if (ev.action === 'swipe_left') {
+      disliked.push(item);
+    } else if (ev.action === 'cart_add') {
+      carted.push(item);
+    } else if (ev.action === 'product_view') {
+      viewed.push(item);
+    }
+  }
+
+  const parts = [];
+  if (liked.length) parts.push(`Recently LIKED (right swipe): ${liked.slice(0, 10).join('; ')}`);
+  if (disliked.length) parts.push(`Recently PASSED (left swipe — do NOT suggest similar): ${disliked.slice(0, 8).join('; ')}`);
+  if (carted.length) parts.push(`Added to CART (strong purchase intent): ${carted.slice(0, 5).join('; ')}`);
+  if (viewed.length) parts.push(`Browsed but didn't act: ${viewed.slice(0, 5).join('; ')}`);
+
+  return parts.length > 0 ? parts.join('\n') : null;
+}
+
 function ownsConversation(convo, userId, guestId) {
   return (userId && convo.user?.toString() === userId.toString()) ||
     (guestId && convo.guestId === guestId);
@@ -227,6 +297,13 @@ async function prepareStylistRequest(req) {
       recentSignals.disliked.map((id) => `- ${id}`).join('\n');
   }
 
+  let interactionHistory = '';
+  try {
+    interactionHistory = await buildInteractionHistory(userId, guestId) || '';
+  } catch (e) {
+    console.warn('Interaction history build failed:', e.message);
+  }
+
   let catalogContext = '';
   let matchedProducts = [];
   const validKey = hasValidOpenAIKey();
@@ -234,17 +311,51 @@ async function prepareStylistRequest(req) {
   try {
     const queryText = message || 'style recommendation';
     const queryEmbedding = validKey ? await generateEmbedding(queryText) : null;
-    matchedProducts = await searchCatalog(queryEmbedding, queryText, 10);
+    matchedProducts = await searchCatalog(queryEmbedding, queryText, 15);
+
+    try {
+      const profile = await buildUserProfile(userId, guestId);
+      profile._userId = userId;
+      profile._guestId = guestId;
+      profile.tasteVector = await buildTasteVector(profile);
+      matchedProducts = await scoreProducts(matchedProducts, profile);
+    } catch (rankErr) {
+      console.warn('Taste re-ranking skipped:', rankErr.message);
+    }
+
+    // On follow-up queries, if search returns nothing, carry forward
+    // previously recommended products so the LLM still has catalog context
+    if (matchedProducts.length === 0 && convo.messages.length > 2) {
+      const prevProductIds = [];
+      for (const msg of convo.messages) {
+        if (msg.role === 'assistant' && msg.productIds?.length) {
+          prevProductIds.push(...msg.productIds);
+        }
+      }
+      if (prevProductIds.length > 0) {
+        const prevProducts = await Product.find({ _id: { $in: prevProductIds } })
+          .select('name brand category tags basePrice images')
+          .lean();
+        if (prevProducts.length > 0) {
+          matchedProducts = prevProducts;
+        }
+      }
+    }
 
     if (matchedProducts.length > 0) {
-      catalogContext = 'Matching products from DRYP catalog:\n' +
+      catalogContext = 'TOP CATALOG MATCHES (ranked by taste fit):\n' +
         matchedProducts.map((p, i) =>
-          `${i + 1}. ${p.name} by ${p.brand} — ${p.category}, $${p.basePrice}${p.tags?.length ? ` [${p.tags.join(', ')}]` : ''}`
+          `${i + 1}. [id:${p._id}] ${p.name} by ${p.brand} — ${p.category}, $${p.basePrice}${p.tags?.length ? ` [${p.tags.join(', ')}]` : ''}`
         ).join('\n');
     }
   } catch (e) {
     console.warn('Embedding/search failed, continuing without catalog context:', e.message);
   }
+
+  const contextParts = [styleProfile];
+  if (interactionHistory) contextParts.push(interactionHistory);
+  if (catalogContext) contextParts.push(catalogContext);
+  const fullContext = contextParts.filter(Boolean).join('\n\n');
 
   const recentMessages = convo.messages.slice(-20).map(m => ({
     role: m.role,
@@ -254,7 +365,7 @@ async function prepareStylistRequest(req) {
   }));
 
   const llmMessages = [
-    { role: 'system', content: `${SYSTEM_PROMPT}\n\n${styleProfile}\n\n${catalogContext}` },
+    { role: 'system', content: `${SYSTEM_PROMPT}\n\n${fullContext}` },
     ...recentMessages,
   ];
 

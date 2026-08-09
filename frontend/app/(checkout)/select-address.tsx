@@ -1,3 +1,5 @@
+// TODO: This screen is currently unreachable — needs navigation link
+// The checkout flow uses /account/addresses with isSelecting=true instead
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -138,7 +140,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
   },
   backButton: {},
-  title: { fontSize: 20, fontFamily: 'JosefinSans_600SemiBold' },
+  title: { fontFamily: 'Zaloga', fontSize: 28 },
   selectButton: { fontSize: 16, color: '#007bff', fontFamily: 'JosefinSans_600SemiBold' },
   addressContainer: {
     padding: 16,

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { CartItem as CartItemType } from '../../state/cart';
 import { resolveImageUri } from '../../utils/imageUri';
+import { formatPrice } from '../../utils/formatting';
 
 interface CartItemProps {
   item: CartItemType;
@@ -14,7 +15,7 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
       <View style={styles.itemDetails}>
         <Text style={styles.itemTitle}>{item.title}</Text>
         <Text style={styles.itemBrand}>{item.brand}</Text>
-        <Text style={styles.itemPrice}>₹{item.price.toFixed(2)}</Text>
+        <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
         <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
       </View>
     </View>

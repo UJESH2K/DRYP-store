@@ -19,6 +19,7 @@ import { useCacheStore } from '../src/state/cache';
 import { apiCall } from '../src/lib/api';
 import SingleSelectDropdown from '../src/components/SingleSelectDropdown';
 import StepIndicator from '../src/components/onboarding/StepIndicator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -131,6 +132,8 @@ export default function Onboarding() {
       if (updatedUser) {
         await updateUser(updatedUser);
         setCurrency(selectedCurrency);
+        // Write to AsyncStorage so index.tsx can detect onboarding completion
+        await AsyncStorage.setItem('categories:selected', JSON.stringify(selectedCategories));
         setShowWelcome(true);
       } else {
         throw new Error('Failed to save preferences');

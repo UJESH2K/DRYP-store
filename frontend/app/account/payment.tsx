@@ -7,6 +7,7 @@ import {
   Pressable,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
@@ -18,15 +19,19 @@ import { useToastStore } from '../../src/state/toast';
 export default function PaymentScreen() {
   const router = useCustomRouter();
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [loading, setLoading] = useState(true);
   const showToast = useToastStore((state) => state.showToast);
 
   const fetchPaymentMethods = useCallback(async () => {
+    setLoading(true);
     try {
       const methods = await apiCall('/api/payments/methods');
       setPaymentMethods(methods || []);
     } catch (error) {
       console.error('Failed to fetch payment methods:', error);
       showToast('Could not load payment methods.', 'error');
+    } finally {
+      setLoading(false);
     }
   }, [showToast]);
 
@@ -88,8 +93,13 @@ export default function PaymentScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {paymentMethods.length > 0 ? (
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#1a1a1a" />
+        </View>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {paymentMethods.length > 0 ? (
           paymentMethods.map(method => (
             <SwipeableRow key={method._id} onDelete={() => handleDeletePayment(method._id)}>
               
@@ -144,6 +154,7 @@ export default function PaymentScreen() {
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -259,5 +270,10 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 8,
     textAlign: 'center',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

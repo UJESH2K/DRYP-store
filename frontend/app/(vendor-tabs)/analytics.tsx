@@ -162,13 +162,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   smallCard: {
-    flexBasis: `calc(33.333% - 8px)`, // Three cards per row
-    flexGrow: 1,
+    flex: 1,
     alignItems: 'center',
   },
   largeCard: {
-    flexBasis: `calc(66.667% - 8px)`, // Takes up 2/3 of the space
-    flexGrow: 1,
+    flex: 2,
   },
   listCard: {
     flexBasis: '100%',

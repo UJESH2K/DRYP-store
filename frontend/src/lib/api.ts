@@ -3,6 +3,8 @@ import { useAuthStore } from '../state/auth';
 
 import { API_BASE_URL } from './config';
 
+export { API_BASE_URL };
+
 // Simple fetch wrapper with error handling and auth token injection
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
   try {
@@ -14,9 +16,6 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     const headers = { ...options.headers };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-    } else {
-      const { guestId } = useAuthStore.getState();
-      if (guestId) headers['x-guest-id'] = guestId;
     }
     if (guestId) {
       headers['x-guest-id'] = guestId;
@@ -62,7 +61,7 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
     if (__DEV__) console.log(`✅ API success: ${endpoint}`, data);
     return data;
   } catch (error) {
-    console.error(`❌ API error: ${endpoint}`, error);
+    if (__DEV__) { console.error(`❌ API error: ${endpoint}`, error); }
     if (__DEV__) console.error(`❌ Full URL was: ${API_BASE_URL}${endpoint}`);
     return { message: error.message || 'An unexpected error occurred.' };
   }

@@ -5,7 +5,7 @@ import { imageUri } from '../utils/imageUri';
  * @param {number} price The product price.
  * @returns {'low' | 'mid' | 'high'}
  */
-const getPriceTier = (price) => {
+export const getPriceTier = (price) => {
   if (price < 50) return 'low';
   if (price < 150) return 'mid';
   return 'high';
@@ -48,19 +48,24 @@ export const mapProductToItem = (product) => {
 
   const { sizes, colors } = getSizesAndColors(product);
 
-  if (!product.images || product.images.length === 0) return null;
+  // Use first image if available; otherwise use a placeholder so the product still renders
+  const image = (product.images && product.images.length > 0)
+    ? imageUri(product.images[0])
+    : null;
 
   return {
     id: product._id,
-    title: product.name,
-    subtitle: product.description.substring(0, 50) + '...',
-    image: imageUri(product.images[0]),
+    title: product.name || 'Untitled',
+    subtitle: product.description
+      ? product.description.substring(0, 50) + (product.description.length > 50 ? '...' : '')
+      : product.brand || product.category || '',
+    image: image,
     tags: product.tags || [],
-    category: product.category,
-    priceTier: getPriceTier(product.basePrice),
-    brand: product.brand,
-    price: product.basePrice,
-    description: product.description,
+    category: product.category || 'Uncategorized',
+    priceTier: getPriceTier(product.basePrice || 0),
+    brand: product.brand || 'Unknown',
+    price: product.basePrice || 0,
+    description: product.description || '',
     sizes,
     colors,
   };

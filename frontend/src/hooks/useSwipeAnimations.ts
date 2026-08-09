@@ -1,11 +1,10 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { Animated, PanResponder,Alert } from 'react-native';
 import { SCREEN_WIDTH } from '../constants/dimensions';
-import { useInteractionStore } from '../state/interactions';
 import { useAuthStore } from '../state/auth';
 import type { Item } from '../types';
 import { sendInteraction, trackInteraction } from '../lib/api';
-import { updateModel } from '../lib/recommender';
+import { recordInteraction } from '../lib/recommender';
 import { useCustomRouter } from './useCustomRouter';
 
 export function useSwipeAnimations(
@@ -22,10 +21,9 @@ export function useSwipeAnimations(
   const position = useRef(new Animated.ValueXY()).current;
   const nextCardAnimation = useRef(new Animated.Value(0.9)).current;
   
-  const undoTimer = useRef<NodeJS.Timeout | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const { user , isAuthenticated} = useAuthStore();
-  const pushInteraction = useInteractionStore((s) => s.pushInteraction);
+  const { isAuthenticated} = useAuthStore();
 
   useEffect(() => {
     return () => {
@@ -73,10 +71,9 @@ export function useSwipeAnimations(
     setIsAnimating(true);
     setCanUndo(true);
     setLastSwipeDirection(decision === 'like' ? 'right' : 'left');
-    pushInteraction({ itemId: currentItem.id, action: decision, at: Date.now(), tags: currentItem.tags, priceTier: currentItem.priceTier });
+    recordInteraction(decision, currentItem);
     sendInteraction(decision, currentItem.id);
     trackInteraction({ action: decision === 'like' ? 'swipe_right' : 'swipe_left', productId: currentItem.id, source: 'swipe_feed' });
-    updateModel(decision, currentItem);
 
     if (undoTimer.current) {
       clearTimeout(undoTimer.current);
@@ -103,7 +100,7 @@ export function useSwipeAnimations(
       });
       setIsAnimating(false);
     });
-  }, [isAnimating, items, currentIndex, pushInteraction, user, nextCardAnimation, position]);
+  }, [isAnimating, items, currentIndex, nextCardAnimation, position]);
 
   const undoSwipe = useCallback(() => {
     if (!canUndo) return;

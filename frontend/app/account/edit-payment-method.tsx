@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
   },
   backButton: {},
-  title: { fontSize: 20, fontWeight: 'bold' },
+  title: { fontFamily: 'Zaloga', fontSize: 28 },
   form: { padding: 16 },
   input: {
     borderWidth: 1,

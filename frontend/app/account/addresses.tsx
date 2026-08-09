@@ -7,6 +7,7 @@ import {
   Pressable,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
@@ -16,6 +17,7 @@ import { useFocusEffect,useLocalSearchParams } from 'expo-router';
 export default function AddressesScreen() {
   const router = useCustomRouter();
   const [addresses, setAddresses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const params = useLocalSearchParams();
   const isSelecting = params.isSelecting === 'true';
@@ -30,6 +32,7 @@ export default function AddressesScreen() {
   useFocusEffect(
     useCallback(() => {
       const fetchAddresses = async () => {
+        setLoading(true);
         try {
           const profile = await apiCall('/api/users/profile');
           if (profile && profile.addresses) {
@@ -37,6 +40,8 @@ export default function AddressesScreen() {
           }
         } catch (error) {
           console.error('Failed to fetch addresses:', error);
+        } finally {
+          setLoading(false);
         }
       };
 
@@ -103,9 +108,14 @@ export default function AddressesScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-  {addresses.map((address) => (
-    <View key={address._id} style={styles.addressCard}>
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#1a1a1a" />
+        </View>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {addresses.map((address) => (
+            <View key={address._id} style={styles.addressCard}>
       
       {/* HEADER: Contains Badges & Action Buttons (Edit/Delete/Default) */}
       <View style={styles.addressHeader}>
@@ -163,7 +173,8 @@ export default function AddressesScreen() {
   </Pressable>
 
   <View style={styles.bottomSpacing} />
-</ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }
@@ -270,14 +281,17 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'Zaloga',
   },
-  deleteText: {
-    color: '#f44336',
+  addressDetails: {
+    flex: 1,
   },
   addressName: {
     fontSize: 18,
     color: '#000000',
     marginBottom: 4,
     fontFamily: 'Zaloga',
+  },
+  deleteText: {
+    color: '#f44336',
   },
   addressLine: {
     fontSize: 16,
@@ -293,5 +307,10 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })

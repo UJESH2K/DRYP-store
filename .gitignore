@@ -2,7 +2,37 @@ tut.txt
 work.md
 .env*
 
+# Signing certs & keys — NEVER commit
+*.p12
+*.cer
+*.mobileprovision
+*.p8
+AuthKey*
+dist-cert.*
+ios_distribution.*
+profile.mobileprovision
+private_keys/
+
 # Dev artifacts
 .mimocode/
 supabase/.temp/
 research/
+.log/
+
+# Deepwork state (git-local, OpenCode-readable)
+.slim/deepwork/
+
+# OpenCode internal
+.omo/
+.opencode/
+.success/
+
+# iOS build artifacts
+frontend/ios/
+frontend/android/
+frontend/.log/
+
+# Misc
+.DS_Store
+.ignore
+100

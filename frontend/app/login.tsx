@@ -69,10 +69,23 @@ export default function LoginScreen() {
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
       if (result.type === 'success') {
-        // Parse query params manually — new URL() rejects non-http schemes
-        // like dryp://oauth-callback in React Native.
         const queryString = result.url.split('?')[1] || '';
         const params = new URLSearchParams(queryString);
+        const error = params.get('error');
+
+        if (error) {
+          const messages: Record<string, string> = {
+            google_denied: 'Google sign-in was cancelled.',
+            no_code: 'No authorization code received from Google.',
+            invalid_state: 'Session expired. Please try again.',
+            token_exchange_failed: 'Could not complete sign-in. Please try again.',
+            oauth_failed: 'Google authentication failed. Please try again.',
+            no_email: 'Could not retrieve email from Google.',
+          };
+          Alert.alert('Sign-In Failed', messages[error] || 'An unknown error occurred during sign-in.');
+          return;
+        }
+
         const token = params.get('token');
         if (token) {
           const user = await loginWithToken(token);
@@ -81,7 +94,11 @@ export default function LoginScreen() {
           } else {
             Alert.alert('Sign-In Failed', 'Could not authenticate with the returned token.');
           }
+        } else {
+          Alert.alert('Sign-In Failed', 'No token received from server.');
         }
+      } else if (result.type === 'dismiss') {
+        // User closed the browser manually — do nothing
       }
     } catch (err) {
       console.error('Google login error:', err);
@@ -196,12 +213,6 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
 
-          <Pressable onPress={() => router.push('/vendor-register')} style={styles.toggleButton}>
-            <Text style={styles.toggleButtonText}>
-              Become a Vendor
-            </Text>
-          </Pressable>
-          
           <Pressable onPress={handleSkip} style={styles.skipButton}>
             <Text style={styles.skipButtonText}>Continue as Guest</Text>
           </Pressable>

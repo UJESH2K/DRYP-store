@@ -12,6 +12,7 @@ import AnimatedLoadingScreen from '../../src/components/common/AnimatedLoadingSc
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { API_BASE_URL } from '../../src/lib/config';
 import { resolveImageUri } from '../../src/utils/imageUri';
+import { formatPrice } from '../../src/utils/formatting';
 
 export default function CartScreen() {
   const router = useCustomRouter();
@@ -83,13 +84,6 @@ export default function CartScreen() {
   }, [items]);
   
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-
-const formatPrice = React.useCallback((price: number) =>
-    new Intl.NumberFormat('en-IN', { 
-      style: 'currency', 
-      currency: 'INR',
-    }).format(price)
-  , []);
 
   const isEveryVariantSelected = React.useMemo(() => {
     return items.every(item => {

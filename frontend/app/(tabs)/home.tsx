@@ -17,6 +17,7 @@ export default function HomeScreen() {
   const {
     items,
     loading,
+    error,
     filters,
     selectedFilters,
     setSelectedFilters,
@@ -73,7 +74,7 @@ export default function HomeScreen() {
   }
 
   if (items.length === 0) {
-    return <EmptyState onClearFilters={clearFilters} />;
+    return <EmptyState onClearFilters={clearFilters} error={error} />;
   }
 
   const currentItem = items[swipeAnimations.currentIndex];

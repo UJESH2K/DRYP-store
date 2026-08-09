@@ -19,6 +19,7 @@ import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { VendorHeader } from '../../src/components/vendor/Header';
 import { useAuthStore } from '../../src/state/auth';
 import { apiCall } from '../../src/lib/api';
+import { formatPrice } from '../../src/utils/formatting';
 
 import { AddProductForm } from '../../src/components/vendor/AddProductForm';
 
@@ -148,7 +149,7 @@ export default function ManageProductsScreen() {
       )}
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productDetails}>Price: ${item.basePrice?.toFixed(2) ?? '0.00'}</Text>
+        <Text style={styles.productDetails}>Price: {formatPrice(item.basePrice ?? 0)}</Text>
         <Text style={styles.productDetails}>
           Stock: {item.variants?.length > 0
             ? item.variants.reduce((acc, v) => acc + (v.stock || 0), 0)
@@ -255,7 +256,7 @@ export default function ManageProductsScreen() {
                   <View key={idx} style={styles.previewItem}>
                     <Text style={styles.previewName}>{p.name || 'Unnamed Product'}</Text>
                     <Text style={styles.previewDetail}>
-                      Price: ${p.basePrice?.toFixed(2) ?? '0.00'}
+                      Price: {formatPrice(p.basePrice ?? 0)}
                     </Text>
                     {p.variants?.length > 0 && (
                       <Text style={styles.previewDetail}>

@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Cart = require('../models/Cart'); 
 const WishlistItem = require('../models/WishlistItem'); 
@@ -45,9 +46,9 @@ router.post('/', protect, async (req, res, next) => {
 // @access  Public
 router.get('/', async (req, res, next) => {
   try {
-    const { brand, category, color, search, vendor, minPrice, maxPrice, source } = req.query;
+    const { brand, category, color, search, vendor, minPrice, maxPrice, source, sortBy, limit, exclude } = req.query;
     const filter = { isActive: true };
-    
+
     if (brand) filter.brand = { $in: brand.split(',') };
     if (category) filter.category = { $in: category.split(',') };
     if (color) filter.variants = { $elemMatch: { 'options.Color': { $in: color.split(',') } } };
@@ -60,11 +61,39 @@ router.get('/', async (req, res, next) => {
       if (minPrice) filter.basePrice.$gte = Number(minPrice);
       if (maxPrice) filter.basePrice.$lte = Number(maxPrice);
     }
+    if (exclude) {
+      const excludeIds = exclude.split(',')
+        .map(id => id.trim())
+        .filter(id => mongoose.Types.ObjectId.isValid(id));
+      if (excludeIds.length > 0) {
+        filter._id = { $nin: excludeIds };
+      }
+    }
     console.log('Fetching products with filter:', filter);
+
+    const sortWhitelist = {
+      createdAt: { createdAt: -1 },
+      basePrice: { basePrice: -1 },
+      rating: { rating: -1 },
+      likes: { likes: -1 },
+    };
+    let sort = sortWhitelist.createdAt;
+    if (sortBy) {
+      const [key, dir] = sortBy.split(':');
+      const baseSort = sortWhitelist[key];
+      if (baseSort) {
+        const direction = dir === 'asc' ? 1 : -1;
+        sort = Object.fromEntries(Object.entries(baseSort).map(([k]) => [k, direction]));
+      }
+    }
+
+    const parsedLimit = Number(limit);
+    const finalLimit = Number.isNaN(parsedLimit) ? 50 : Math.min(Math.max(parsedLimit, 1), 100);
+
     const products = await Product.find(filter)
       .populate({ path: 'vendor', select: 'name' })
-      .limit(50)
-      .sort({ createdAt: -1 });
+      .limit(finalLimit)
+      .sort(sort);
     console.log('Found products:', products.length);
     res.json(await Promise.all(products.map((product) => signProductImages(product))));
   } catch (error) {

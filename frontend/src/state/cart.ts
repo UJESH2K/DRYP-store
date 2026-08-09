@@ -20,7 +20,7 @@ type CartState = {
   addToCart: (item: Omit<CartItem, 'id'> & { id?: string }) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
-  updateCartItem: (oldId: string, newItemData: Omit<CartItem, 'id' | 'quantity'>) => void;
+  updateCartItem: (oldId: string, newData: Omit<CartItem, 'id' | 'quantity'>) => void;
   clearCart: () => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
@@ -70,13 +70,13 @@ export const useCartStore = create<CartState>()(
             set({ items: syncedItems });
           }
         } catch (error) {
-          console.error("Failed to sync cart from server:", error);
+          if (__DEV__) { console.error("Failed to sync cart from server:", error); }
         }
       },
 
       addToCart: async (item) => {
         if (typeof item.price !== 'number' || isNaN(item.price)) {
-          console.error("Invalid price in addToCart. Aborting action.");
+          if (__DEV__) { console.error("Invalid price in addToCart. Aborting action."); }
           return;
         }
 
@@ -113,7 +113,7 @@ export const useCartStore = create<CartState>()(
             })
           });
         } catch (error) {
-          console.error("Failed to push cart item to server:", error);
+          if (__DEV__) { console.error("Failed to push cart item to server:", error); }
         }
       },
       
@@ -130,7 +130,7 @@ export const useCartStore = create<CartState>()(
           try {
             await apiCall(`/api/cart/${encodeURIComponent(itemToRemove.id)}`, { method: 'DELETE' });
           } catch (error) {
-            console.error("Failed to delete cart item on server:", error);
+            if (__DEV__) { console.error("Failed to delete cart item on server:", error); }
           }
         }
       },
@@ -157,36 +157,17 @@ export const useCartStore = create<CartState>()(
               });
             }
           } catch (error) {
-            console.error("Failed to update cart quantity on server:", error);
+            if (__DEV__) { console.error("Failed to update cart quantity on server:", error); }
           }
         }
       },
-      
-      updateCartItem: (oldId, newItemData) => {
-        if (typeof newItemData.price !== 'number' || isNaN(newItemData.price)) {
-          console.error("Invalid price in updateCartItem. Aborting update.");
-          return;
-        }
-        
-        const newId = generateCartId(newItemData.productId, newItemData.options);
-        const existingItem = get().items.find(i => i.id === oldId);
 
-        if (!existingItem) return;
-
-        const newCartItem: CartItem = {
-          ...newItemData,
-          id: newId,
-          quantity: existingItem.quantity, // Keep the quantity
-        };
-
-        set(state => ({
+      updateCartItem: (oldId, newData) => {
+        set((state) => ({
           items: state.items.map(item =>
-            item.id === oldId ? newCartItem : item
+            item.id === oldId ? { ...item, ...newData, id: generateCartId(newData.productId, newData.options) } : item
           ),
         }));
-
-        // Optional: Implement backend sync here if necessary. 
-        // Typically involves a DELETE of the old variant and POST of the new variant.
       },
 
       clearCart: () => set({ items: [] }),

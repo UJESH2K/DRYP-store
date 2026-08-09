@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Image, Animated, StyleSheet } from 'react-native';
 import type { Item } from '../../types';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../../constants/dimensions';
 import { formatPrice } from '../../utils/formatting';
+import { onItemViewed } from '../../lib/recommender';
 
 interface CardProps {
   item: Item;
@@ -16,6 +17,12 @@ interface CardProps {
 export function Card({ item, style, likeOpacity, nopeOpacity, isNext = false, panHandlers }: CardProps) {
   if (!item) return null;
 
+  useEffect(() => {
+    if (!isNext) {
+      onItemViewed(item);
+    }
+  }, [item, isNext]);
+
   return (
     <Animated.View 
       style={[styles.card, style]} 
@@ -25,7 +32,11 @@ export function Card({ item, style, likeOpacity, nopeOpacity, isNext = false, pa
       {likeOpacity && <Animated.View style={[styles.overlay, styles.likeOverlay, { opacity: likeOpacity }]} />}
       {nopeOpacity && <Animated.View style={[styles.overlay, styles.dislikeOverlay, { opacity: nopeOpacity }]} />}
       
-      <Image source={{ uri: item.image }} style={styles.cardImage} />
+      <Image
+        source={item.image ? { uri: item.image } : require('../../../assets/casa_denim.jpg')}
+        style={styles.cardImage}
+        onError={() => {}}
+      />
       
       <View style={styles.infoSection}>
         <View>

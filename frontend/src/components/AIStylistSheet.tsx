@@ -19,13 +19,19 @@ import { sendStylistMessageStream } from '../lib/ai-stylist';
 import { useAuthStore } from '../state/auth';
 import { useWishlistStore } from '../state/wishlist';
 import { useCartStore } from '../state/cart';
-import { useInteractionStore } from '../state/interactions';
+import { useInteractionStore } from '../lib/recommender';
 import { mapProductsToItems } from '../utils/productMapping';
 import ProductDetailModal from './ProductDetailModal';
 import * as ImagePicker from 'expo-image-picker';
 import type { Item } from '../types';
 import { uploadImage } from '../lib/upload';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const stripMarkdown = (text: string) =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold** → bold
+    .replace(/^\* /gm, '')              // * bullet → bullet
+    .replace(/\n{3,}/g, '\n\n');        // collapse triple+ newlines
 
 interface AIStylistSheetProps {
   visible: boolean;
@@ -100,7 +106,7 @@ export default function AIStylistSheet({ visible, onClose }: AIStylistSheetProps
 
       setLoadingHistory(true);
       const { apiCall } = require('../lib/api');
-      const result = await apiCall(`/api/ai/zaloga/conversations/${storedId}`);
+      const result = await apiCall(`/api/stylist/conversations/${storedId}`);
 
       if (result && Array.isArray(result.messages)) {
         conversationIdRef.current = storedId;
@@ -307,7 +313,7 @@ export default function AIStylistSheet({ visible, onClose }: AIStylistSheetProps
         <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
           {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.msgImg} />}
           {item.text ? (
-            <Text style={[styles.msgText, isUser ? styles.userText : styles.aiText]}>{item.text}</Text>
+            <Text style={[styles.msgText, isUser ? styles.userText : styles.aiText]}>{stripMarkdown(item.text)}</Text>
           ) : !isUser ? (
             <ActivityIndicator size="small" />
           ) : null}

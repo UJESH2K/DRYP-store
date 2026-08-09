@@ -21,12 +21,27 @@ import { apiCall } from '../../src/lib/api';
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../src/lib/config';
 
+interface VendorProfile {
+  name: string;
+  description: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  phone: string;
+  website: string;
+  logo: string;
+}
+
 export default function StoreProfileScreen() {
   const { user, token, logout } = useAuthStore();
-  const [vendor, setVendor] = useState(null);
+  const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState<Partial<VendorProfile>>({});
   const [shopifyStatus, setShopifyStatus] = useState(null);
   const [showShopifyInput, setShowShopifyInput] = useState(false);
   const [shopDomain, setShopDomain] = useState('');
@@ -39,6 +54,11 @@ export default function StoreProfileScreen() {
     try {
       const data = await apiCall('/api/vendors/me');
       if (data && !data.message) {
+        // Normalize address: backend may return it as a string or object
+        if (typeof data.address === 'string') {
+          data.address = { street: data.address, city: '', state: '', zipCode: '', country: '' };
+        }
+        data.logo = data.logo || '';
         setVendor(data);
         setFormData(data);
       } else {
@@ -92,8 +112,11 @@ export default function StoreProfileScreen() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
   
-  const handleAddressChange = (field, value) => {
-    setFormData(prev => ({ ...prev, address: { ...prev.address, [field]: value } }));
+  const handleAddressChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      address: { ...(prev.address as any || {}), [field]: value } as any,
+    }));
   };
 
   const handleSaveChanges = async () => {
@@ -348,4 +371,5 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  disabledButton: { opacity: 0.5 },
 });

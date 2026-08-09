@@ -18,6 +18,7 @@ import { useCartStore } from '../../src/state/cart';
 import { useAuthStore } from '../../src/state/auth';
 import { useToastStore } from '../../src/state/toast';
 import { apiCall } from '../../src/lib/api';
+import { formatPrice } from '../../src/utils/formatting';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // @ts-ignore
 import CartItem from '../../src/components/checkout/CartItem';
@@ -88,8 +89,6 @@ export default function CheckoutScreen() {
   const tax = useMemo(() => subtotal * 0.08, [subtotal]);
   const total = useMemo(() => subtotal + shipping + tax, [subtotal, shipping, tax]);
 
-  const formatPrice = (price: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
-  
   const handlePlaceOrder = async () => {
     if (!shippingAddress) {
       showToast('Please select a shipping address.', 'error');

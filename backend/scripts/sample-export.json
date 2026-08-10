@@ -1,0 +1,655 @@
+{
+  "generatedAt": "2026-08-04T15:48:18.739Z",
+  "counts": {
+    "interactionEvents": 25,
+    "likes": 25
+  },
+  "interactionEvents": [
+    {
+      "id": "6a7209c2f397b407e6ae0ce2",
+      "user": "6a4d99285a90c410e6fa3d0d",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "69bf1e9b63e9b1beed19ec9b",
+      "productSnapshot": {
+        "brand": "ujesh",
+        "category": "yadav",
+        "tags": "hehe"
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 791.1,
+      "timestamp": "2026-08-03T14:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce3",
+      "user": null,
+      "guestId": "guest_anon_d4e5f6",
+      "action": "swipe_left",
+      "product": "6a4ec2627293b644a9df1efb",
+      "productSnapshot": {
+        "name": "Asymmetric Wool Overcoat",
+        "brand": "Darinda",
+        "category": "Outerwear",
+        "tags": [
+          "AW26",
+          "Wool",
+          "Tailoring",
+          "Avant-Garde"
+        ],
+        "basePrice": 850
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 873.1,
+      "timestamp": "2026-08-03T15:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce4",
+      "user": "6a4eb2475347568f6a3305ef",
+      "guestId": null,
+      "action": "swipe_up",
+      "product": "6a4ec2627293b644a9df1efc",
+      "productSnapshot": {
+        "name": "Pleated Wide-Leg Trousers",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Trousers",
+          "Tailored",
+          "Flow"
+        ],
+        "basePrice": 320
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 367,
+      "timestamp": "2026-08-03T16:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce5",
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "action": "product_view",
+      "product": "6a4ec2627293b644a9df1efd",
+      "productSnapshot": {
+        "name": "Deconstructed Silk Shirt",
+        "brand": "Darinda",
+        "category": "Tops",
+        "tags": [
+          "Silk",
+          "Deconstructed",
+          "SS26"
+        ],
+        "basePrice": 280
+      },
+      "source": "sample_seed",
+      "dwellTimeMs": 2740,
+      "timestamp": "2026-08-03T17:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce6",
+      "user": "6a4eb43a5347568f6a330612",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "6a4ec2627293b644a9df1efe",
+      "productSnapshot": {
+        "name": "Heavyweight Boxy Hoodie",
+        "brand": "Darinda",
+        "category": "Sweatshirts",
+        "tags": [
+          "Streetwear",
+          "Heavyweight",
+          "Cropped"
+        ],
+        "basePrice": 190
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 527.9,
+      "timestamp": "2026-08-03T18:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce7",
+      "user": null,
+      "guestId": "guest_anon_g7h8i9",
+      "action": "swipe_left",
+      "product": "6a4ec2627293b644a9df1eff",
+      "productSnapshot": {
+        "name": "Artisan Leather Derbies",
+        "brand": "Darinda",
+        "category": "Footwear",
+        "tags": [
+          "Leather",
+          "Footwear",
+          "Chunky"
+        ],
+        "basePrice": 550
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 206.2,
+      "timestamp": "2026-08-03T19:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce8",
+      "user": "6a4d9a024b05fd93479c540e",
+      "guestId": null,
+      "action": "swipe_up",
+      "product": "6a4ec2627293b644a9df1f00",
+      "productSnapshot": {
+        "name": "Distressed Overdyed Denim",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Denim",
+          "Distressed",
+          "Grunge"
+        ],
+        "basePrice": 240
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 760.9,
+      "timestamp": "2026-08-03T20:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ce9",
+      "user": null,
+      "guestId": "guest_anon_d4e5f6",
+      "action": "product_view",
+      "product": "6a4ec2627293b644a9df1f01",
+      "productSnapshot": {
+        "name": "Structured Minimalist Blazer",
+        "brand": "Darinda",
+        "category": "Outerwear",
+        "tags": [
+          "Tailored",
+          "Minimalist",
+          "Suiting"
+        ],
+        "basePrice": 620
+      },
+      "source": "sample_seed",
+      "dwellTimeMs": 3113,
+      "timestamp": "2026-08-03T21:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cea",
+      "user": "6a4eb3b161dc8de7d2c722be",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "6a4ec2627293b644a9df1f02",
+      "productSnapshot": {
+        "name": "Technical Flared Cargo",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Techwear",
+          "Cargo",
+          "Nylon"
+        ],
+        "basePrice": 290
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 902.2,
+      "timestamp": "2026-08-03T22:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ceb",
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "action": "swipe_left",
+      "product": "6a4ec2627293b644a9df1f03",
+      "productSnapshot": {
+        "name": "Destroyed Mohair Knit",
+        "brand": "Darinda",
+        "category": "Knitwear",
+        "tags": [
+          "Mohair",
+          "Knit",
+          "Grunge"
+        ],
+        "basePrice": 380
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 553.7,
+      "timestamp": "2026-08-03T23:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cec",
+      "user": "6a4d99285a90c410e6fa3d0d",
+      "guestId": null,
+      "action": "swipe_up",
+      "product": "6a4ec2627293b644a9df1f04",
+      "productSnapshot": {
+        "name": "Geometric Crossbody Harness",
+        "brand": "Darinda",
+        "category": "Accessories",
+        "tags": [
+          "Leather",
+          "Bag",
+          "Hardware"
+        ],
+        "basePrice": 410
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 827.4,
+      "timestamp": "2026-08-04T00:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0ced",
+      "user": null,
+      "guestId": "guest_anon_g7h8i9",
+      "action": "product_view",
+      "product": "69bf1e9b63e9b1beed19ec9b",
+      "productSnapshot": {
+        "brand": "ujesh",
+        "category": "yadav",
+        "tags": "hehe"
+      },
+      "source": "sample_seed",
+      "dwellTimeMs": 1882,
+      "timestamp": "2026-08-04T01:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cee",
+      "user": "6a4eb2475347568f6a3305ef",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "6a4ec2627293b644a9df1efb",
+      "productSnapshot": {
+        "name": "Asymmetric Wool Overcoat",
+        "brand": "Darinda",
+        "category": "Outerwear",
+        "tags": [
+          "AW26",
+          "Wool",
+          "Tailoring",
+          "Avant-Garde"
+        ],
+        "basePrice": 850
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 858.8,
+      "timestamp": "2026-08-04T02:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cef",
+      "user": null,
+      "guestId": "guest_anon_d4e5f6",
+      "action": "swipe_left",
+      "product": "6a4ec2627293b644a9df1efc",
+      "productSnapshot": {
+        "name": "Pleated Wide-Leg Trousers",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Trousers",
+          "Tailored",
+          "Flow"
+        ],
+        "basePrice": 320
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 647.8,
+      "timestamp": "2026-08-04T03:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf0",
+      "user": "6a4eb43a5347568f6a330612",
+      "guestId": null,
+      "action": "swipe_up",
+      "product": "6a4ec2627293b644a9df1efd",
+      "productSnapshot": {
+        "name": "Deconstructed Silk Shirt",
+        "brand": "Darinda",
+        "category": "Tops",
+        "tags": [
+          "Silk",
+          "Deconstructed",
+          "SS26"
+        ],
+        "basePrice": 280
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 575.7,
+      "timestamp": "2026-08-04T04:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf1",
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "action": "product_view",
+      "product": "6a4ec2627293b644a9df1efe",
+      "productSnapshot": {
+        "name": "Heavyweight Boxy Hoodie",
+        "brand": "Darinda",
+        "category": "Sweatshirts",
+        "tags": [
+          "Streetwear",
+          "Heavyweight",
+          "Cropped"
+        ],
+        "basePrice": 190
+      },
+      "source": "sample_seed",
+      "dwellTimeMs": 3413,
+      "timestamp": "2026-08-04T05:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf2",
+      "user": "6a4d9a024b05fd93479c540e",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "6a4ec2627293b644a9df1eff",
+      "productSnapshot": {
+        "name": "Artisan Leather Derbies",
+        "brand": "Darinda",
+        "category": "Footwear",
+        "tags": [
+          "Leather",
+          "Footwear",
+          "Chunky"
+        ],
+        "basePrice": 550
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 919,
+      "timestamp": "2026-08-04T06:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf3",
+      "user": null,
+      "guestId": "guest_anon_g7h8i9",
+      "action": "swipe_left",
+      "product": "6a4ec2627293b644a9df1f00",
+      "productSnapshot": {
+        "name": "Distressed Overdyed Denim",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Denim",
+          "Distressed",
+          "Grunge"
+        ],
+        "basePrice": 240
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 791.2,
+      "timestamp": "2026-08-04T07:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf4",
+      "user": "6a4eb3b161dc8de7d2c722be",
+      "guestId": null,
+      "action": "swipe_up",
+      "product": "6a4ec2627293b644a9df1f01",
+      "productSnapshot": {
+        "name": "Structured Minimalist Blazer",
+        "brand": "Darinda",
+        "category": "Outerwear",
+        "tags": [
+          "Tailored",
+          "Minimalist",
+          "Suiting"
+        ],
+        "basePrice": 620
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 346.6,
+      "timestamp": "2026-08-04T08:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf5",
+      "user": null,
+      "guestId": "guest_anon_d4e5f6",
+      "action": "product_view",
+      "product": "6a4ec2627293b644a9df1f02",
+      "productSnapshot": {
+        "name": "Technical Flared Cargo",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Techwear",
+          "Cargo",
+          "Nylon"
+        ],
+        "basePrice": 290
+      },
+      "source": "sample_seed",
+      "dwellTimeMs": 2962,
+      "timestamp": "2026-08-04T09:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf6",
+      "user": "6a4d99285a90c410e6fa3d0d",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "6a4ec2627293b644a9df1f03",
+      "productSnapshot": {
+        "name": "Destroyed Mohair Knit",
+        "brand": "Darinda",
+        "category": "Knitwear",
+        "tags": [
+          "Mohair",
+          "Knit",
+          "Grunge"
+        ],
+        "basePrice": 380
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 430.2,
+      "timestamp": "2026-08-04T10:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf7",
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "action": "swipe_left",
+      "product": "6a4ec2627293b644a9df1f04",
+      "productSnapshot": {
+        "name": "Geometric Crossbody Harness",
+        "brand": "Darinda",
+        "category": "Accessories",
+        "tags": [
+          "Leather",
+          "Bag",
+          "Hardware"
+        ],
+        "basePrice": 410
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 710.8,
+      "timestamp": "2026-08-04T11:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf8",
+      "user": "6a4eb2475347568f6a3305ef",
+      "guestId": null,
+      "action": "swipe_up",
+      "product": "69bf1e9b63e9b1beed19ec9b",
+      "productSnapshot": {
+        "brand": "ujesh",
+        "category": "yadav",
+        "tags": "hehe"
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 538.6,
+      "timestamp": "2026-08-04T12:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cf9",
+      "user": null,
+      "guestId": "guest_anon_g7h8i9",
+      "action": "product_view",
+      "product": "6a4ec2627293b644a9df1efb",
+      "productSnapshot": {
+        "name": "Asymmetric Wool Overcoat",
+        "brand": "Darinda",
+        "category": "Outerwear",
+        "tags": [
+          "AW26",
+          "Wool",
+          "Tailoring",
+          "Avant-Garde"
+        ],
+        "basePrice": 850
+      },
+      "source": "sample_seed",
+      "dwellTimeMs": 1177,
+      "timestamp": "2026-08-04T13:48:18.562Z"
+    },
+    {
+      "id": "6a7209c2f397b407e6ae0cfa",
+      "user": "6a4eb43a5347568f6a330612",
+      "guestId": null,
+      "action": "swipe_right",
+      "product": "6a4ec2627293b644a9df1efc",
+      "productSnapshot": {
+        "name": "Pleated Wide-Leg Trousers",
+        "brand": "Darinda",
+        "category": "Bottoms",
+        "tags": [
+          "Trousers",
+          "Tailored",
+          "Flow"
+        ],
+        "basePrice": 320
+      },
+      "source": "sample_seed",
+      "swipeVelocity": 865.8,
+      "timestamp": "2026-08-04T14:48:18.562Z"
+    }
+  ],
+  "likes": [
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1efd",
+      "timestamp": "2026-08-03T02:18:18.562Z"
+    },
+    {
+      "user": "6a4d9a024b05fd93479c540e",
+      "product": "6a4ec2627293b644a9df1efe",
+      "timestamp": "2026-08-03T03:48:18.562Z"
+    },
+    {
+      "user": "6a4eb2475347568f6a3305ef",
+      "product": "6a4ec2627293b644a9df1eff",
+      "timestamp": "2026-08-03T05:18:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1f00",
+      "timestamp": "2026-08-03T06:48:18.562Z"
+    },
+    {
+      "user": "6a4eb43a5347568f6a330612",
+      "product": "6a4ec2627293b644a9df1f01",
+      "timestamp": "2026-08-03T08:18:18.562Z"
+    },
+    {
+      "user": "6a4d99285a90c410e6fa3d0d",
+      "product": "6a4ec2627293b644a9df1f02",
+      "timestamp": "2026-08-03T09:48:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1f03",
+      "timestamp": "2026-08-03T11:18:18.562Z"
+    },
+    {
+      "user": "6a4eb2475347568f6a3305ef",
+      "product": "6a4ec2627293b644a9df1f04",
+      "timestamp": "2026-08-03T12:48:18.562Z"
+    },
+    {
+      "user": "6a4eb3b161dc8de7d2c722be",
+      "product": "69bf1e9b63e9b1beed19ec9b",
+      "timestamp": "2026-08-03T14:18:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1efb",
+      "timestamp": "2026-08-03T15:48:18.562Z"
+    },
+    {
+      "user": "6a4d99285a90c410e6fa3d0d",
+      "product": "6a4ec2627293b644a9df1efc",
+      "timestamp": "2026-08-03T17:18:18.562Z"
+    },
+    {
+      "user": "6a4d9a024b05fd93479c540e",
+      "product": "6a4ec2627293b644a9df1efd",
+      "timestamp": "2026-08-03T18:48:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1efe",
+      "timestamp": "2026-08-03T20:18:18.562Z"
+    },
+    {
+      "user": "6a4eb3b161dc8de7d2c722be",
+      "product": "6a4ec2627293b644a9df1eff",
+      "timestamp": "2026-08-03T21:48:18.562Z"
+    },
+    {
+      "user": "6a4eb43a5347568f6a330612",
+      "product": "6a4ec2627293b644a9df1f00",
+      "timestamp": "2026-08-03T23:18:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1f01",
+      "timestamp": "2026-08-04T00:48:18.562Z"
+    },
+    {
+      "user": "6a4d9a024b05fd93479c540e",
+      "product": "6a4ec2627293b644a9df1f02",
+      "timestamp": "2026-08-04T02:18:18.562Z"
+    },
+    {
+      "user": "6a4eb2475347568f6a3305ef",
+      "product": "6a4ec2627293b644a9df1f03",
+      "timestamp": "2026-08-04T03:48:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1f04",
+      "timestamp": "2026-08-04T05:18:18.562Z"
+    },
+    {
+      "user": "6a4eb43a5347568f6a330612",
+      "product": "69bf1e9b63e9b1beed19ec9b",
+      "timestamp": "2026-08-04T06:48:18.562Z"
+    },
+    {
+      "user": "6a4d99285a90c410e6fa3d0d",
+      "product": "6a4ec2627293b644a9df1efb",
+      "timestamp": "2026-08-04T08:18:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1efc",
+      "timestamp": "2026-08-04T09:48:18.562Z"
+    },
+    {
+      "user": "6a4eb2475347568f6a3305ef",
+      "product": "6a4ec2627293b644a9df1efd",
+      "timestamp": "2026-08-04T11:18:18.562Z"
+    },
+    {
+      "user": "6a4eb3b161dc8de7d2c722be",
+      "product": "6a4ec2627293b644a9df1efe",
+      "timestamp": "2026-08-04T12:48:18.562Z"
+    },
+    {
+      "user": null,
+      "guestId": "guest_anon_a1b2c3",
+      "product": "6a4ec2627293b644a9df1eff",
+      "timestamp": "2026-08-04T14:18:18.562Z"
+    }
+  ]
+}

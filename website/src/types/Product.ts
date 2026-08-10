@@ -5,7 +5,7 @@ export interface Variant {
   options?: {
     Color?: string;
     Size?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   color?: string; 
   sizes?: string; 

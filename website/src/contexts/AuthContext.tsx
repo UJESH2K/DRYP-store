@@ -4,9 +4,11 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation';
 
 type AuthContextType = {
-  user: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  user: Record<string, any> | null;
   token: string | null;
-  login: (userData: any, userToken: string, redirectTo?: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  login: (userData: Record<string, any>, userToken: string, redirectTo?: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
@@ -15,7 +17,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<Record<string, unknown> | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -37,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = (userData: any, userToken: string, redirectTo = '/dashboard') => {
+  const login = (userData: Record<string, unknown>, userToken: string, redirectTo = '/dashboard') => {
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', userToken);
     setUser(userData);

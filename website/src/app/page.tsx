@@ -375,7 +375,7 @@ export default function LandingPage() {
                       
                       let cardStyle = "";
                       let isTop = false;
-                      let isSwiping = stackIndex === 0 && isSwipingOut;
+                      const isSwiping = stackIndex === 0 && isSwipingOut;
 
                       if (!isSwipingOut) {
                         if (stackIndex === 0) { 

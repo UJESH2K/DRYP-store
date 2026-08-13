@@ -237,7 +237,7 @@ export default function CheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f2f7' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
   scrollView: { flex: 1, paddingHorizontal: 16, paddingTop: 10 },
   itemsHeader: {
     flexDirection: 'row',

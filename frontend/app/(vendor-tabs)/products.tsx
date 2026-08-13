@@ -155,6 +155,10 @@ export default function ManageProductsScreen() {
             ? item.variants.reduce((acc, v) => acc + (v.stock || 0), 0)
             : (item.stock || 0)}
         </Text>
+        <View style={styles.likeBadge}>
+          <Ionicons name="heart" size={14} color="#e0245e" />
+          <Text style={styles.likeBadgeText}>{item.likes ?? 0} likes</Text>
+        </View>
       </View>
       <Pressable onPress={() => router.push(`/vendor/edit-product?id=${item._id}`)}>
         <Ionicons name="pencil-outline" size={24} color="#1a1a1a" />
@@ -297,7 +301,7 @@ export default function ManageProductsScreen() {
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -364,6 +368,13 @@ const styles = StyleSheet.create({
   productInfo: { flex: 1 },
   productName: { fontSize: 16, fontWeight: '600', fontFamily: 'Zaloga' },
   productDetails: { fontSize: 14, color: '#666666', marginTop: 4, fontFamily: 'Zaloga' },
+  likeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 4,
+  },
+  likeBadgeText: { fontSize: 13, color: '#666666', fontFamily: 'Zaloga' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   retryText: { color: 'blue', marginTop: 10 },
   emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#666666' },

@@ -262,7 +262,7 @@ export default function AIChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#F7F2E9',
   },
   flex: {
     flex: 1,

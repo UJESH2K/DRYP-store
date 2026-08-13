@@ -62,9 +62,7 @@ export default function RootLayout() {
             user.preferences.colors.length > 0 ||
             user.preferences.brands.length > 0);
 
-        if (user?.role === 'vendor') {
-          router.replace('/(vendor-tabs)/products');
-        } else if (hasCompletedOnboarding) {
+        if (hasCompletedOnboarding) {
           router.replace('/(tabs)/home');
         } else {
           router.replace('/onboarding');

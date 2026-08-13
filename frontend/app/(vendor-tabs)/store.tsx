@@ -271,7 +271,7 @@ export default function StoreProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   editButton: {
     backgroundColor: '#1a1a1a',

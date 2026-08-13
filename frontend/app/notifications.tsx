@@ -19,7 +19,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F7F2E9',
   },
   listContainer: {
     // paddingVertical: 8, // Removed to reduce space between header and first item

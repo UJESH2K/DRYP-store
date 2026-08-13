@@ -210,7 +210,7 @@ export default function WishlistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#F7F2E9',
   },
   header: {
     paddingHorizontal: 20,

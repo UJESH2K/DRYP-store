@@ -148,6 +148,139 @@ router.post("/google-registration-drafts", async (req, res, next) => {
   }
 });
 
+// @desc    Core approve/reject decision for a vendor application.
+//          Extracted from the route handler so the flow can be integration
+//          tested without an HTTP server. `sendEmailFn` is injectable
+//          (defaults to the real sender) so tests can capture the message
+//          instead of dispatching real mail.
+//
+//          The whole decision runs inside a single MongoDB session
+//          transaction: the application status flip, invited User
+//          creation/upgrade, Vendor profile creation, and the hashed
+//          one-time password setup token commit together or not at all.
+//          If any write fails (e.g. a duplicate-key race on User.email or
+//          Vendor.email), the transaction aborts and the application stays
+//          pending. The notification email is sent only after a successful
+//          commit.
+// @returns {ok: true, application, user?, vendor?, passwordUrl?} on success,
+//          or {ok: false, error: 'invalid_status' | 'not_found' | 'conflict'}.
+async function processApplicationDecision({
+  applicationId,
+  status,
+  adminId,
+  sendEmailFn = sendEmail,
+}) {
+  if (!["approved", "rejected"].includes(status)) {
+    return { ok: false, error: "invalid_status" };
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const application = await VendorApplication.findById(applicationId).session(
+      session,
+    );
+    if (!application) {
+      await session.abortTransaction();
+      session.endSession();
+      return { ok: false, error: "not_found" };
+    }
+
+    application.status = status;
+    application.reviewedBy = adminId;
+    application.reviewedAt = Date.now();
+    await application.save({ session });
+
+    const frontendUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
+
+    if (status === "approved") {
+      const claimToken = createPasswordToken(7 * 24 * 60 * 60 * 1000);
+      let user = await User.findOne({ email: application.email }).session(
+        session,
+      );
+
+      if (!user) {
+        const created = await User.create(
+          [
+            {
+              name: application.studioName,
+              email: application.email,
+              authProvider: "invited",
+              role: "vendor",
+              resetPasswordToken: claimToken.hashedToken,
+              resetPasswordExpire: claimToken.expiresAt,
+            },
+          ],
+          { session },
+        );
+        user = created[0];
+      } else {
+        if (user.role === "user") user.role = "vendor";
+        user.resetPasswordToken = claimToken.hashedToken;
+        user.resetPasswordExpire = claimToken.expiresAt;
+        await user.save({ session });
+      }
+
+      let vendor = null;
+      if (user.role === "vendor") {
+        vendor = await Vendor.findOne({ owner: user._id }).session(session);
+        if (!vendor) {
+          const created = await Vendor.create(
+            [
+              {
+                name: application.studioName,
+                email: application.email,
+                owner: user._id,
+              },
+            ],
+            { session },
+          );
+          vendor = created[0];
+        }
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+
+      const passwordUrl = `${frontendUrl}/reset-password/${claimToken.rawToken}`;
+      await sendEmailFn({
+        email: application.email,
+        subject: "DRYP: Studio Approved",
+        message: `Your application has been accepted.\n\nSet your password securely here: ${passwordUrl}\n\nOr log in with Google after approval: ${frontendUrl}/login\n\nThis password link expires in 7 days. After login you can upload products via Manual, Excel, or Shopify link.`,
+      });
+
+      return { ok: true, application, user, vendor, passwordUrl };
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await sendEmailFn({
+      email: application.email,
+      subject: "DRYP: Application Status",
+      message: `Thank you for your interest in DRYP. Unfortunately, your studio does not align with our current curation. We wish you the best.`,
+    });
+
+    return { ok: true, application };
+  } catch (err) {
+    try {
+      await session.abortTransaction();
+    } catch {
+      // Transaction may already be aborted by the write error.
+    }
+    session.endSession();
+    if (err && err.code === 11000) {
+      // Duplicate-key race on a unique User/Vendor identity index. Nothing
+      // was committed, so the application remains pending and can be
+      // re-decided; report a generic non-enumerating conflict.
+      return { ok: false, error: "conflict" };
+    }
+    throw err;
+  }
+}
+
 // @route   PUT /api/vendors/applications/:id
 // @desc    Admin: Approve or Reject a vendor application
 // @access  Private (Admin Only)
@@ -158,65 +291,25 @@ router.put("/applications/:id", protect, async (req, res, next) => {
     }
 
     const { status } = req.body; // 'approved' or 'rejected'
-    if (!["approved", "rejected"].includes(status)) {
-      return res.status(400).json({ message: "Invalid status update." });
-    }
+    const result = await processApplicationDecision({
+      applicationId: req.params.id,
+      status,
+      adminId: req.user._id,
+    });
 
-    const application = await VendorApplication.findById(req.params.id);
-    if (!application)
-      return res.status(404).json({ message: "Application not found" });
-
-    application.status = status;
-    application.reviewedBy = req.user._id;
-    application.reviewedAt = Date.now();
-    await application.save();
-
-    const frontendUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
-
-    if (status === "approved") {
-      const claimToken = createPasswordToken(7 * 24 * 60 * 60 * 1000);
-      let user = await User.findOne({ email: application.email });
-
-      if (!user) {
-        user = await User.create({
-          name: application.studioName,
-          email: application.email,
-          authProvider: "invited",
-          role: "vendor",
-          resetPasswordToken: claimToken.hashedToken,
-          resetPasswordExpire: claimToken.expiresAt,
-        });
-      } else {
-        if (user.role === "user") user.role = "vendor";
-        user.resetPasswordToken = claimToken.hashedToken;
-        user.resetPasswordExpire = claimToken.expiresAt;
-        await user.save();
+    if (!result.ok) {
+      if (result.error === "invalid_status") {
+        return res.status(400).json({ message: "Invalid status update." });
       }
-
-      if (user.role === "vendor") {
-        const existingVendor = await Vendor.findOne({ owner: user._id });
-        if (!existingVendor) {
-          await Vendor.create({
-            name: application.studioName,
-            email: application.email,
-            owner: user._id,
-          });
-        }
+      if (result.error === "not_found") {
+        return res.status(404).json({ message: "Application not found" });
       }
-
-      const passwordUrl = `${frontendUrl}/reset-password/${claimToken.rawToken}`;
-      await sendEmail({
-        email: application.email,
-        subject: "DRYP: Studio Approved",
-        message: `Your application has been accepted.\n\nSet your password securely here: ${passwordUrl}\n\nOr log in with Google after approval: ${frontendUrl}/login\n\nThis password link expires in 7 days. After login you can upload products via Manual, Excel, or Shopify link.`,
-      });
-    } else {
-      await sendEmail({
-        email: application.email,
-        subject: "DRYP: Application Status",
-        message: `Thank you for your interest in DRYP. Unfortunately, your studio does not align with our current curation. We wish you the best.`,
-      });
+      if (result.error === "conflict") {
+        return res
+          .status(409)
+          .json({ message: "Application conflicts with an existing account; no changes were saved." });
+      }
+      return next(new Error(`Unexpected decision error: ${result.error}`));
     }
 
     res.json({
@@ -959,3 +1052,4 @@ router.put("/admin/suspend/:vendorId", protect, async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.processApplicationDecision = processApplicationDecision;

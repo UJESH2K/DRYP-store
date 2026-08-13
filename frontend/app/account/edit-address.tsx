@@ -229,7 +229,7 @@ export default function EditAddressScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
   form: { padding: 16 },
   input: {
     borderWidth: 1,

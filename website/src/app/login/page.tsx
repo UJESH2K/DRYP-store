@@ -251,15 +251,6 @@ export default function LoginPage() {
                   Register
                 </Link>
               </p>
-              <p className="font-sans text-[9px] uppercase tracking-[0.2em] text-gray-400">
-                Approved, need a password?{" "}
-                <Link
-                  href="/signup"
-                  className="text-black font-bold hover:text-gray-500"
-                >
-                  Set password
-                </Link>
-              </p>
             </div>
           </div>
         </div>

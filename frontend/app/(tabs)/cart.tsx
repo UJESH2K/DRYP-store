@@ -244,7 +244,7 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
   header: {
     paddingVertical: 16,
     paddingHorizontal: 20,

@@ -5,6 +5,7 @@ const router = express.Router();
 
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
+const VendorApplication = require('../models/VendorApplication');
 const agenda = require('../config/agenda');
 const { encrypt } = require('../utils/crypto');
 const { shopifyGraphQL } = require('../utils/shopifyClient');
@@ -130,6 +131,19 @@ router.get('/callback', async (req, res, next) => {
           // that would let anyone with control of a Shopify store's contact email
           // take over a DRYP account. Require them to log in and connect manually.
           return redirect({ error: 'account_exists' });
+        }
+
+        // Gate: an anonymous Shopify OAuth start may only create a vendor
+        // account when an application has been approved for this email. This
+        // mirrors the approval policy enforced in /api/vendors/register and
+        // the Google OAuth callback (decideStudioAccess).
+        const normalizedEmail = String(shopEmail || '').toLowerCase().trim();
+        const approvedApplication = await VendorApplication.findOne({
+          $or: [{ email: normalizedEmail }, { googleEmail: normalizedEmail }],
+          status: 'approved',
+        });
+        if (!approvedApplication) {
+          return redirect({ error: 'no_application' });
         }
 
         const session = await mongoose.startSession();

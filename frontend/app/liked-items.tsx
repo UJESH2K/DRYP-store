@@ -146,7 +146,7 @@ const renderItem = ({ item }: { item: Item }) => (
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#F7F2E9',
     },
     listContainer: {
         padding: 16,

@@ -371,7 +371,7 @@ export default function EditProductScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  container: { flex: 1, padding: 16, backgroundColor: '#F7F2E9' },
   title: { fontFamily: 'Zaloga', fontSize: 28, marginBottom: 20 },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 5, marginBottom: 10 },
   switchContainer: {

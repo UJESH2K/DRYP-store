@@ -247,6 +247,10 @@ const ProductsPage = () => {
                       </p>
                     </div>
 
+                    <p className="font-sans text-[10px] tracking-widest text-gray-400 uppercase mt-2">
+                      ♥ {product.likes ?? 0} likes
+                    </p>
+
                     {/* Minimalist Variants List */}
                     {product.variants && product.variants.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-gray-200">

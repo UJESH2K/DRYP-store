@@ -4,8 +4,6 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-
 const ResetPasswordPage = () => {
   const params = useParams();
   const token = params.token as string;
@@ -45,7 +43,7 @@ const ResetPasswordPage = () => {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password/${token}`, {
+      const response = await fetch(`/api/auth/reset-password/${token}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),

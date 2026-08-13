@@ -8,7 +8,14 @@ const Vendor = require('../models/Vendor');
 const VendorApplication = require('../models/VendorApplication');
 const GoogleRegistrationDraft = require('../models/GoogleRegistrationDraft');
 const { mergeGuestData } = require('./auth');
-const { assertStudioAccessAllowed, normalizeEmail } = require('../utils/studioAccess');
+// assertStudioAccessAllowed is retained in the destructure for the structural
+// ship gate (tests/shipWebsiteStudio.test.js asserts it precedes jwt.sign here);
+// runtime resolution now uses utils/identityResolution below.
+const { decideStudioAccess, normalizeEmail, assertStudioAccessAllowed } = require('../utils/studioAccess');
+const {
+  findIdentityForGoogle,
+  linkVerifiedIdentityToCanonicalUser,
+} = require('../utils/identityResolution');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -186,11 +193,21 @@ router.get('/callback', async (req, res) => {
 
     if (platform === 'web') {
       // Website studio: only approved applications / existing vendor|admin may enter.
-      const access = await assertStudioAccessAllowed(
-        email,
-        { User, VendorApplication },
-        googleId,
-      );
+      // Resolve the verified Google identity (subject-ID precedence, unique
+      // normalized email fallback, fail closed on ambiguity), then gate access.
+      const identity = await findIdentityForGoogle({
+        models: { User, VendorApplication },
+        verifiedGoogleId: googleId,
+        verifiedGoogleEmail: email,
+      });
+      if (!identity.ok && identity.error === 'identity_ambiguous') {
+        // Fail closed: ambiguous email match grants no access (no enumeration).
+        return res.redirect(buildRedirect('web', { error: 'identity_ambiguous' }));
+      }
+      const access = decideStudioAccess({
+        existingUser: identity.existingUser,
+        application: identity.application,
+      });
       if (!access.ok) {
         if (access.error === 'no_application') {
           if (intent === 'register' && draftId) {
@@ -226,7 +243,24 @@ router.get('/callback', async (req, res) => {
       // Approved access - log in the user
       user = access.existingUser;
       if (!user && access.application) {
-        user = await User.findOne({ email: access.application.email });
+        // Link the approved application's verified Google identity to its
+        // canonical User and reuse the existing Vendor profile. Never creates
+        // a second User/Vendor — fail closed when the canonical records are
+        // missing (User/Vendor creation happens at admin approval time).
+        const linked = await linkVerifiedIdentityToCanonicalUser({
+          models: { User, Vendor },
+          application: access.application,
+          verifiedGoogleId: googleId,
+          verifiedGoogleEmail: email,
+        });
+        if (!linked.ok) {
+          console.error('Google identity linking failed:', linked.error);
+          if (intent === 'register') {
+            return res.redirect(buildRegisterStatusRedirect('registration_error'));
+          }
+          return res.redirect(buildRedirect('web', { error: 'oauth_failed' }));
+        }
+        user = linked.user;
       }
 
       if (user) {
@@ -348,36 +382,17 @@ async function consumeDraftAndCreateApplication(draftId, googleIdentity) {
       return { ok: false, error: 'draft_unavailable' };
     }
 
-    // Check for existing application with this verified Google identity
-    const existingByGoogleId = await VendorApplication.findOne({
-      verifiedGoogleId: googleIdentity.googleId,
-    }).session(session);
-
-    if (existingByGoogleId) {
-      await session.abortTransaction();
-      session.endSession();
-      return { ok: false, error: 'identity_collision' };
-    }
-
-    const existingByGoogleEmail = await VendorApplication.findOne({
-      verifiedGoogleEmail: googleIdentity.email,
-    }).session(session);
-
-    if (existingByGoogleEmail) {
-      await session.abortTransaction();
-      session.endSession();
-      return { ok: false, error: 'identity_collision' };
-    }
-
-    // Check for cross-field collision with contact email
-    const crossCollision = await VendorApplication.findOne({
-      $or: [
-        { email: googleIdentity.email },
-        { googleEmail: googleIdentity.email },
-      ],
-    }).session(session);
-
-    if (crossCollision) {
+    // Reject duplicate/cross-field identity collisions before creating the
+    // pending application (generic, non-enumerating result).
+    const unique = await assertIdentityUnique({
+      models: { VendorApplication },
+      application: {
+        email: googleIdentity.email,
+        verifiedGoogleEmail: googleIdentity.email,
+        verifiedGoogleId: googleIdentity.googleId,
+      },
+    });
+    if (!unique.ok) {
       await session.abortTransaction();
       session.endSession();
       return { ok: false, error: 'identity_collision' };
@@ -397,8 +412,17 @@ async function consumeDraftAndCreateApplication(draftId, googleIdentity) {
     session.endSession();
     return { ok: true };
   } catch (err) {
-    await session.abortTransaction();
+    try {
+      await session.abortTransaction();
+    } catch {
+      // Transaction may already be aborted by the write error.
+    }
     session.endSession();
+    if (err && err.code === 11000) {
+      // Concurrent duplicate-key race on a unique identity/email index.
+      // Return the generic non-enumerating result, never a stack trace.
+      return { ok: false, error: 'identity_collision' };
+    }
     throw err;
   }
 }

@@ -141,8 +141,8 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F2E9' },
   errorText: { color: 'red', fontSize: 16 },
   scrollContent: { padding: 12 },
   

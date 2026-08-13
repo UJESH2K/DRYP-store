@@ -128,7 +128,7 @@ export default function SelectAddressScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#F7F2E9' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

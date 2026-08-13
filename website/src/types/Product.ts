@@ -21,4 +21,5 @@ export interface Product {
   basePrice: number;
   variants: Variant[];
   images?: string[];
+  likes?: number;
 }

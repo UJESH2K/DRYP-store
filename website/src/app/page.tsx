@@ -4,10 +4,22 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
+interface Product {
+  _id: string;
+  name: string;
+  basePrice: number;
+  images: string[];
+  brand?: string;
+  vendor?: { name?: string };
+}
+
 export default function LandingPage() {
   // Cursor state
   const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
   const [isHovering, setIsHovering] = useState(false);
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   // Swipe Demo State
   const demoImages = [
@@ -44,6 +56,17 @@ export default function LandingPage() {
 
     return () => clearInterval(swipeInterval);
   }, [demoImages.length]);
+
+  useEffect(() => {
+    fetch("/api/products?page=1&limit=8")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.products || [];
+        setProducts(list.slice(0, 8));
+        setLoadingProducts(false);
+      })
+      .catch(() => setLoadingProducts(false));
+  }, []);
 
   return (
     <>
@@ -446,6 +469,74 @@ export default function LandingPage() {
               </div>
 
             </div>
+          </section>
+        </div>
+
+        {/* =========================================
+            PRODUCT SHOWCASE
+        ========================================= */}
+        <div className="w-full bg-white relative z-10 border-b border-gray-300/50">
+          <section className="py-24 px-6 md:px-12 w-full max-w-screen-2xl mx-auto">
+            <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8">
+              <h2 className="font-editorial text-4xl md:text-6xl font-light tracking-tight text-black">
+                The <span className="font-cursive text-5xl md:text-7xl text-gray-700 lowercase -ml-2">Archive</span>
+              </h2>
+              <p className="text-[10px] font-light uppercase tracking-[0.2em] text-gray-500 max-w-xs leading-relaxed">
+                Curated pieces from approved brands. Discover, archive, and curate your unique style.
+              </p>
+            </div>
+
+            {loadingProducts ? (
+              <div className="flex items-center justify-center py-24">
+                <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-gray-400 animate-pulse">
+                  Loading archive...
+                </p>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="flex items-center justify-center py-24">
+                <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-gray-400">
+                  No products available yet.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                {products.map((product) => (
+                  <div key={product._id} className="group cursor-pointer">
+                    <div className="relative aspect-[3/4] overflow-hidden bg-gray-100 border border-gray-200">
+                      {product.images && product.images[0] ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="h-full w-full object-cover transition-all duration-700 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <span className="text-[9px] uppercase tracking-widest text-gray-300">No image</span>
+                        </div>
+                      )}
+                      {product.images && product.images[1] && (
+                        <img
+                          src={product.images[1]}
+                          alt={product.name}
+                          className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                        />
+                      )}
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-gray-400">
+                        {product.vendor?.name || product.brand || "DRYP"}
+                      </p>
+                      <p className="text-[11px] font-medium text-black leading-tight line-clamp-1">
+                        {product.name}
+                      </p>
+                      <p className="text-[11px] font-light text-gray-600">
+                        ₹{product.basePrice.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 

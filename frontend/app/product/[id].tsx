@@ -269,7 +269,7 @@ export default function ProductDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
+    container: { flex: 1, backgroundColor: '#F7F2E9' },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: { 
         position: 'absolute', 

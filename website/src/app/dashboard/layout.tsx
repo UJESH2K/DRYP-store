@@ -12,14 +12,14 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, loading, logout } = useAuth();
+  const { isAuthenticated, loading, logout, hasStudioAccess } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!loading && !hasStudioAccess) {
       router.replace("/login");
     }
-  }, [isAuthenticated, loading, router]);
+  }, [hasStudioAccess, loading, router]);
 
   // Close menu on route change
   useEffect(() => {
@@ -45,7 +45,9 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthenticated) {
+  // No dashboard shell (nav, sidebar, children) for unauthenticated visitors,
+  // shoppers, suspended accounts, or pending/rejected applicants.
+  if (!isAuthenticated || !hasStudioAccess) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FCFCFA]">
         <p className="font-sans text-[10px] uppercase tracking-[0.4em] text-gray-400 animate-pulse">

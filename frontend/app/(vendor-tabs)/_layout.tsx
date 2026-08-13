@@ -1,6 +1,7 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../../src/state/auth';
 
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
   const getIconName = () => {
@@ -22,6 +23,17 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 export default function VendorTabLayout() {
+  const { user, isAuthenticated } = useAuthStore();
+
+  // Vendor area is only reachable via explicit navigation (profile → Vendor Dashboard).
+  // Redirect any deep-link from a non-vendor or unauthenticated user back to the user side.
+  if (!isAuthenticated) {
+    return <Redirect href="/login" />;
+  }
+  if (user?.role !== 'vendor') {
+    return <Redirect href="/(tabs)/home" />;
+  }
+
   return (
     <Tabs
       screenOptions={{

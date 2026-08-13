@@ -77,6 +77,10 @@ export default function ProfileScreen() {
     { id: 'about', title: 'About Us', icon: <Ionicons name="information-circle-outline" size={22} color="#333" />, onPress: () => router.push('/account/about') },
   ];
 
+  const vendorItems = [
+    { id: 'dashboard', title: 'Vendor Dashboard', icon: <Ionicons name="storefront-outline" size={22} color="#333" />, onPress: () => router.push('/(vendor-tabs)/products') },
+  ];
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
@@ -120,6 +124,12 @@ export default function ProfileScreen() {
         <Section header="Preferences">
           {preferencesItems.map((item, index) => <Row key={item.id} {...item} isFirst={index === 0} isLast={index === preferencesItems.length - 1} />)}
         </Section>
+
+        {user?.role === 'vendor' && (
+          <Section header="Vendor">
+            {vendorItems.map((item, index) => <Row key={item.id} {...item} isFirst={index === 0} isLast={index === vendorItems.length - 1} />)}
+          </Section>
+        )}
         
         <Section header="Support">
           {supportItems.map((item, index) => <Row key={item.id} {...item} isFirst={index === 0} isLast={index === supportItems.length - 1} />)}
@@ -138,7 +148,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#F7F2E9',
   },
   header: {
     paddingVertical: 16,

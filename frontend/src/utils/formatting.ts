@@ -1,8 +1,11 @@
-// All charges go through Razorpay in INR — display must match what's charged.
+import { useSettingsStore } from '../state/settings';
+
 export const formatPrice = (price: number) => {
+  const { currency } = useSettingsStore.getState();
   try {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(price);
   } catch (e) {
-    return `₹ ${(price || 0).toFixed(2)}`;
+    // Fallback for invalid currency code
+    return `${currency} ${(price || 0).toFixed(2)}`;
   }
 };

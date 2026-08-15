@@ -52,6 +52,9 @@ const catalogUploadSingle = (req, res, next) => {
   });
 };
 
+// @route   POST /api/vendors/apply
+// @desc    Submit a studio application to the waitlist
+// @access  Public
 router.post("/apply", async (req, res, next) => {
   try {
     const { studioName, email, websiteOrPortfolio } = req.body;
@@ -105,6 +108,9 @@ router.post("/apply", async (req, res, next) => {
   }
 });
 
+// @route   POST /api/vendors/google-registration-drafts
+// @desc    Create a pre-OAuth registration draft for Google vendor registration
+// @access  Public
 router.post("/google-registration-drafts", async (req, res, next) => {
   try {
     const { studioName, websiteOrPortfolio } = req.body;
@@ -142,6 +148,7 @@ router.post("/google-registration-drafts", async (req, res, next) => {
   }
 });
 
+// @desc    Core approve/reject decision for a vendor application.
 //          Extracted from the route handler so the flow can be integration
 //          tested without an HTTP server. `sendEmailFn` is injectable
 //          (defaults to the real sender) so tests can capture the message
@@ -185,7 +192,8 @@ async function processApplicationDecision({
     application.reviewedAt = Date.now();
     await application.save({ session });
 
-    const { frontendUrl } = require('../utils/frontendUrl');
+    const frontendUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
 
     if (status === "approved") {
       const claimToken = createPasswordToken(7 * 24 * 60 * 60 * 1000);
@@ -236,11 +244,11 @@ async function processApplicationDecision({
       await session.commitTransaction();
       session.endSession();
 
-      const passwordUrl = `${frontendUrl()}/reset-password/${claimToken.rawToken}`;
+      const passwordUrl = `${frontendUrl}/reset-password/${claimToken.rawToken}`;
       await sendEmailFn({
         email: application.email,
         subject: "DRYP: Studio Approved",
-        message: `Your application has been accepted.\n\nSet your password securely here: ${passwordUrl}\n\nOr log in with Google after approval: ${frontendUrl()}/login\n\nThis password link expires in 7 days. After login you can upload products via Manual, Excel, or Shopify link.`,
+        message: `Your application has been accepted.\n\nSet your password securely here: ${passwordUrl}\n\nOr log in with Google after approval: ${frontendUrl}/login\n\nThis password link expires in 7 days. After login you can upload products via Manual, Excel, or Shopify link.`,
       });
 
       return { ok: true, application, user, vendor, passwordUrl };
@@ -273,6 +281,9 @@ async function processApplicationDecision({
   }
 }
 
+// @route   PUT /api/vendors/applications/:id
+// @desc    Admin: Approve or Reject a vendor application
+// @access  Private (Admin Only)
 router.put("/applications/:id", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "admin") {
@@ -309,6 +320,9 @@ router.put("/applications/:id", protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/vendors/applications
+// @desc    Admin: View all applications
+// @access  Private (Admin Only)
 router.get("/applications", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "admin")
@@ -321,6 +335,9 @@ router.get("/applications", protect, async (req, res, next) => {
   }
 });
 
+// @route   POST /api/vendors/register
+// @desc    Register a new vendor and user
+// @access  Public
 router.post("/register", async (req, res, next) => {
   const { name, email, password } = req.body;
   const normalizedEmail = String(email || "").toLowerCase().trim();
@@ -415,7 +432,7 @@ router.post("/login", async (req, res, next) => {
     const { email, password } = req.body;
 
     // 1. Find the user
-    const user = await User.findOne({ email }).select('+passwordHash');
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -463,6 +480,9 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+// @route   GET /api/vendors/me/products
+// @desc    Get all products for the logged-in vendor
+// @access  Private (Vendor only)
 router.get("/me/products", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "vendor") {
@@ -485,6 +505,9 @@ router.get("/me/products", protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/vendors/me
+// @desc    Get the logged-in vendor's profile
+// @access  Private (Vendor only)
 router.get("/me", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "vendor") {
@@ -504,6 +527,9 @@ router.get("/me", protect, async (req, res, next) => {
   }
 });
 
+// @route   PUT /api/vendors/me
+// @desc    Update the logged-in vendor's profile
+// @access  Private (Vendor only)
 router.put("/me", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "vendor") {
@@ -547,6 +573,9 @@ router.put("/me", protect, async (req, res, next) => {
   }
 });
 
+// @route   POST /api/vendors/me/catalog-preview
+// @desc    Vendor: Parse an uploaded spreadsheet into draft products for review
+// @access  Private (Vendor only)
 router.post(
   "/me/catalog-preview",
   protect,
@@ -629,6 +658,9 @@ router.post(
   },
 );
 
+// @route   POST /api/vendors/me/catalog-import
+// @desc    Vendor: Commit reviewed products into their own catalog
+// @access  Private (Vendor only)
 router.post("/me/catalog-import", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "vendor") {
@@ -707,6 +739,9 @@ router.post("/me/catalog-import", protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/vendors/me/catalog-imports
+// @desc    Vendor: Get import history
+// @access  Private (Vendor only)
 router.get("/me/catalog-imports", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "vendor") {
@@ -730,6 +765,9 @@ router.get("/me/catalog-imports", protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/vendors/me/shopify-import
+// @desc    Get the logged-in vendor's Shopify connection + latest import status
+// @access  Private (Vendor only)
 router.get("/me/shopify-import", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "vendor") {
@@ -786,7 +824,10 @@ router.get("/:id/products", async (req, res, next) => {
   }
 });
 
+// @route   POST /api/vendors/admin/onboard
+// @desc    Admin: Create a vendor account on a brand's behalf, skipping the
 //          application/approval flow, and email them a link to claim it
+// @access  Private (Admin Only)
 router.post("/admin/onboard", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "admin")
@@ -841,8 +882,9 @@ router.post("/admin/onboard", protect, async (req, res, next) => {
     user.resetPasswordExpire = Date.now() + 7 * 24 * 60 * 60 * 1000;
     await user.save();
 
-    const { frontendUrl } = require('../utils/frontendUrl');
-    const claimUrl = `${frontendUrl()}/reset-password/${claimToken}`;
+    const frontendUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
+    const claimUrl = `${frontendUrl}/reset-password/${claimToken}`;
 
     await sendEmail({
       email: user.email,
@@ -856,6 +898,9 @@ router.post("/admin/onboard", protect, async (req, res, next) => {
   }
 });
 
+// @route   POST /api/vendors/admin/catalog-preview
+// @desc    Admin: Parse an uploaded spreadsheet into draft products for review
+// @access  Private (Admin Only)
 router.post(
   "/admin/catalog-preview",
   protect,
@@ -875,7 +920,7 @@ router.post(
       const fileTooBig = req.file.size > STREAM_THRESHOLD;
 
       let products, skippedRows;
-      let droppedColumns;
+      let droppedColumns = unknownHeaders;
 
       if (fileTooBig) {
         const result = await parseCatalogFileStream(req.file.buffer, req.file.originalname);
@@ -902,6 +947,9 @@ router.post(
   },
 );
 
+// @route   POST /api/vendors/admin/:vendorId/catalog-import
+// @desc    Admin: Commit reviewed products into a vendor's catalog
+// @access  Private (Admin Only)
 router.post("/admin/:vendorId/catalog-import", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "admin")
@@ -938,6 +986,9 @@ router.post("/admin/:vendorId/catalog-import", protect, async (req, res, next) =
   }
 });
 
+// @route   GET /api/vendors/admin/directory
+// @desc    Admin: Get all officially registered studios
+// @access  Private (Admin Only)
 router.get("/admin/directory", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "admin")
@@ -954,6 +1005,9 @@ router.get("/admin/directory", protect, async (req, res, next) => {
   }
 });
 
+// @route   PUT /api/vendors/admin/suspend/:vendorId
+// @desc    Admin: Toggle a studio's suspension status and email them
+// @access  Private (Admin Only)
 router.put("/admin/suspend/:vendorId", protect, async (req, res, next) => {
   try {
     if (req.user.role !== "admin")

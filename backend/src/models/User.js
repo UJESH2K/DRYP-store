@@ -17,35 +17,43 @@ const AddressSchema = new mongoose.Schema(
   { _id: true },
 );
 
+const PaymentMethodSchema = new mongoose.Schema(
+  {
+    type: { type: String, required: true, enum: ["card"] },
+    last4: { type: String, required: true },
+    brand: { type: String, required: true },
+    isDefault: { type: Boolean, default: false },
+  },
+  { _id: true },
+);
+
 const UserSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true, maxlength: 100 },
+    name: { type: String, required: true, trim: true },
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
       index: true,
-      maxlength: 254,
     },
     passwordHash: {
       type: String,
-      select: false,
       required: function () {
         return this.authProvider === "local";
       },
     },
-    authProvider: { type: String, enum: ["local", "shopify", "google", "apple", "invited"], default: "local" },
+    authProvider: { type: String, enum: ["local", "shopify", "google", "invited"], default: "local" },
     googleId: { type: String, index: true, sparse: true },
-    appleId: { type: String, index: true, sparse: true },
     phone: { type: String, required: false },
     avatar: { type: String, required: false },
     addresses: { type: [AddressSchema], default: [] },
+    paymentMethods: { type: [PaymentMethodSchema], default: [] },
     role: { type: String, enum: ["user", "vendor", "admin"], default: "user" },
     isActive: { type: Boolean, default: true },
     likedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
     preferences: {
-      currency: { type: String, default: "INR" },
+      currency: { type: String, default: "USD" },
       categories: { type: [String], default: [] },
       colors: { type: [String], default: [] },
       brands: { type: [String], default: [] },

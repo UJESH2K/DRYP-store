@@ -83,8 +83,7 @@ export default function ProductDetailScreen() {
         setLoading(true);
         try {
             const productData = await apiCall(`/api/products/${id}`);
-            // apiCall never throws: 404 comes back as { message } — treat as not found.
-            setProduct(productData && productData._id ? productData : null);
+            setProduct(productData);
         } catch (error) {
             console.error("Failed to fetch product:", error);
             Alert.alert("Error", "Failed to load product details.");
@@ -296,7 +295,7 @@ const styles = StyleSheet.create({
     optionTextSelected: { color: '#fff' },
     stockIn: { fontSize: 16, color: '#10B981', marginBottom: 15, fontFamily: 'Zaloga' },
     stockOut: { fontSize: 16, color: '#EF4444', marginBottom: 15, fontFamily: 'Zaloga' },
-    actions: { flexDirection: 'row', marginTop: 20, gap: 10, paddingBottom: 40 },
+    actions: { flexDirection: 'row', marginTop: 20, gap: 10, paddingBottom: 40 }, // Added paddingBottom
     wishlistButton: { 
         padding: 15, 
         borderRadius: 12, 

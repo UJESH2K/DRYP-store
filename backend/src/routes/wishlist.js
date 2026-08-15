@@ -6,6 +6,9 @@ const WishlistItem = require('../models/WishlistItem');
 const Product = require('../models/Product');
 const { signProductImages } = require('../utils/imageUrls');
 
+// @route   GET /api/wishlist
+// @desc    Get all products in the current user's or guest's wishlist
+// @access  Public / Private
 router.get('/', identifyUser, async (req, res, next) => {
   try {
     const query = req.user ? { user: req.user._id } : { guestId: req.guestId };
@@ -13,17 +16,16 @@ router.get('/', identifyUser, async (req, res, next) => {
       return res.json([]);
     }
     const wishlistItems = await WishlistItem.find(query).populate('product');
-    // signProductImages is async — awaiting the batch is required or res.json
-    // serializes the promises as empty objects.
-    const signed = (await Promise.all(
-      wishlistItems.map(item => signProductImages(item.product)),
-    )).filter(p => p && p.isActive !== false);
+    const signed = wishlistItems.map(item => signProductImages(item.product)).filter(Boolean);
     res.json(signed);
   } catch (error) { 
     next(error); 
   }
 });
 
+// @route   POST /api/wishlist/:productId
+// @desc    Add a product to the user's or guest's wishlist
+// @access  Public / Private
 router.post('/:productId', identifyUser, async (req, res, next) => {
   try {
     const { productId } = req.params;
@@ -38,27 +40,28 @@ router.post('/:productId', identifyUser, async (req, res, next) => {
       return res.status(400).json({ message: `Invalid product ID: ${productId}` });
     }
 
-    const product = await Product.findOne({ _id: productId, isActive: true });
+    const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
     const query = userId ? { user: userId, product: productId } : { guestId, product: productId };
-    const result = await WishlistItem.findOneAndUpdate(
-      query,
-      { $setOnInsert: { ...query } },
-      { upsert: true, new: true, includeResultMetadata: true },
-    );
-    if (result.lastErrorObject && result.lastErrorObject.updatedExisting) {
+    const existingItem = await WishlistItem.findOne(query);
+    if (existingItem) {
       return res.status(200).json({ success: true, message: 'Product already in wishlist.' });
     }
 
+    await WishlistItem.create({ ...query, user: userId });
+    
     res.status(201).json({ success: true, message: `Successfully added ${productId} to wishlist.` });
   } catch (error) { 
     next(error); 
   }
 });
 
+// @route   DELETE /api/wishlist/:productId
+// @desc    Remove a product from the user's or guest's wishlist
+// @access  Public / Private
 router.delete('/:productId', identifyUser, async (req, res, next) => {
   try {
     const { productId } = req.params;

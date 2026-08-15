@@ -113,9 +113,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await AsyncStorage.removeItem('guest_id');
 
         const wishlistItems = await apiCall('/api/wishlist');
-        // Backend returns the product docs directly (not {product} wrappers).
         if (Array.isArray(wishlistItems)) {
-          useWishlistStore.getState().setWishlist(wishlistItems.filter(Boolean));
+          const validWishlistProducts = wishlistItems
+            .filter(item => item && item.product)
+            .map(item => item.product);
+          useWishlistStore.getState().setWishlist(validWishlistProducts);
         }
 
         useToastStore.getState().showToast('Logged in successfully!');
@@ -149,9 +151,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await AsyncStorage.removeItem('guest_id');
 
         const wishlistItems = await apiCall('/api/wishlist');
-        // Backend returns the product docs directly (not {product} wrappers).
         if (Array.isArray(wishlistItems)) {
-          useWishlistStore.getState().setWishlist(wishlistItems.filter(Boolean));
+          const validWishlistProducts = wishlistItems
+            .filter(item => item && item.product)
+            .map(item => item.product);
+          useWishlistStore.getState().setWishlist(validWishlistProducts);
         }
 
         useToastStore.getState().showToast('Logged in successfully!');
@@ -177,10 +181,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.removeItem('user_token');
       await AsyncStorage.removeItem('user_data');
       useWishlistStore.getState().setWishlist([]);
-      // Lazy require: cart.ts imports api.ts which imports this store — a
-      // top-level import would create a circular dependency.
-      const { useCartStore } = require('./cart');
-      useCartStore.getState().clearCart();
       set({ user: null, token: null, isAuthenticated: false, isLoading: false });
     } catch (error) {
       if (__DEV__) { console.error('Error logging out:', error); }

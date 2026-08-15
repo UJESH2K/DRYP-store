@@ -10,7 +10,7 @@ type SettingsState = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      currency: 'INR', // All payments are Razorpay INR — kept for compat, unused by formatPrice
+      currency: 'USD', // Default currency
       setCurrency: (currency) => set({ currency }),
     }),
     {

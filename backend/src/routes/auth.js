@@ -5,7 +5,6 @@ const User = require('../models/User');
 const Like = require('../models/Like');
 const WishlistItem = require('../models/WishlistItem');
 const Order = require('../models/Order');
-const Cart = require('../models/Cart');
 
 const router = express.Router();
 const sendEmail = require('../utils/sendEmail');
@@ -38,45 +37,7 @@ const mergeGuestData = async (userId, guestId) => {
     });
     if (wishlistOps.length) await WishlistItem.bulkWrite(wishlistOps);
 
-    // Transfer the guest cart so items survive login. Documented as intended
-    // behavior (AGENTS.md) but was never implemented — without it, a guest's
-    // cart vanishes the moment they log in.
-    const guestCart = await Cart.findOne({ guestId });
-    if (guestCart && guestCart.items.length) {
-      const optionsKey = (o) => {
-        const plain = o instanceof Map ? Object.fromEntries(o) : o || {};
-        return JSON.stringify(
-          Object.entries(plain)
-            .filter(([k]) => k !== '_id' && k !== 'id')
-            .sort(([a], [b]) => a.localeCompare(b)),
-        );
-      };
-      const userCart = await Cart.findOne({ user: userId });
-      if (!userCart) {
-        guestCart.user = userId;
-        guestCart.guestId = null;
-        await guestCart.save();
-      } else {
-        for (const gItem of guestCart.items) {
-          const idx = userCart.items.findIndex(
-            (i) =>
-              i.product.toString() === gItem.product.toString() &&
-              optionsKey(i.options) === optionsKey(gItem.options),
-          );
-          if (idx > -1) userCart.items[idx].quantity += gItem.quantity;
-          else userCart.items.push(gItem);
-        }
-        await userCart.save();
-        await Cart.deleteOne({ guestId });
-      }
-    }
-
-    // Orders are created with status 'pending' (not 'cart'), so the old
-    // filter could never match — migrate pending guest orders as well.
-    await Order.updateMany(
-      { guestId, status: { $in: ['cart', 'pending'] } },
-      { user: userId, guestId: null },
-    );
+    await Order.updateMany({ guestId, status: 'cart' }, { user: userId, guestId: null });
   } catch (error) {
     console.error(`Error merging guest data for user ${userId} from guest ${guestId}:`, error);
   }
@@ -138,11 +99,15 @@ router.post('/login', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// @route   GET /api/auth/me
+// @desc    Hydrate the logged-in user from a bearer token (e.g. after an OAuth redirect
 //          that only carries a token, not a full user object)
 router.get('/me', protect, async (req, res) => {
   res.json({ user: req.user });
 });
 
+// @route   POST /api/auth/forgot-password
+// @desc    Generate token and send email
 router.post('/forgot-password', async (req, res, next) => {
   try {
     const user = await User.findOne({ email: req.body.email });
@@ -160,9 +125,9 @@ router.post('/forgot-password', async (req, res, next) => {
     user.resetPasswordExpire = resetToken.expiresAt;
     await user.save();
 
-    // 3. Create the reset URL pointing to the website frontend
-    const { frontendUrl } = require('../utils/frontendUrl');
-    const resetUrl = `${frontendUrl()}/reset-password/${resetToken.rawToken}`;
+    // 3. Create the reset URL pointing to your NEXT.JS FRONTEND
+    // Ensure NEXT_PUBLIC_FRONTEND_URL is in your .env (e.g., http://localhost:3000)
+    const resetUrl = `${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken.rawToken}`;
 
     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. \n\nPlease make a PUT request to: \n\n ${resetUrl}`;
 
@@ -256,6 +221,8 @@ router.post('/forgot-password', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// @route   PUT /api/auth/reset-password/:token
+// @desc    Verify token and save new password
 router.put('/reset-password/:token', async (req, res, next) => {
   try {
     // 1. Re-hash the token from the URL to match what is saved in the DB
@@ -288,8 +255,11 @@ router.put('/reset-password/:token', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// @route   PUT /api/auth/change-password
+// @desc    Change the password for the currently authenticated user.
 //          Requires the current password — for forgotten passwords use
 //          /forgot-password + /reset-password instead.
+// @access  Private (any authenticated local user)
 router.put('/change-password', protect, async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body || {};

@@ -36,5 +36,3 @@ frontend/.log/
 .DS_Store
 .ignore
 100
-# Markdown docs — not tracked (user preference)
-*.md

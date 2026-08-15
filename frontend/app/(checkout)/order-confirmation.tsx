@@ -10,31 +10,19 @@ import { formatPrice } from '../../src/utils/formatting';
 
 export default function OrderConfirmationScreen() {
   const router = useCustomRouter();
-  const { orderId, orderNumber } = useLocalSearchParams();
+  const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchOrder = async () => {
-      // Payments navigate with the human order number (DRYP-XXXX-YYYY);
-      // orderId is a legacy fallback that may hold a Mongo _id.
-      const numberParam = orderNumber ? String(orderNumber) : '';
-      const idParam = orderId ? String(orderId) : '';
-      const byNumber = numberParam || (idParam.startsWith('DRYP-') ? idParam : '');
-      if (!byNumber && !idParam) {
+      if (!orderId) {
         setLoading(false);
         return;
       }
       try {
-        if (byNumber) {
-          const result = await apiCall(`/api/orders/by-number/${encodeURIComponent(String(byNumber))}`);
-          // apiCall never throws: failures come back as { message }. Only a
-          // real order carries orderNumber — anything else is "not found".
-          setOrder(result && result.orderNumber ? result : null);
-        } else {
-          const result = await apiCall(`/api/orders/${encodeURIComponent(idParam)}`);
-          setOrder(result && result.orderNumber ? result : null);
-        }
+        const result = await apiCall(`/api/orders/by-number/${orderId}`);
+        setOrder(result);
       } catch (error) {
         console.error('Failed to fetch order:', error);
       } finally {
@@ -43,7 +31,7 @@ export default function OrderConfirmationScreen() {
     };
 
     fetchOrder();
-  }, [orderId, orderNumber]);
+  }, [orderId]);
 
   const renderOrderItem = ({ item }: { item: any }) => (
     <View style={styles.itemContainer}>
@@ -52,8 +40,8 @@ export default function OrderConfirmationScreen() {
         style={styles.itemImage}
       />
       <View style={styles.itemInfo}>
-        <Text style={styles.itemTitle} numberOfLines={1}>{item.product?.name || 'Unavailable item'}</Text>
-        <Text style={styles.itemDetailsText}>Brand: {item.product?.brand || ''}</Text>
+        <Text style={styles.itemTitle} numberOfLines={1}>{item.product.name}</Text>
+        <Text style={styles.itemDetailsText}>Brand: {item.product.brand}</Text>
         <Text style={styles.itemDetailsText}>Qty: {item.quantity}</Text>
       </View>
       <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
@@ -98,7 +86,7 @@ export default function OrderConfirmationScreen() {
           <FlatList
             data={order.items}
             renderItem={renderOrderItem}
-            keyExtractor={(item) => item.product?._id || item._id || String(Math.random())}
+            keyExtractor={(item) => item.product._id}
             scrollEnabled={false}
           />
           <View style={styles.summaryContainer}>

@@ -16,14 +16,12 @@ import TextTicker from 'react-native-text-ticker';
 import { FontAwesome } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
-import * as AppleAuthentication from 'expo-apple-authentication';
 // Required for expo-web-browser to complete auth sessions on iOS
 WebBrowser.maybeCompleteAuthSession();
 import { useAuthStore } from '../src/state/auth';
 import { useCustomRouter } from '../src/hooks/useCustomRouter';
-import { apiCall, API_BASE_URL } from '../src/lib/api';
 
-const appleAuthAvailable = Platform.OS === 'ios';
+import { API_BASE_URL } from '../src/lib/api';
 
 export default function LoginScreen() {
   const router = useCustomRouter();
@@ -31,7 +29,6 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isAppleLoading, setIsAppleLoading] = useState(false);
 
   const { login, register, loginWithToken, isLoading, guestId } = useAuthStore();
 
@@ -109,77 +106,9 @@ export default function LoginScreen() {
     }
   };
 
-  const handleAppleLogin = async () => {
-    // Native Sign in with Apple only exists on iOS (Apple guideline 4.8 +
-    // platform sanity); the button is not rendered on Android at all.
-    if (Platform.OS !== 'ios') return;
-
-    try {
-      if (!(await AppleAuthentication.isAvailableAsync())) return;
-    } catch (err) {
-      console.error('Apple auth availability check failed:', err);
-      return;
-    }
-
-    setIsAppleLoading(true);
-    try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-
-      if (!credential.identityToken) {
-        Alert.alert('Sign-In Failed', 'No identity token was returned by Apple.');
-        return;
-      }
-
-      const fullName = credential.fullName
-        ? {
-            givenName: credential.fullName.givenName || undefined,
-            familyName: credential.fullName.familyName || undefined,
-          }
-        : undefined;
-
-      const response = await apiCall('/api/auth/apple', {
-        method: 'POST',
-        body: JSON.stringify({
-          identityToken: credential.identityToken,
-          fullName,
-          guestId: guestId || undefined,
-        }),
-      });
-
-      if (response && response.token) {
-        const user = await loginWithToken(response.token);
-        if (user) {
-          router.replace('/(tabs)/home');
-        } else {
-          Alert.alert('Sign-In Failed', 'Could not authenticate with the returned token.');
-        }
-      } else {
-        Alert.alert('Sign-In Failed', (response && response.message) || 'Apple sign-in failed. Please try again.');
-      }
-    } catch (err) {
-      if (err && typeof err.code === 'string' && err.code === 'ERR_REQUEST_CANCELED') {
-        // User tapped Cancel in the native sheet — not an error.
-        return;
-      }
-      console.error('Apple login error:', err);
-      Alert.alert('Apple Sign-In', 'Something went wrong. Please try again.');
-    } finally {
-      setIsAppleLoading(false);
-    }
-  };
-
   const handleSocialLogin = (provider: string) => {
     if (provider === 'Google') {
       handleGoogleLogin();
-      return;
-    }
-    if (provider === 'Apple') {
-      handleAppleLogin();
       return;
     }
     Alert.alert('Coming Soon', `Login with ${provider} is not available yet.`);
@@ -271,19 +200,9 @@ export default function LoginScreen() {
             <Pressable style={styles.socialButton} onPress={() => handleSocialLogin('Google')}>
               <FontAwesome name="google" size={24} color="black" />
             </Pressable>
-            {appleAuthAvailable && (
-              <Pressable
-                style={styles.socialButton}
-                onPress={() => handleSocialLogin('Apple')}
-                disabled={isAppleLoading}
-              >
-                {isAppleLoading ? (
-                  <ActivityIndicator size="small" color="black" />
-                ) : (
-                  <FontAwesome name="apple" size={24} color="black" />
-                )}
-              </Pressable>
-            )}
+            <Pressable style={styles.socialButton} onPress={() => handleSocialLogin('Apple')}>
+              <FontAwesome name="apple" size={24} color="black" />
+            </Pressable>
           </View>
         </View>
 

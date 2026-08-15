@@ -11,6 +11,9 @@ const { signProductImages, normalizeImageKeys } = require('../utils/imageUrls');
 const { generateProductEmbedding } = require('../utils/embeddings');
 const router = express.Router();
 
+// @route   POST /api/products
+// @desc    Create a new product
+// @access  Private (Vendor only)
 router.post('/', protect, async (req, res, next) => {
   try {
     if (req.user.role !== 'vendor') {
@@ -38,6 +41,9 @@ router.post('/', protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products
+// @desc    Get all active products with filtering
+// @access  Public
 router.get('/', async (req, res, next) => {
   try {
     const { brand, category, color, search, vendor, minPrice, maxPrice, source, sortBy, limit, exclude } = req.query;
@@ -63,10 +69,10 @@ router.get('/', async (req, res, next) => {
         filter._id = { $nin: excludeIds };
       }
     }
+    console.log('Fetching products with filter:', filter);
 
-    // Sort whitelist — cursor pagination is only valid on the default createdAt sort.
     const sortWhitelist = {
-      createdAt: { createdAt: -1, _id: -1 },
+      createdAt: { createdAt: -1 },
       basePrice: { basePrice: -1 },
       rating: { rating: -1 },
       likes: { likes: -1 },
@@ -80,6 +86,7 @@ router.get('/', async (req, res, next) => {
         sort = Object.fromEntries(Object.entries(baseSort).map(([k]) => [k, direction]));
       }
     }
+
     const parsedLimit = Number(limit);
     const finalLimit = Number.isNaN(parsedLimit) ? 50 : Math.min(Math.max(parsedLimit, 1), 100);
 
@@ -87,12 +94,16 @@ router.get('/', async (req, res, next) => {
       .populate({ path: 'vendor', select: 'name' })
       .limit(finalLimit)
       .sort(sort);
+    console.log('Found products:', products.length);
     res.json(await Promise.all(products.map((product) => signProductImages(product))));
   } catch (error) {
     next(error);
   }
 });
 
+// @route   GET /api/products/brands
+// @desc    Get a unique list of all brands
+// @access  Public
 router.get('/brands', async (req, res, next) => {
   try {
     const brands = await Product.find({ isActive: true }).distinct('brand');
@@ -102,6 +113,9 @@ router.get('/brands', async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/categories
+// @desc    Get a unique list of all categories
+// @access  Public
 router.get('/categories', async (req, res, next) => {
   try {
     const categories = await Product.find({ isActive: true }).distinct('category');
@@ -111,6 +125,9 @@ router.get('/categories', async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/colors
+// @desc    Get a unique list of all colors
+// @access  Public
 router.get('/colors', async (req, res, next) => {
   try {
     const products = await Product.find({ isActive: true }).select('options');
@@ -127,6 +144,9 @@ router.get('/colors', async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/tags
+// @desc    Get a unique list of all tags
+// @access  Public
 router.get('/tags', async (req, res, next) => {
   try {
     const tags = await Product.find({ isActive: true }).distinct('tags');
@@ -136,6 +156,9 @@ router.get('/tags', async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/suggestions
+// @desc    Get search suggestions
+// @access  Public
 router.get('/suggestions', async (req, res, next) => {
   try {
     const { query } = req.query;
@@ -163,11 +186,11 @@ router.get('/suggestions', async (req, res, next) => {
   }
 });
 
+// @route   PUT /api/products/:id
+// @desc    Update a product
+// @access  Private (Vendor only)
 router.put('/:id', protect, async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
     if (req.user.role !== 'vendor') {
       return res.status(403).json({ message: 'Forbidden: Only vendors can edit products' });
     }
@@ -182,7 +205,7 @@ router.put('/:id', protect, async (req, res, next) => {
       return res.status(401).json({ message: 'Not authorized to edit this product' });
     }
 
-    const { name, description, brand, category, tags, basePrice, options, variants, images, isActive } = req.body;
+    const { name, description, brand, category, tags, basePrice, options, variants, images } = req.body;
     const safeUpdateData = {
         name,
         description,
@@ -198,7 +221,6 @@ router.put('/:id', protect, async (req, res, next) => {
             }))
           : variants,
         images: normalizeImageKeys(images),
-        ...(typeof isActive === 'boolean' ? { isActive } : {}),
     };
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -206,16 +228,6 @@ router.put('/:id', protect, async (req, res, next) => {
       { $set: safeUpdateData }, 
       { new: true, runValidators: true }
     );
-
-    // Deactivating via the edit screen must have the same integrity effect as
-    // archiving: drop the product from carts, wishlists and likes so inactive
-    // products stop appearing in user flows (orders already reject them).
-    if (updatedProduct && updatedProduct.isActive === false) {
-      const productId = updatedProduct._id;
-      await Cart.updateMany({}, { $pull: { items: { product: productId } } });
-      await WishlistItem.deleteMany({ product: productId });
-      await Like.deleteMany({ product: productId });
-    }
 
     generateProductEmbedding(updatedProduct).then(embedding => {
       Product.updateOne({ _id: updatedProduct._id }, { $set: { embedding } }).catch(() => {});
@@ -228,11 +240,11 @@ router.put('/:id', protect, async (req, res, next) => {
   }
 });
 
+// @route   DELETE /api/products/:id
+// @desc    Delete a product and all its associated data
+// @access  Private (Vendor only)
 router.delete('/:id', protect, async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
     if (req.user.role !== 'vendor') {
       return res.status(403).json({ message: 'Forbidden: Only vendors can delete products' });
     }
@@ -261,12 +273,12 @@ router.delete('/:id', protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/products/:id
+// @desc    Get a single product by ID
+// @access  Public
 router.get('/:id', async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-    const product = await Product.findOne({ _id: req.params.id, isActive: true }).populate('vendor', 'name');
+    const product = await Product.findById(req.params.id).populate('vendor', 'name');
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -278,6 +290,9 @@ router.get('/:id', async (req, res, next) => {
 
 const { scrapeShopifyProduct } = require('../utils/shopifyScraper');
 
+// @route   POST /api/products/shopify-scrape
+// @desc    Scrape a Shopify product page and create a product
+// @access  Private (Vendor only)
 router.post('/shopify-scrape', protect, async (req, res, next) => {
   try {
     if (req.user.role !== 'vendor') {
@@ -324,6 +339,9 @@ router.post('/shopify-scrape', protect, async (req, res, next) => {
   }
 });
 
+// @route   POST /api/products/shopify-preview
+// @desc    Preview scraped data without saving
+// @access  Private (Vendor only)
 router.post('/shopify-preview', protect, async (req, res, next) => {
   try {
     if (req.user.role !== 'vendor') {

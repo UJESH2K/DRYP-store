@@ -6,8 +6,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
   JosefinSans_400Regular,
+  JosefinSans_500Medium,
   JosefinSans_600SemiBold,
 } from '@expo-google-fonts/josefin-sans';
+import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
 import { useAuthStore } from '../src/state/auth';
 import Toast from '../src/components/Toast';
 import ErrorBoundary from '../src/components/common/ErrorBoundary';
@@ -20,7 +22,9 @@ export default function RootLayout() {
   const { isAuthenticated, user, loadUser } = useAuthStore();
   const [fontsLoaded] = useFonts({
     JosefinSans_400Regular,
+    JosefinSans_500Medium,
     JosefinSans_600SemiBold,
+    CormorantGaramond_700Bold,
     Zaloga: require('../assets/fonts/Zaloga.ttf'),
   });
   const [authIsReady, setAuthIsReady] = React.useState(false);

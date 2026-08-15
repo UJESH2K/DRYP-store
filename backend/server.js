@@ -1,15 +1,4 @@
-const path = require('path');
-// Base .env always loads (DB, keys). In production, .env.production overlays
-// it so values like GOOGLE_REDIRECT_URI actually reach the app (previously
-// dead files that dotenv never read).
 require("dotenv").config();
-if (process.env.NODE_ENV === 'production') {
-  require("dotenv").config({ path: path.join(__dirname, '.env.production'), override: true });
-  if (!process.env.GOOGLE_REDIRECT_URI) {
-    console.error('FATAL: GOOGLE_REDIRECT_URI must be set for production');
-    process.exit(1);
-  }
-}
 
 if (!process.env.JWT_SECRET) {
   console.error("FATAL: JWT_SECRET must be set in .env");
@@ -19,13 +8,13 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path"); // Import path module
 const connectDatabase = require("./src/config/database");
 
 // Route imports
 const authRoutes = require("./src/routes/auth");
 const shopifyAuthRoutes = require("./src/routes/shopifyAuth");
 const googleAuthRoutes = require("./src/routes/googleAuth");
-const appleAuthRoutes = require("./src/routes/appleAuth");
 const productRoutes = require("./src/routes/products");
 const vendorRoutes = require("./src/routes/vendors");
 const orderRoutes = require("./src/routes/orders");
@@ -95,14 +84,6 @@ const shopifyAuthLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const appleAuthLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: isProduction ? 10 : 50,
-  message: { message: "Too many Apple authentication attempts from this IP. Please wait 1 minute and try again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 // Express app
 const app = express();
 const http = require("http");
@@ -127,38 +108,20 @@ app.use(
 app.use("/api/payments/webhook", paymentsWebhookRoutes);
 app.get('/api/payments/checkout', (req, res) => {
   const order_id = String(req.query.order_id || '');
-  const key = String(req.query.key || process.env.RAZORPAY_KEY_ID || '');
-  const amount = Number(req.query.amount) || 0;
+  const key = String(req.query.key || '');
+  const amount = String(req.query.amount || '0');
   const currency = String(req.query.currency || 'INR');
   res.setHeader('Content-Type', 'text/html');
-  // JSON.stringify on every interpolated value to prevent HTML/JS injection.
-  // handler/ondismiss are real functions authored below — the RN side receives
-  // {razorpay_payment_id, razorpay_order_id, razorpay_signature} on success,
-  // {action:'cancel'} on dismiss, {action:'failed', error} on payment failure.
-  const config = { key, order_id, currency };
-  const script = `
-var cfg = ${JSON.stringify(config)};
-var post = function (m) { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(m)); };
-var options = {
-  key: cfg.key,
-  amount: ${JSON.stringify(amount)},
-  currency: cfg.currency,
-  order_id: cfg.order_id,
-  handler: function (r) {
-    post({ razorpay_payment_id: r.razorpay_payment_id, razorpay_order_id: r.razorpay_order_id, razorpay_signature: r.razorpay_signature });
-  },
-  modal: { ondismiss: function () { post({ action: 'cancel' }); } }
-};
-var rzp = new Razorpay(options);
-rzp.on('payment.failed', function (r) { post({ action: 'failed', error: r.error }); });
-rzp.open();`.trim();
+  // JSON.stringify on every interpolated value to prevent HTML/JS injection
+  const options = {
+    key, amount, currency, order_id,
+    handler: "function(response){window.ReactNativeWebView.postMessage(JSON.stringify(response));}",
+    modal: {
+      ondismiss: "function(){window.ReactNativeWebView.postMessage(JSON.stringify({action:\"cancel\"}));}",
+    },
+  };
+  const script = `var options=${JSON.stringify(options)};var rzp=new Razorpay(options);rzp.open();`;
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://checkout.razorpay.com/v1/checkout.js"></script></head><body style="margin:0;padding:0"><script>${script}</script></body></html>`;
-  // Helmet's default CSP (script-src 'self') would block both the remote
-  // checkout.js and the inline handler above, blanking the page in the WebView.
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://checkout.razorpay.com https://api.razorpay.com; frame-src 'self' https://checkout.razorpay.com"
-  );
   res.send(html);
 });
 
@@ -190,10 +153,9 @@ app.use("/api/vendors/apply", vendorApplyLimiter);
 app.use("/api/vendors/google-registration-drafts", googleRegistrationDraftLimiter);
 app.use("/api/auth/shopify", shopifyAuthLimiter);
 app.use("/api/auth/google", googleAuthLimiter);
-app.use("/api/auth/apple", appleAuthLimiter);
+
 app.use("/api/auth/shopify", shopifyAuthRoutes);
 app.use("/api/auth/google", googleAuthRoutes);
-app.use("/api/auth/apple", appleAuthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/vendors", vendorRoutes);

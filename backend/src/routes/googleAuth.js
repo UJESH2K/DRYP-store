@@ -13,7 +13,6 @@ const { mergeGuestData } = require('./auth');
 // runtime resolution now uses utils/identityResolution below.
 const { decideStudioAccess, normalizeEmail, assertStudioAccessAllowed } = require('../utils/studioAccess');
 const {
-  assertIdentityUnique,
   findIdentityForGoogle,
   linkVerifiedIdentityToCanonicalUser,
 } = require('../utils/identityResolution');
@@ -25,15 +24,13 @@ const REDIRECT_URI =
   `${process.env.SHOPIFY_APP_URL || 'http://localhost:8081'}/api/auth/google/callback`;
 
 const buildFrontendRedirect = (params) => {
-  const { frontendUrl } = require('../utils/frontendUrl');
-  const base = frontendUrl();
+  const base = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
   const query = new URLSearchParams(params).toString();
   return `${base}/oauth/google/callback?${query}`;
 };
 
 const buildRegisterStatusRedirect = (status) => {
-  const { frontendUrl } = require('../utils/frontendUrl');
-  const base = frontendUrl();
+  const base = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
   const query = new URLSearchParams({ status }).toString();
   return `${base}/register?${query}`;
 };
@@ -62,6 +59,9 @@ const buildRedirect = (platform, params, customRedirectUri) => {
   return buildFrontendRedirect(params);
 };
 
+// @route   GET /api/auth/google
+// @desc    Redirect to Google OAuth consent page
+// @access  Public
 router.get('/', async (req, res, next) => {
   try {
   if (!GOOGLE_CLIENT_ID) {
@@ -73,15 +73,6 @@ router.get('/', async (req, res, next) => {
   const { guestId, draftId, redirect_uri } = req.query;
   const platform = req.query.platform === 'mobile' ? 'mobile' : 'web';
   const intent = req.query.intent === 'register' ? 'register' : 'login';
-
-  // Open-redirect guard: the mobile app's only legit post-auth target is the
-  // dryp:// deep link. An attacker-supplied redirect_uri would receive the
-  // fresh 7-day JWT after auth (account-takeover phishing), so anything off
-  // the app scheme is dropped and the default dryp://oauth-callback is used.
-  const safeRedirectUri =
-    typeof redirect_uri === 'string' && redirect_uri.startsWith('dryp://')
-      ? redirect_uri
-      : null;
 
   if (intent === 'register' && !draftId) {
     return res.redirect(buildRegisterStatusRedirect('draft_expired'));
@@ -99,7 +90,7 @@ router.get('/', async (req, res, next) => {
   }
 
   const state = jwt.sign(
-    buildOAuthStatePayload({ guestId, platform, intent, draftId, redirectUri: safeRedirectUri }),
+    buildOAuthStatePayload({ guestId, platform, intent, draftId, redirectUri: redirect_uri }),
     process.env.JWT_SECRET,
     { expiresIn: '10m' },
   );
@@ -120,6 +111,9 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// @route   GET /api/auth/google/callback
+// @desc    Handle Google OAuth callback (website studio gate / mobile customer)
+// @access  Public (Google redirect)
 router.get('/callback', async (req, res) => {
   const { code, state: stateParam, error } = req.query;
 

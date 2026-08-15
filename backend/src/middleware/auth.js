@@ -4,8 +4,15 @@ const User = require("../models/User");
 const identifyUser = async (req, res, next) => {
   req.user = null;
 
-  // 1. Token auth first — a valid Bearer token must win over any stale
-  //    x-guest-id header (guest identity is a fallback, not an override).
+  // 0. Guest identity via x-guest-id header (no auth token required)
+  const guestId = req.headers["x-guest-id"];
+  if (guestId && /^[a-z0-9]{8,40}$/.test(String(guestId))) {
+    req.guestId = String(guestId);
+    req.user = null;
+    return next();
+  }
+
+  // 1. Try Supabase / JWT auth
   const authHeader = req.headers.authorization;
   const token =
     authHeader && authHeader.startsWith("Bearer")
@@ -61,12 +68,6 @@ const identifyUser = async (req, res, next) => {
     } catch (error) {
       console.error(`Auth Middleware: ${error.message}.`);
     }
-  }
-
-  // 2. Guest identity via x-guest-id header (only when no valid token)
-  const guestId = req.headers["x-guest-id"];
-  if (guestId && /^[a-z0-9]{8,40}$/.test(String(guestId))) {
-    req.guestId = String(guestId);
   }
 
   req.user = null;

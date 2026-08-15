@@ -33,7 +33,7 @@ async function runTests() {
       body: JSON.stringify({
         name: 'Test User',
         email: testEmail,
-        password: 'TestPass123',
+        password: 'password123',
       }),
     });
     if (response.status !== 200) throw new Error(`Status code: ${response.status}`);

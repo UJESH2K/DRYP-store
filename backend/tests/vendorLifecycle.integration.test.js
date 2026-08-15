@@ -179,7 +179,7 @@ async function main() {
       found.resetPasswordExpire = undefined;
       await found.save();
 
-      const after = await User.findOne({ email: email('reset') }).select('+passwordHash').lean();
+      const after = await User.findOne({ email: email('reset') }).lean();
       assert.strictEqual(after.resetPasswordToken, undefined);
       assert.strictEqual(after.resetPasswordExpire, undefined);
       const match = await bcrypt.compare(newPassword, after.passwordHash);

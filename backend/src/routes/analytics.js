@@ -5,6 +5,9 @@ const Like = require('../models/Like');
 const WishlistItem = require('../models/WishlistItem');
 const router = express.Router();
 
+// @route   GET /api/analytics/summary
+// @desc    Get summary analytics for a vendor
+// @access  Private (Vendor only)
 router.get('/summary', protect, async (req, res, next) => {
   try {
     if (req.user.role !== 'vendor') {
@@ -34,6 +37,9 @@ router.get('/summary', protect, async (req, res, next) => {
   }
 });
 
+// @route   GET /api/analytics/products
+// @desc    Get product analytics for a vendor
+// @access  Private (Vendor only)
 router.get('/products', protect, async (req, res, next) => {
   try {
     if (req.user.role !== 'vendor') {

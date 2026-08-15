@@ -12,9 +12,6 @@ const { signProductImages } = require('../utils/imageUrls');
  * Query params:
  *   - limit: number (default 50, max 100)
  *   - exclude: comma-separated product IDs to exclude
- *   - brand: comma-separated brand names (same semantics as GET /api/products)
- *   - category: comma-separated categories
- *   - color: comma-separated variant colors (matches variants.options.Color)
  */
 router.get('/personalized', identifyUser, async (req, res, next) => {
   try {
@@ -42,29 +39,9 @@ router.get('/personalized', identifyUser, async (req, res, next) => {
       }
     }
 
-    // Optional browse filters — same $in/$elemMatch semantics as GET /api/products
-    // Accepts comma-separated strings or repeated query keys (Express parses those as arrays).
-    const toValues = (v) => [].concat(v ?? [])
-      .flatMap(s => String(s).split(','))
-      .map(s => s.trim())
-      .filter(Boolean);
-    const browseFilter = {};
-    const brands = toValues(req.query.brand);
-    const categories = toValues(req.query.category);
-    const colors = toValues(req.query.color);
-    if (brands.length > 0) browseFilter.brand = { $in: brands };
-    if (categories.length > 0) browseFilter.category = { $in: categories };
-    if (colors.length > 0) {
-      browseFilter.variants = { $elemMatch: { 'options.Color': { $in: colors } } };
-    }
-
-    // Build candidate pool (larger than limit for meaningful ranking).
-    // Sort newest-first at the DB so the pool covers recent products instead
-    // of an arbitrary insertion-order window — otherwise the newest ~744 of
-    // the 944-product catalog would never surface on the first load.
+    // Build candidate pool (larger than limit for meaningful ranking)
     const candidateLimit = Math.max(200, limit * 4);
-    const candidates = await Product.find({ isActive: true, ...browseFilter, ...excludeFilter })
-      .sort({ createdAt: -1, _id: -1 })
+    const candidates = await Product.find({ isActive: true, ...excludeFilter })
       .populate({ path: 'vendor', select: 'name' })
       .limit(candidateLimit)
       .lean();

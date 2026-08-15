@@ -20,7 +20,7 @@ type CartState = {
   addToCart: (item: Omit<CartItem, 'id'> & { id?: string }) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
-  updateCartItem: (oldId: string, newData: Omit<CartItem, 'id' | 'quantity'>) => Promise<void>;
+  updateCartItem: (oldId: string, newData: Omit<CartItem, 'id' | 'quantity'>) => void;
   clearCart: () => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
@@ -162,30 +162,12 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      updateCartItem: async (oldId, newData) => {
-        const oldItem = get().items.find(i => i.id === oldId);
-        const quantity = oldItem?.quantity || 1;
+      updateCartItem: (oldId, newData) => {
         set((state) => ({
           items: state.items.map(item =>
             item.id === oldId ? { ...item, ...newData, id: generateCartId(newData.productId, newData.options) } : item
           ),
         }));
-        // Keep the server cart in sync: the old variant line is replaced by
-        // the new one (backend PUT only handles quantity, not options).
-        try {
-          await apiCall(`/api/cart/${encodeURIComponent(oldId)}`, { method: 'DELETE' });
-          await apiCall('/api/cart', {
-            method: 'POST',
-            body: JSON.stringify({
-              productId: newData.productId,
-              quantity,
-              price: newData.price,
-              options: newData.options,
-            }),
-          });
-        } catch (error) {
-          if (__DEV__) { console.error('Failed to sync variant change to server:', error); }
-        }
       },
 
       clearCart: () => set({ items: [] }),

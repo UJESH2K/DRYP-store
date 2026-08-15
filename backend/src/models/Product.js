@@ -7,15 +7,15 @@ const OptionSchema = new mongoose.Schema({
 
 const VariantSchema = new mongoose.Schema({
   options: { type: Map, of: String, required: true }, // e.g., { "Color": "Red", "Size": "M" }
-  sku: { type: String, required: false, sparse: true }, // Stock Keeping Unit
+  sku: { type: String, required: false, unique: true, sparse: true }, // Stock Keeping Unit
   stock: { type: Number, required: true, min: 0, default: 0 },
   price: { type: Number, required: true }, // Optional: if different from base price
   images: { type: [String], default: [] }, // Optional: if variant has its own images
 }, { _id: false });
 
 const ProductSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true, maxlength: 200 },
-  description: { type: String, required: false, maxlength: 10000 },
+  name: { type: String, required: true, trim: true },
+  description: { type: String, required: false },
   
   // Core Details
   brand: { type: String, required: true, index: true },
@@ -24,7 +24,7 @@ const ProductSchema = new mongoose.Schema({
   
   // Pricing & Stock
   basePrice: { type: Number, required: true, min: 0 },
-  sku: { type: String, required: false, sparse: true }, // For simple products
+  sku: { type: String, required: false, unique: true, sparse: true }, // For simple products
   stock: { type: Number, default: 0 }, // For simple products without variants
   
   // Variants for complex products
@@ -50,13 +50,6 @@ const ProductSchema = new mongoose.Schema({
 
 // Re-importing from the same external source should update, not duplicate, a product.
 ProductSchema.index({ vendor: 1, externalId: 1 }, { unique: true, sparse: true });
-
-// SKUs are unique per vendor, not globally — different vendors may use the same SKU.
-// NOTE (prod one-time migration): a global unique index on sku (name `sku_1`) may already
-// exist from the previous schema. It must be dropped manually in Atlas before/while this
-// new index builds, or inserts will still hit E11000. Not done in this task.
-ProductSchema.index({ vendor: 1, sku: 1 }, { unique: true, sparse: true });
-ProductSchema.index({ vendor: 1, 'variants.sku': 1 }, { unique: true, sparse: true });
 
 // Ensure that for a given product, each variant has a unique combination of options
 ProductSchema.path('variants').validate(function(variants) {

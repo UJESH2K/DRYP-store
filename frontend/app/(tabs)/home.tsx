@@ -3,8 +3,6 @@ import { View, Text, StyleSheet, StatusBar, Pressable, Animated } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHomeScreenData } from '../../src/hooks/useHomeScreenData';
 import { useSwipeAnimations } from '../../src/hooks/useSwipeAnimations';
-import { useCartStore } from '../../src/state/cart';
-import { useToastStore } from '../../src/state/toast';
 import { Header } from '../../src/components/home/Header';
 import { Filters } from '../../src/components/home/Filters';
 import AnimatedLoadingScreen from '../../src/components/common/AnimatedLoadingScreen';
@@ -24,35 +22,17 @@ export default function HomeScreen() {
     selectedFilters,
     setSelectedFilters,
     clearFilters,
-    loadMore,
-    loadingMore,
-    endReached,
   } = useHomeScreenData();
   
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const [showStylist, setShowStylist] = useState(false);
-  const addToCart = useCartStore((s) => s.addToCart);
-  const showToast = useToastStore((s) => s.showToast);
 
   const showDetailsWithAnimation = (item: Item) => {
     swipeAnimations.showDetailsAnimation();
     setSelectedProductId(item.id);
     setModalVisible(true);
-  };
-
-  const addToCartWithFeedback = (item: Item) => {
-    addToCart({
-      productId: item.id,
-      title: item.title,
-      brand: item.brand,
-      image: item.image,
-      price: item.price,
-      options: undefined,
-      quantity: 1,
-    });
-    showToast(`Added ${item.title} to cart`, 'success');
   };
   
   const hideDetailsWithAnimation = () => {
@@ -61,7 +41,7 @@ export default function HomeScreen() {
     setSelectedProductId(null);
   };
   
-  const swipeAnimations = useSwipeAnimations(items, showDetailsWithAnimation, addToCartWithFeedback);
+  const swipeAnimations = useSwipeAnimations(items, showDetailsWithAnimation);
   const undoOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -89,19 +69,6 @@ export default function HomeScreen() {
     return () => clearTimeout(timer);
   }, [swipeAnimations.canUndo, swipeAnimations.currentIndex]);
 
-  const currentItem = items[swipeAnimations.currentIndex];
-  // Infinite scroll: fetch the next batch when the deck runs low.
-  useEffect(() => {
-    if (loading || loadingMore || endReached) return;
-    if (items.length === 0) return;
-    if (swipeAnimations.currentIndex >= items.length - 5) {
-      loadMore();
-    }
-  }, [swipeAnimations.currentIndex, items.length, loading, loadingMore, endReached, loadMore]);
-
-  // FIX: Remove the modulo so the stack actually ends when it runs out of items
-  const nextItem = items[swipeAnimations.currentIndex + 1];
-
   if (loading) {
     return <AnimatedLoadingScreen text="Finding your next look..." />;
   }
@@ -109,6 +76,10 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return <EmptyState onClearFilters={clearFilters} error={error} />;
   }
+
+  const currentItem = items[swipeAnimations.currentIndex];
+  // FIX: Remove the modulo so the stack actually ends when it runs out of items
+  const nextItem = items[swipeAnimations.currentIndex + 1];
 
   return (
     <>
@@ -124,8 +95,8 @@ export default function HomeScreen() {
           {/* Add this fallback message behind the cards */}
           {swipeAnimations.currentIndex >= items.length && (
             <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 22, fontFamily: 'Zaloga', marginBottom: 8 }}>{loadingMore || !endReached ? 'Finding more styles…' : "You're all caught up!"}</Text>
-              <Text style={{ fontSize: 16, color: '#666', fontFamily: 'Zaloga' }}>{endReached ? 'Check back later for new styles.' : 'Loading more styles…'}</Text>
+              <Text style={{ fontSize: 22, fontFamily: 'Zaloga', marginBottom: 8 }}>You're all caught up!</Text>
+              <Text style={{ fontSize: 16, color: '#666', fontFamily: 'Zaloga' }}>Check back later for new styles.</Text>
             </View>
           )}
           {nextItem && (

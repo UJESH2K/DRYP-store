@@ -62,7 +62,6 @@
       "expo-web-browser",
       "expo-document-picker",
       "expo-image-picker",
-      "expo-apple-authentication",
       "expo-router"
     ],
     "extra": {

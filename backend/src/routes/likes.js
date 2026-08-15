@@ -5,9 +5,6 @@ const { identifyUser } = require('../middleware/auth'); // Use identifyUser
 const mongoose = require('mongoose');
 const router = express.Router();
 
-// @route   GET /api/likes
-// @desc    Get all products liked by the current user or guest
-// @access  Public / Private
 router.get('/', identifyUser, async (req, res, next) => {
   try {
     const query = req.user ? { user: req.user._id } : { guestId: req.guestId };
@@ -15,15 +12,14 @@ router.get('/', identifyUser, async (req, res, next) => {
       return res.json([]); // No user or guest, return empty array
     }
     const likes = await Like.find(query).populate('product');
-    res.json(likes.map(l => l.product));
+    // Drop hard-deleted (null) and deactivated products; archived products
+    // get their Like rows cleaned at archive time, this guards the rest.
+    res.json(likes.map(l => l.product).filter(p => p && p.isActive !== false));
   } catch (error) { 
     next(error); 
   }
 });
 
-// @route   POST /api/likes/:productId
-// @desc    Like a product
-// @access  Public / Private
 router.post('/:productId', identifyUser, async (req, res, next) => {
   try {
     const { productId } = req.params;
@@ -38,7 +34,7 @@ router.post('/:productId', identifyUser, async (req, res, next) => {
       return res.status(400).json({ message: `Invalid product ID: ${productId}` });
     }
 
-    const product = await Product.findById(productId);
+    const product = await Product.findOne({ _id: productId, isActive: true });
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -58,9 +54,6 @@ router.post('/:productId', identifyUser, async (req, res, next) => {
   }
 });
 
-// @route   DELETE /api/likes/:productId
-// @desc    Unlike a product
-// @access  Public / Private
 router.delete('/:productId', identifyUser, async (req, res, next) => {
   try {
     const { productId } = req.params;

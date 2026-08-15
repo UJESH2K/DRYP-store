@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Pressable, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router'; // Added useFocusEffect for fetching on screen focus
+import { useFocusEffect } from 'expo-router';
 import { apiCall } from '../../src/lib/api';
 import { useCartStore, CartItem } from '../../src/state/cart';
 import { Ionicons } from '@expo/vector-icons';

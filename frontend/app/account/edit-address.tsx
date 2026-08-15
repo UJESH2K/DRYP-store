@@ -12,7 +12,13 @@ export default function EditAddressScreen() {
   const navigation = useNavigation();
   const { address: addressString } = useLocalSearchParams();
   
-  const initialAddress = JSON.parse(addressString as string);
+  let parsedAddress = null;
+  try {
+    parsedAddress = typeof addressString === 'string' ? JSON.parse(addressString) : null;
+  } catch {
+    parsedAddress = null;
+  }
+  const initialAddress = parsedAddress || {};
   const [address, setAddress] = useState({
     name: '',
     phone: '',

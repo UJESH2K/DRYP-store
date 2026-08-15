@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const Order = require('../models/Order');
+const { decrementOrderStock } = require('../utils/orderStock');
 
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -21,7 +22,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     const event = JSON.parse(req.body);
     const payment = event.payload && event.payload.payment && event.payload.payment.entity;
     if (event.event === 'payment.captured' && payment) {
-      await Order.findOneAndUpdate({ razorpayOrderId: payment.order_id }, { paymentStatus: 'completed', status: 'confirmed', razorpayPaymentId: payment.id });
+      // Idempotent: only the transition pending->completed decrements stock.
+      const order = await Order.findOneAndUpdate(
+        { razorpayOrderId: payment.order_id, paymentStatus: { $ne: 'completed' } },
+        { paymentStatus: 'completed', status: 'confirmed', razorpayPaymentId: payment.id },
+        { new: true }
+      );
+      if (order) await decrementOrderStock(order);
     } else if (event.event === 'payment.failed' && payment) {
       await Order.findOneAndUpdate({ razorpayOrderId: payment.order_id }, { paymentStatus: 'failed' });
     }

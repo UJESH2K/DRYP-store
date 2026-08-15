@@ -68,7 +68,7 @@ export default function ManageProductsScreen() {
         {
           text: "OK", onPress: async () => {
             const result = await apiCall(`/api/products/${productId}`, { method: 'DELETE' });
-            if (result.message === 'Product removed') {
+            if (result.message === 'Product archived successfully') {
               setProducts(prev => prev.filter(p => p._id !== productId));
             } else {
               Alert.alert('Error', result.message || 'Failed to delete product.');

@@ -51,8 +51,6 @@ export default function AccountLayout() {
           headerShadowVisible: false,
         }}
       />
-      <Stack.Screen name="add-payment-method" options={{ headerShown: false }} />
-      <Stack.Screen name="edit-payment-method" options={{ headerShown: false }} />
       <Stack.Screen
         name="settings"
         options={{
@@ -103,27 +101,10 @@ export default function AccountLayout() {
           headerShadowVisible: false,
         }} 
       />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
       <Stack.Screen
         name="orders"
         options={{
           title: 'My Orders',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#ffffff',
-          },
-          headerTintColor: '#1a1a1a',
-          headerTitleStyle: {
-            fontFamily: 'Zaloga',
-            fontSize: 28,
-          },
-          headerShadowVisible: false,
-        }}
-      />
-      <Stack.Screen
-        name="payment"
-        options={{
-          title: 'Payment Methods',
           headerShown: true,
           headerStyle: {
             backgroundColor: '#ffffff',

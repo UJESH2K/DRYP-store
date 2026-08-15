@@ -33,7 +33,8 @@ interface ProductRef {
   brand: string;
   category?: string;
   basePrice: number;
-  image: string | null;
+  image?: string | null;
+  images?: string[];
   tags?: string[];
   colors?: string[];
 }
@@ -43,7 +44,7 @@ function toItem(p: ProductRef): Item {
     id: p._id,
     title: p.name,
     subtitle: p.brand,
-    image: p.image || '',
+    image: (p.images && p.images[0]) || p.image || '',
     tags: p.tags || [],
     category: p.category || 'Uncategorized',
     priceTier: getPriceTier(p.basePrice || 0),
@@ -95,7 +96,7 @@ export default function AIChatScreen() {
       if (token) headers.Authorization = `Bearer ${token}`;
       else if (guestId) headers['x-guest-id'] = guestId;
 
-      const response = await fetch(`${API_BASE_URL}/api/stylist`, {
+      const response = await fetch(`${API_BASE_URL}${process.env.EXPO_PUBLIC_AI_STYLIST_ENDPOINT || '/api/stylist'}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -159,9 +160,9 @@ export default function AIChatScreen() {
               style={styles.productChip}
               onPress={() => handleProductTap(p)}
             >
-              {p.image && (
-                <Image source={{ uri: p.image }} style={styles.chipImage} />
-              )}
+              {(p.images && p.images[0]) || p.image ? (
+                <Image source={{ uri: (p.images && p.images[0]) || p.image }} style={styles.chipImage} />
+              ) : null}
               <View style={styles.chipInfo}>
                 <Text style={styles.chipName} numberOfLines={1}>{p.name}</Text>
                 <Text style={styles.chipBrand}>{p.brand}</Text>

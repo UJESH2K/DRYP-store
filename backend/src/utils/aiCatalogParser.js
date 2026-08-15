@@ -98,7 +98,7 @@ async function aiEnhanceSchema(worksheet, allColumns) {
   try {
     const openai = getClient();
     const startTime = Date.now();
-    console.log(`[catalogImport] AI mapping started: model=${AI_MODEL}, headers=${allColumns.length}, key=${process.env.OPENAI_API_KEY.slice(0, 7)}...`);
+    console.log(`[catalogImport] AI mapping started: model=${AI_MODEL}, headers=${allColumns.length}`);
     const response = await Promise.race([
       openai.chat.completions.create({
         model: AI_MODEL,

@@ -6,37 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useCustomRouter } from '../../src/hooks/useCustomRouter';
 import { apiCall } from '../../src/lib/api';
-
-// Helper function to upload an image
-const uploadImage = async (uri) => {
-  try {
-    const formData = new FormData();
-    formData.append('image', {
-      uri,
-      name: `upload_${Date.now()}.jpg`,
-      type: 'image/jpeg',
-    } as any);
-
-    const result = await apiCall('/api/upload', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      body: formData,
-    });
-
-    if (result && result.url) {
-      return result.url;
-    } else {
-      Alert.alert('Upload Failed', result.message || 'Could not upload image.');
-      return null;
-    }
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    Alert.alert('Upload Error', 'An error occurred during image upload.');
-    return null;
-  }
-};
+import { uploadImage } from '../../src/lib/upload';
 
 export default function EditProductScreen() {
   const { id } = useLocalSearchParams();

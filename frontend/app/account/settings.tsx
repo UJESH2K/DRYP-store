@@ -15,21 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from 'expo-router';
 import { useCustomRouter } from '@/hooks/useCustomRouter';
 import { useAuthStore } from '@/state/auth';
-import { useSettingsStore } from '@/state/settings';
 import { apiCall } from '@/lib/api';
 import { useToastStore } from '@/state/toast';
-import SingleSelectDropdown from '@/components/SingleSelectDropdown';
 import { Ionicons } from '@expo/vector-icons';
-
-const countryCurrencyOptions = [
-  { label: '🇮🇳 India (INR)', value: 'INR' },
-  { label: '🇺🇸 United States (USD)', value: 'USD' },
-  { label: '🇪🇺 Europe (EUR)', value: 'EUR' },
-  { label: '🇬🇧 United Kingdom (GBP)', value: 'GBP' },
-  { label: '🇯🇵 Japan (JPY)', value: 'JPY' },
-  { label: '🇨🇦 Canada (CAD)', value: 'CAD' },
-  { label: '🇦🇺 Australia (AUD)', value: 'AUD' },
-];
 
 const Row = ({ children, isFirst, isLast }: { children: React.ReactNode; isFirst?: boolean; isLast?: boolean }) => (
   <View
@@ -56,11 +44,9 @@ export default function SettingsScreen() {
   const router = useCustomRouter();
   const navigation = useNavigation();
   const { user, updateUser, logout } = useAuthStore();
-  const { currency, setCurrency } = useSettingsStore();
   const { showToast } = useToastStore();
   
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState(user?.preferences?.currency || currency);
   const [notificationSettings, setNotificationSettings] = useState({
     orderUpdates: true,
     promotions: false,
@@ -75,8 +61,6 @@ export default function SettingsScreen() {
   const handleSaveChanges = async () => {
     setIsLoading(true);
     try {
-      setCurrency(selectedCurrency);
-
       const updatedUser = await apiCall('/api/users/profile', {
         method: 'PUT',
         body: JSON.stringify({
@@ -89,10 +73,7 @@ export default function SettingsScreen() {
         throw new Error(updatedUser?.message || 'Failed to save settings.');
       }
 
-      await updateUser({
-        ...updatedUser,
-        preferences: { ...updatedUser.preferences, currency: selectedCurrency },
-      });
+      await updateUser(updatedUser);
 
       showToast('Settings saved successfully!', 'success');
     } catch (error) {
@@ -114,7 +95,7 @@ export default function SettingsScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, isLoading, selectedCurrency, notificationSettings]);
+  }, [navigation, isLoading, notificationSettings]);
 
   const handleNotificationChange = (key, value) => {
     setNotificationSettings(prev => ({ ...prev, [key]: value }));
@@ -207,12 +188,7 @@ export default function SettingsScreen() {
         <Section header="General">
           <Row isFirst isLast>
             <Text style={styles.rowLabel}>Currency</Text>
-            <SingleSelectDropdown
-              options={countryCurrencyOptions}
-              selectedValue={selectedCurrency}
-              onSelectionChange={setSelectedCurrency}
-              placeholder="Select currency"
-            />
+            <Text style={styles.rowValue}>INR (₹)</Text>
           </Row>
         </Section>
         
@@ -311,6 +287,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Zaloga',
     fontSize: 17,
     color: '#000000',
+  },
+  rowValue: {
+    fontFamily: 'Zaloga',
+    fontSize: 17,
+    color: '#666666',
   },
   fullWidthPressable: {
     flexDirection: 'row',

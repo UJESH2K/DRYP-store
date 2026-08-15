@@ -5,6 +5,7 @@ const OrderItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, min: 1 },
   price: { type: Number, required: true },
   size: { type: String, required: false },
+  variantKey: { type: String, required: false }, // Variant identity (sku or Size) — variants are _id:false
   vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 }, { _id: false });
 
@@ -12,6 +13,9 @@ const OrderSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
   guestId: { type: String, required: false, index: true },
   items: { type: [OrderItemSchema], required: true },
+  subtotal: { type: Number, required: false },
+  shippingCost: { type: Number, required: false },
+  tax: { type: Number, required: false },
   totalAmount: { type: Number, required: true },
   status: { 
     type: String, 

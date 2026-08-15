@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../state/auth';
 import { apiCall } from '../../lib/api';
+import { uploadImage } from '../../lib/upload';
 
 const Checkbox = ({ label, value, onValueChange }) => (
   <Pressable style={formStyles.checkboxContainer} onPress={() => onValueChange(!value)}>
@@ -55,29 +56,11 @@ export const AddProductForm = ({ visible, onClose, onProductAdded }) => {
         setIsUploading(true);
         const uploadedUrls = [];
         for (const asset of result.assets) {
-          const formData = new FormData();
           const uriParts = asset.uri.split('.');
           const fileType = uriParts[uriParts.length - 1];
-  
-          formData.append('image', {
-            uri: asset.uri,
-            name: `photo.${fileType}`,
-            type: `image/${fileType}`,
-          } as any);
-  
           try {
-            const res = await apiCall('/api/upload', {
-              method: 'POST',
-              body: formData,
-              headers: { 
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            if (res.url) {
-              uploadedUrls.push(res.url);
-            } else {
-              Alert.alert('Upload Failed', res.message || 'Could not upload image.');
-            }
+            const url = await uploadImage(asset.uri, `photo.${fileType}`);
+            uploadedUrls.push(url);
           } catch (error) {
             Alert.alert('Upload Error', 'An error occurred while uploading.');
           }

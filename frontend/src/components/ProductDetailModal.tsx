@@ -131,10 +131,27 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ productId, isVi
 
   const fetchProductDetails = async (id: string) => {
     try {
-      const productData: Product = await apiCall(`/api/products/${id}`);
-      if (productData) {
-        setProduct(productData);
+      const productData = await apiCall(`/api/products/${id}`);
+      // apiCall returns the error body ({message}) on non-2xx instead of
+      // throwing — a 404 must not render a broken product sheet.
+      if (productData && (productData as Product)._id) {
+        setProduct(productData as Product);
         trackInteraction({ action: 'product_view', productId: id, source: 'detail_modal' });
+      } else {
+        const serverMsg =
+          productData &&
+          typeof productData === 'object' &&
+          'message' in productData &&
+          typeof productData.message === 'string'
+            ? productData.message
+            : '';
+        setAlertInfo({
+          visible: true,
+          title: 'Product Unavailable',
+          message: serverMsg || 'This product is no longer available.',
+          buttons: [{ text: 'OK', onPress: () => setAlertInfo(null) }]
+        });
+        onClose();
       }
     } catch (error) {
       if (__DEV__) { console.error('Failed to fetch product details:', error); }

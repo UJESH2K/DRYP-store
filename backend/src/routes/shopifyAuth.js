@@ -28,13 +28,10 @@ const PLATFORMS = ['web', 'mobile'];
 const buildRedirectUrl = (platform, params) => {
   const query = new URLSearchParams(params).toString();
   if (platform === 'mobile') return `dryp://oauth-callback?${query}`;
-  const frontendUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
-  return `${frontendUrl}/oauth/shopify/callback?${query}`;
+  const { frontendUrl } = require('../utils/frontendUrl');
+  return `${frontendUrl()}/oauth/shopify/callback?${query}`;
 };
 
-// @route   GET /api/auth/shopify/start
-// @desc    Kick off the Shopify OAuth handshake for a vendor's store
-// @access  Public (optionally authenticated via `token` to link an existing account)
 router.get('/start', (req, res) => {
   const { shop, platform, token } = req.query;
   const redirectPlatform = PLATFORMS.includes(platform) ? platform : 'web';
@@ -69,9 +66,6 @@ router.get('/start', (req, res) => {
   res.redirect(buildAuthorizeUrl({ shop, state }));
 });
 
-// @route   GET /api/auth/shopify/callback
-// @desc    Complete the Shopify OAuth handshake, link/create the vendor, and kick off import
-// @access  Public (Shopify redirect)
 router.get('/callback', async (req, res, next) => {
   const { shop, code } = req.query;
 

@@ -53,13 +53,6 @@ export default function HelpScreen() {
 
   const contactOptions = [
     {
-      id: 'chat',
-      title: 'Live Chat',
-      description: 'Chat with our support team',
-      icon: 'chatbubble-ellipses-outline',
-      action: () => Alert.alert('Live Chat', 'Live chat feature coming soon!'),
-    },
-    {
       id: 'email',
       title: 'Email Support',
       description: 'support@dryp.store',

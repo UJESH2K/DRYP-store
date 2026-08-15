@@ -49,6 +49,14 @@ const Input = ({
   type = "text",
   placeholder,
   disabled = false,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: React.HTMLInputTypeAttribute;
+  placeholder?: string;
+  disabled?: boolean;
 }) => (
   <div className="mb-6 relative">
     <label
@@ -77,6 +85,13 @@ const TextArea = ({
   onChange,
   placeholder,
   disabled = false,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  disabled?: boolean;
 }) => (
   <div className="mb-6 relative">
     <label
@@ -157,7 +172,9 @@ const ProductForm = React.forwardRef(
     const handleVariantChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value } = e.target;
       const newVariants = [...variants];
-      newVariants[index][name] = value;
+      if (name === "color" || name === "sizes" || name === "price") {
+        newVariants[index][name] = value;
+      }
 
       if (name === "sizes") {
         const sizesArray = value
@@ -283,7 +300,7 @@ const ProductForm = React.forwardRef(
     };
 
     const handleImageSelect = async (variantIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files);
+      const files = e.target.files ? Array.from(e.target.files) : [];
       if (files.length === 0) return;
 
       for (const file of files) {
@@ -382,7 +399,7 @@ const ProductForm = React.forwardRef(
       setVariants(newVariants);
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
       setFormStatus({ type: null, message: "" });
 
@@ -408,7 +425,24 @@ const ProductForm = React.forwardRef(
 
         const allVariantImages = uploadedVariants.flatMap((variant) => variant.images);
 
-        const productData = {
+        type VariantPayload = {
+          options: Record<string, string>;
+          stock: number;
+          price: number;
+          images: string[];
+        };
+        type ProductPayload = {
+          name: string;
+          description: string;
+          brand: string;
+          category: string;
+          tags: string[];
+          basePrice: number;
+          images: string[];
+          options: { name: string; values: string[] }[];
+          variants: VariantPayload[];
+        };
+        const productData: ProductPayload = {
           ...formData,
           basePrice: parsedBasePrice,
           tags: formData.tags.split(",").map((t) => t.trim()).filter(Boolean),
@@ -489,7 +523,8 @@ const ProductForm = React.forwardRef(
         }
       } catch (error) {
         // Replaced alert with elegant error status message
-        setFormStatus({ type: 'error', message: `Network Sync Error: ${error.message}` });
+        const message = error instanceof Error ? error.message : String(error);
+        setFormStatus({ type: 'error', message: `Network Sync Error: ${message}` });
         setIsSubmitting(false); // Only set false on error, so it stays "submitting" during success delay
       } finally {
         setIsUploading(false);
@@ -510,7 +545,7 @@ const ProductForm = React.forwardRef(
           brand: product.brand || "",
           category: product.category || "",
           tags: Array.isArray(product.tags) ? product.tags.join(", ") : "",
-          basePrice: product.basePrice || "",
+          basePrice: product.basePrice != null ? String(product.basePrice) : "",
         });
 
         if (product.variants && product.variants.length > 0) {
@@ -519,8 +554,11 @@ const ProductForm = React.forwardRef(
               ...v,
               sizes: v.options && v.options.Size ? v.options.Size : "",
               color: v.options && v.options.Color ? v.options.Color : "",
-              price: v.price || "",
-              stock: v.options && v.options.Size ? { [v.options.Size]: v.stock } : {},
+              price: v.price != null ? String(v.price) : "",
+              stock:
+                v.options && v.options.Size
+                  ? { [v.options.Size]: String(v.stock) }
+                  : {},
               images: getS3StorageImages(v.images || []),
               imageDrafts: [],
             })),

@@ -1,11 +1,46 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
-// @route   GET /api/users/me
-// @desc    Get current user (creates MongoDB user from Supabase JWT if new)
-// @access  Private
+// Delete the authenticated user's account. Requires their password (local
+// accounts) and removes their guest-linked data along with the user.
+router.delete('/me', protect, async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
+
+    const { password } = req.body || {};
+    const user = await User.findById(req.user._id).select('+passwordHash');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.authProvider === 'local') {
+      if (!password || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+        return res.status(401).json({ message: 'Incorrect password' });
+      }
+    }
+
+    const Cart = require('../models/Cart');
+    const WishlistItem = require('../models/WishlistItem');
+    const Like = require('../models/Like');
+    const Order = require('../models/Order');
+    if (req.user._id) {
+      await Promise.all([
+        Cart.deleteMany({ user: req.user._id }),
+        WishlistItem.deleteMany({ user: req.user._id }),
+        Like.deleteMany({ user: req.user._id }),
+        Order.deleteMany({ user: req.user._id }),
+      ]);
+    }
+
+    await User.findByIdAndDelete(req.user._id);
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting account:', error.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.get('/me', protect, async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Not authorized' });
@@ -16,9 +51,6 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
-// @route   PUT /api/users/preferences
-// @desc    Update user preferences
-// @access  Private
 router.put('/preferences', protect, async (req, res) => {
   try {
     const { currency, categories, colors, brands } = req.body;
@@ -32,9 +64,9 @@ router.put('/preferences', protect, async (req, res) => {
     user.preferences = {
       ...user.preferences,
       currency: currency || user.preferences.currency,
-      categories: categories || user.preferences.categories,
-      colors: colors || user.preferences.colors,
-      brands: brands || user.preferences.brands,
+      categories: (categories || user.preferences.categories).slice(0, 100),
+      colors: (colors || user.preferences.colors).slice(0, 100),
+      brands: (brands || user.preferences.brands).slice(0, 100),
     };
 
     await user.save();
@@ -45,9 +77,6 @@ router.put('/preferences', protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/users/profile
-// @desc    Get user profile
-// @access  Private
 router.get('/profile', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -61,9 +90,6 @@ router.get('/profile', protect, async (req, res) => {
   }
 });
 
-// @route   PUT /api/users/profile
-// @desc    Update user profile
-// @access  Private
 router.put('/profile', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -75,10 +101,24 @@ router.put('/profile', protect, async (req, res) => {
     // Update user fields from request body
     const { name, phone, avatar, addresses } = req.body;
     
-    if (name) user.name = name;
-    if (phone) user.phone = phone;
-    if (avatar) user.avatar = avatar;
-    if (addresses) user.addresses = addresses;
+    if (typeof name === 'string' && name.trim()) {
+      if (name.trim().length > 100) return res.status(400).json({ message: 'Name must be 100 characters or fewer.' });
+      user.name = name.trim();
+    }
+    if (typeof phone === 'string' && phone.trim()) {
+      if (phone.trim().length > 20) return res.status(400).json({ message: 'Phone must be 20 characters or fewer.' });
+      user.phone = phone.trim();
+    }
+    if (typeof avatar === 'string' && avatar.trim()) {
+      if (avatar.trim().length > 2000) return res.status(400).json({ message: 'Avatar URL too long.' });
+      user.avatar = avatar.trim();
+    }
+    if (addresses) {
+      if (!Array.isArray(addresses) || addresses.length > 50) {
+        return res.status(400).json({ message: 'Address list must be an array of at most 50 entries.' });
+      }
+      user.addresses = addresses;
+    }
 
     await user.save();
 

@@ -34,7 +34,7 @@ export default function LandingPage() {
 
   // Handle global mouse movement for cursor
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
     };
     window.addEventListener("mousemove", handleMouseMove);

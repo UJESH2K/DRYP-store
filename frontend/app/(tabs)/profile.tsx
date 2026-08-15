@@ -63,7 +63,6 @@ export default function ProfileScreen() {
   const accountItems = [
     { id: 'orders', title: 'My Orders', icon: <Ionicons name="cube-outline" size={22} color="#333" />, onPress: () => router.push('/account/orders') },
     { id: 'addresses', title: 'Shipping Addresses', icon: <Ionicons name="location-outline" size={22} color="#333" />, onPress: () => router.push('/account/addresses') },
-    { id: 'payment', title: 'Payment Methods', icon: <Ionicons name="card-outline" size={22} color="#333" />, onPress: () => router.push('/account/payment') },
   ];
   
   const preferencesItems = [

@@ -9,8 +9,8 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  ScrollView, // Added ScrollView
-  FlatList, // Changed FlatList source
+  ScrollView,
+  FlatList,
 } from 'react-native';
 
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -28,8 +28,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// A simple card component for visual grouping
-const InfoCard = ({ title, action, children }) => (
+const InfoCard = ({ title, action = null, children }) => (
   <View style={styles.card}>
     <View style={styles.cardHeader}>
       <Text style={styles.cardTitle}>{title}</Text>
@@ -49,14 +48,17 @@ export default function CheckoutScreen() {
   const showToast = useToastStore((state) => state.showToast);
   
   const [shippingAddress, setShippingAddress] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [itemsExpanded, setItemsExpanded] = useState(false);
 
   // Fetch initial data (default address and payment)
   useEffect(() => {
     if (params.selectedAddress) {
-      setShippingAddress(JSON.parse(params.selectedAddress as string));
+      try {
+        setShippingAddress(JSON.parse(params.selectedAddress as string));
+      } catch {
+        showToast('Invalid address data. Please choose an address.', 'error');
+      }
     } else {
       const fetchDefaultAddress = async () => {
         try {
@@ -71,19 +73,6 @@ export default function CheckoutScreen() {
     }
   }, [params.selectedAddress]);
 
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const payments = await apiCall('/api/payments/methods');
-        if (payments?.length > 0) {
-          const defaultPayment = payments.find(p => p.isDefault) || payments[0];
-          setPaymentMethod(defaultPayment);
-        }
-      } catch (error) { console.error('Failed to fetch payment methods:', error); }
-    };
-    fetchPayments();
-  }, []);
-  
   const subtotal = getTotalPrice();
   const shipping = useMemo(() => subtotal > 75 ? 0 : 9.99, [subtotal]);
   const tax = useMemo(() => subtotal * 0.08, [subtotal]);
@@ -94,10 +83,6 @@ export default function CheckoutScreen() {
       showToast('Please select a shipping address.', 'error');
       return;
     }
-    if (!paymentMethod) {
-      showToast('Please select a payment method.', 'error');
-      return;
-    }
 
     setIsProcessing(true);
     try {
@@ -106,22 +91,40 @@ export default function CheckoutScreen() {
         shippingAddress,
       };
 
+      // POST /api/orders returns an ARRAY — one order per vendor.
       const result = await apiCall('/api/orders', { method: 'POST', body: JSON.stringify(orderPayload) });
 
-      if (result && result.length > 0) {
-        showToast('Order placed successfully!', 'success');
-        clearCart();
-        const createdOrder = result[0];
-        const intent = await apiCall('/api/payments/create-intent', { method: 'POST', body: JSON.stringify({ orderId: createdOrder._id }) });
-        if (intent && intent.id) {
-          router.push({ pathname: "/(checkout)/razorpay-checkout", params: { orderId: String(createdOrder._id), amount: String(intent.amount), currency: String(intent.currency || 'INR') } });
+      if (!result || !Array.isArray(result) || result.length === 0) {
+        showToast((result && result.message) || 'Failed to place order.', 'error');
+        return;
+      }
+
+      showToast('Order placed successfully!', 'success');
+      clearCart();
+
+      // Backend has no combined multi-order payment: create one Razorpay
+      // intent per vendor order so EVERY order gets paid and confirmed,
+      // never just result[0].
+      const queue = [];
+      for (const order of result) {
+        const intent = await apiCall('/api/payments/create-intent', { method: 'POST', body: JSON.stringify({ orderId: order._id }) });
+        if (!intent || !intent.id) {
+          // Stay on checkout — navigating to order-confirmation here would
+          // show an unpaid order as confirmed.
+          showToast(intent?.message || 'Could not start payment. Your order was not charged.', 'error');
           return;
         }
-        router.push({ pathname: '/(checkout)/order-confirmation', params: { orderId: createdOrder.orderNumber } });
-      } else {
-        throw new Error('Failed to place order.');
+        queue.push({
+          orderId: String(order._id),
+          orderNumber: String(order.orderNumber),
+          razorpayOrderId: String(intent.id),
+          amount: String(intent.amount),
+          currency: String(intent.currency || 'INR'),
+        });
       }
-    } catch (error: any) {
+
+      router.push({ pathname: "/(checkout)/razorpay-checkout", params: { queue: JSON.stringify(queue) } });
+    } catch (error) {
       console.error('Order placement error:', error);
       showToast(error?.data?.message || 'An unexpected error occurred.', 'error');
     } finally {
@@ -188,21 +191,8 @@ export default function CheckoutScreen() {
           )}
         </InfoCard>
 
-        <InfoCard 
-  title="Payment"
-  action={
-    <Pressable onPress={() => router.push('/account/payment')}>
-      <Text style={styles.changeButtonText}>Change</Text>
-    </Pressable>
-  }>
-          {paymentMethod ? (
-            <View style={styles.paymentMethodContainer}>
-              <Ionicons name="card-outline" size={24} color="#1c1c1e" />
-              <Text style={styles.cardBodyText}>{paymentMethod.brand} ending in {paymentMethod.last4}</Text>
-            </View>
-          ) : (
-            <Text style={styles.cardBodyText}>No payment method selected.</Text>
-          )}
+        <InfoCard title="Payment">
+          <Text style={styles.cardBodyText}>Pay securely with Razorpay at checkout.</Text>
         </InfoCard>
 
         <View style={styles.summaryContainer}>
@@ -292,11 +282,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1c1c1e',
     lineHeight: 24,
-  },
-  paymentMethodContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   summaryContainer: {
     backgroundColor: '#fff',

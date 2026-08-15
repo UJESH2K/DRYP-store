@@ -45,7 +45,7 @@ export default function ChangePasswordScreen() {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
 
-      if (result && result.message === 'Password updated successfully') {
+      if (result && result.message === 'Password updated successfully.') {
         showToast('Your password has been changed.');
         router.back();
       } else {

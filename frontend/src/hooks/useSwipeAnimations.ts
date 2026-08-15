@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { Animated, PanResponder,Alert } from 'react-native';
-import { SCREEN_WIDTH } from '../constants/dimensions';
+import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../constants/dimensions';
 import { useAuthStore } from '../state/auth';
 import type { Item } from '../types';
 import { sendInteraction, trackInteraction } from '../lib/api';
@@ -10,6 +10,7 @@ import { useCustomRouter } from './useCustomRouter';
 export function useSwipeAnimations(
     items: Item[], 
     onShowDetails: (item: Item) => void,
+    onAddToCart: (item: Item) => void,
 ) {
   const router = useCustomRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -33,7 +34,11 @@ export function useSwipeAnimations(
     };
   }, []);
 
+  const itemsRef = useRef(items);
   useEffect(() => {
+    const wasEmpty = itemsRef.current.length === 0;
+    itemsRef.current = items;
+    if (!wasEmpty) return; // appended batch, not first load — keep current position
     setCurrentIndex(0);
     position.setValue({ x: 0, y: 0 });
     nextCardAnimation.setValue(0.9);
@@ -44,6 +49,25 @@ export function useSwipeAnimations(
   const rotate = position.x.interpolate({ inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2], outputRange: ['-10deg', '0deg', '10deg'], extrapolate: 'clamp' });
   const likeOpacity = position.x.interpolate({ inputRange: [10, SCREEN_WIDTH / 4], outputRange: [0, 1], extrapolate: 'clamp' });
   const nopeOpacity = position.x.interpolate({ inputRange: [-SCREEN_WIDTH / 4, -10], outputRange: [1, 0], extrapolate: 'clamp' });
+
+  const advanceCard = useCallback((exitX: number, exitY: number = 0) => {
+    Animated.timing(nextCardAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(position, { toValue: { x: exitX, y: exitY }, duration: 300, useNativeDriver: false }).start(() => {
+      position.setValue({ x: 0, y: 0 });
+      nextCardAnimation.setValue(0.9);
+      setCurrentIndex(prev => {
+        if (!items || items.length === 0) return 0;
+        // FIX: Remove the modulo so the index actually advances past the end of the array
+        return (prev + 1);
+      });
+      setIsAnimating(false);
+    });
+  }, [items, position, nextCardAnimation]);
 
   const onDecision = useCallback((decision: 'like' | 'dislike') => {
     if (isAnimating) return;
@@ -83,24 +107,8 @@ export function useSwipeAnimations(
       undoTimer.current = null;
     }, 3000);
 
-    Animated.timing(nextCardAnimation, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-
-    const exitX = decision === 'like' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
-    Animated.timing(position, { toValue: { x: exitX, y: 0 }, duration: 300, useNativeDriver: false }).start(() => {
-      position.setValue({ x: 0, y: 0 });
-      nextCardAnimation.setValue(0.9);
-      setCurrentIndex(prev => {
-        if (!items || items.length === 0) return 0;
-        // FIX: Remove the modulo so the index actually advances past the end of the array
-        return (prev + 1);
-      });
-      setIsAnimating(false);
-    });
-  }, [isAnimating, items, currentIndex, nextCardAnimation, position]);
+    advanceCard(decision === 'like' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5);
+  }, [isAnimating, items, currentIndex, nextCardAnimation, position, advanceCard]);
 
   const undoSwipe = useCallback(() => {
     if (!canUndo) return;
@@ -186,8 +194,12 @@ export function useSwipeAnimations(
 
 
               if(currentItem) {
-                onShowDetails(currentItem);
+                onAddToCart(currentItem);
+                recordInteraction('like', currentItem);
+                sendInteraction('like', currentItem.id);
                 trackInteraction({ action: 'swipe_up', productId: currentItem.id, source: 'swipe_feed' });
+                setIsAnimating(true);
+                advanceCard(0, -SCREEN_HEIGHT * 1.2);
               }
 
 
@@ -203,7 +215,7 @@ export function useSwipeAnimations(
       }), 
 
 
-      [isAnimating, isDetailsVisible, items, currentIndex, onDecision, onShowDetails]
+      [isAnimating, isDetailsVisible, items, currentIndex, onDecision, onShowDetails, onAddToCart]
 
 
     );

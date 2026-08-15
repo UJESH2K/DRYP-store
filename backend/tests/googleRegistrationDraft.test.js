@@ -5,6 +5,9 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+// Match server.js bootstrap: without this, googleAuth sees no env and
+// falls back to the prod URL, failing the dev-URL assertion below.
+require('dotenv').config();
 
 const {
   buildOAuthStatePayload,

@@ -21,9 +21,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F2E9',
   },
-  listContainer: {
-    // paddingVertical: 8, // Removed to reduce space between header and first item
-  },
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'center',

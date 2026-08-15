@@ -15,13 +15,13 @@ interface CardProps {
 }
 
 export function Card({ item, style, likeOpacity, nopeOpacity, isNext = false, panHandlers }: CardProps) {
-  if (!item) return null;
-
   useEffect(() => {
-    if (!isNext) {
+    if (!isNext && item) {
       onItemViewed(item);
     }
   }, [item, isNext]);
+
+  if (!item) return null;
 
   return (
     <Animated.View 
@@ -77,10 +77,7 @@ const styles = StyleSheet.create({
   infoSection: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    height: 150, // Fixed height
-  },
-  topInfo: {
-    // Removed flexShrink: 1
+    height: 150,
   },
   cardBrand: {
     fontSize: 14,

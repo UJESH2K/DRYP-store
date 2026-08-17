@@ -221,6 +221,16 @@ app.use((err, _req, res, _next) => {
     .json({ message: isProduction ? "Server error" : (err.message || "Server error") });
 });
 
+// A stray async rejection (e.g. Supabase DNS outage) must never take down the
+// whole API. Log and keep serving — Node 22 treats unhandled rejections as
+// fatal by default.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+
 const PORT = process.env.PORT || 8081; // Backend runs on port from .env (currently 8081)
 
 // Start server

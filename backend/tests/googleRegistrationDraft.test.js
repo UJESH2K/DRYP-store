@@ -8,6 +8,11 @@ const jwt = require('jsonwebtoken');
 // Match server.js bootstrap: without this, googleAuth sees no env and
 // falls back to the prod URL, failing the dev-URL assertion below.
 require('dotenv').config();
+// CI has no .env file (gitignored) — pin the frontend URL so the
+// redirect assertions are deterministic everywhere.
+if (!process.env.NEXT_PUBLIC_FRONTEND_URL) {
+  process.env.NEXT_PUBLIC_FRONTEND_URL = 'http://localhost:3000';
+}
 
 const {
   buildOAuthStatePayload,

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store</string>
+	<key>teamID</key>
+	<string>4BN94U42M5</string>
+	<key>uploadBitcode</key>
+	<false/>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>compileBitcode</key>
+	<false/>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.dryp.store</key>
+		<string>*[expo] com.dryp.store AppStore 2026-07-21T18:33:21.809Z</string>
+	</dict>
+	<key>signingCertificate</key>
+	<string>iPhone Distribution: vedansh rakyan (4BN94U42M5)</string>
+</dict>
+</plist>
